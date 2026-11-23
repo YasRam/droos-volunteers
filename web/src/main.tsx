@@ -14,7 +14,7 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
         <AuthProvider>
           <App />
           <Toaster position="top-center" richColors dir="rtl" toastOptions={{ style: { fontFamily: 'Cairo' } }} />

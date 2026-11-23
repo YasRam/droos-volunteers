@@ -37,7 +37,7 @@ tests/10_roles_test.sql              اختبارات الصلاحيات لكل 
    ```
 5. **ضيف نفسك أدمن** من SQL Editor:
    ```sql
-   update staff_roles set role = 'admin' where email = 'y.r.a.elnobe@gmail.com';
+   update staff_roles set role = 'admin' where email = 'your.email@gmail.com';
    ```
 
 ## تحديث الداتا من الشيت قبل الإطلاق
