@@ -186,7 +186,7 @@ def main(src, dst):
             note('dropped', f'HR_Users row {i}: email "{email}" / role "{title}" not usable')
             continue
         staff.append({'email': email.lower(), 'full_name': text(r.get('الاسم')) or email, 'role': role})
-    sql.extend(values('staff_roles', ['email', 'full_name', 'role'], staff, 'on conflict (email) do nothing'))
+    sql.extend(values('staff_roles', ['email', 'full_name', 'role'], staff, 'on conflict do nothing'))
 
     leaders = []
     for i, r in rows(wb['Committee_Leaders']):
@@ -254,15 +254,14 @@ def main(src, dst):
         })
         if vols[-1]['gender'] not in (None, 'ذكر', 'أنثى'):
             vols[-1]['gender'] = None
-        privs.append({'volunteer_id': vid, 'national_id': nid,
-                      'requested_national_id': digits(r.get('رقم قومي مطلوب'))})
+        privs.append({'volunteer_id': vid, 'national_id': nid})
         hrs.append({'volunteer_id': vid, 'acceptance': acceptance, 'interview_date': date(r.get('تاريخ المقابلة')),
                     'interviewer': text(r.get('القائم على المقابلة')), 'hr_notes': text(r.get('ملاحظات')),
                     'status_changed_at': timestamp(r.get('تاريخ تحديث الحالة'))})
 
     vcols = list(vols[0].keys())
     sql.extend(values('volunteers', vcols, vols))
-    sql.extend(values('volunteer_private', ['volunteer_id', 'national_id', 'requested_national_id'], privs))
+    sql.extend(values('volunteer_private', ['volunteer_id', 'national_id'], privs))
     sql.extend(values('volunteer_hr', ['volunteer_id', 'acceptance', 'interview_date', 'interviewer', 'hr_notes',
                                        'status_changed_at'], hrs))
     sql.append(f"select setval('public.volunteer_code_seq', greatest({max_code}, (select last_value from public.volunteer_code_seq)));\n")

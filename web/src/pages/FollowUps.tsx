@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Trash2 } from 'lucide-react'
+import clsx from 'clsx'
+import { ChevronDown, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { VolunteerName } from '@/components/VolunteerLink'
-import { Button, Card, Empty, Field, Input, PageHeader, RequestBadge, Select, Spinner } from '@/components/ui'
+import { Badge, Button, Card, Empty, Field, Input, PageHeader, RequestBadge, Select, Spinner } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
 import { addDays, cairoToday, fmtShort, useDirectory, useLookups } from '@/lib/data'
 import { toastError } from '@/lib/errors'
@@ -46,11 +47,21 @@ export default function FollowUps() {
     onError: toastError,
   })
 
-  const byDay = useMemo(() => {
+  // One block per person, most active first
+  const byPerson = useMemo(() => {
     const m = new Map<string, Participation[]>()
-    for (const r of q.data ?? []) m.set(r.activity_date, [...(m.get(r.activity_date) ?? []), r])
+    for (const r of q.data ?? []) m.set(r.volunteer_id, [...(m.get(r.volunteer_id) ?? []), r])
     return [...m.entries()]
-  }, [q.data])
+      .map(([id, rows]) => ({ id, rows, days: new Set(rows.map((r) => r.activity_date)).size }))
+      .sort((a, b) => b.days - a.days || b.rows.length - a.rows.length || (names.get(a.id) ?? '').localeCompare(names.get(b.id) ?? '', 'ar'))
+  }, [q.data, names])
+  const [open, setOpen] = useState<Set<string>>(new Set())
+  const toggle = (id: string) => setOpen((s) => {
+    const n = new Set(s)
+    if (n.has(id)) n.delete(id)
+    else n.add(id)
+    return n
+  })
 
   return (
     <>
@@ -80,40 +91,59 @@ export default function FollowUps() {
       </Card>
       {q.isLoading ? (
         <Spinner />
-      ) : !byDay.length ? (
+      ) : !byPerson.length ? (
         <Empty title="مفيش مشاركات في الفترة دي" />
       ) : (
-        <div className="space-y-4">
-          {byDay.map(([day, rows]) => (
-            <section key={day}>
-              <h2 className="mb-2 text-sm font-bold text-muted">
-                {fmtShort(day)} · {rows.length}
-              </h2>
-              <Card className="divide-y divide-line p-0">
-                {rows.map((r) => (
-                  <div key={r.id} className="flex items-center gap-3 px-4 py-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold"><VolunteerName id={r.volunteer_id} name={names.get(r.volunteer_id)} /></p>
-                      <p className="truncate text-xs text-muted">
-                        {r.event}
-                        {r.subject && ` · ${r.subject}`}
-                        {r.grade && ` · ${r.grade}`}
-                        {r.beneficiaries && ` · ${r.beneficiaries} طالب`}
-                        {r.method === 'group' && ' · جماعي'}
-                      </p>
-                    </div>
-                    <RequestBadge status={r.status} />
-                    {p.full && (
-                      <Button variant="ghost" size="sm" className="text-red-600" onClick={() => confirm('مسح المشاركة دي؟') && remove.mutate(r.id)} aria-label="مسح">
-                        <Trash2 className="size-4" />
-                      </Button>
-                    )}
+        <>
+          <p className="mb-2 text-sm text-muted">
+            {byPerson.length} متطوع · {q.data?.length} مشاركة · مترتبين بعدد الأيام
+          </p>
+          <Card className="divide-y divide-line p-0">
+            {byPerson.map(({ id, rows, days }) => (
+              <div key={id}>
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <button onClick={() => toggle(id)} className="text-muted" aria-label="التفاصيل">
+                    <ChevronDown className={clsx('size-5 transition', open.has(id) && 'rotate-180')} />
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">
+                      <VolunteerName id={id} name={names.get(id)} />
+                    </p>
+                    <p className="truncate text-xs text-muted">
+                      {[...new Set(rows.map((r) => r.event))].join('، ')} · آخر مرة {fmtShort(rows[0].activity_date)}
+                    </p>
                   </div>
-                ))}
-              </Card>
-            </section>
-          ))}
-        </div>
+                  <Badge tone="brand">{days} يوم</Badge>
+                  <Badge tone="green">{rows.length} مشاركة</Badge>
+                  {rows.some((r) => r.status === 'pending') && <Badge tone="orange">فيه طلب مستني</Badge>}
+                </div>
+                {open.has(id) && (
+                  <div className="divide-y divide-line border-t border-line bg-surface/50">
+                    {rows.map((r) => (
+                      <div key={r.id} className="flex items-center gap-3 py-2 pe-4 ps-12">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm">
+                            <span className="font-semibold">{fmtShort(r.activity_date)}</span> · {r.event}
+                            {r.subject && ` · ${r.subject}`}
+                            {r.grade && ` · ${r.grade}`}
+                            {r.beneficiaries && ` · ${r.beneficiaries} طالب`}
+                            {r.method === 'group' && ' · جماعي'}
+                          </p>
+                        </div>
+                        <RequestBadge status={r.status} />
+                        {p.full && (
+                          <Button variant="ghost" size="sm" className="text-red-600" onClick={() => confirm('مسح المشاركة دي؟') && remove.mutate(r.id)} aria-label="مسح">
+                            <Trash2 className="size-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </Card>
+        </>
       )}
     </>
   )

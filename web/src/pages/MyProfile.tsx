@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
-import { Badge, Button, Card, Field, Input, PageHeader, Spinner, StatusBadge, Textarea } from '@/components/ui'
+import { Button, Card, Field, Input, PageHeader, Spinner, StatusBadge, Textarea } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
 import { ageFrom, fmtDate, useSetting } from '@/lib/data'
 import { toastError } from '@/lib/errors'
@@ -94,7 +94,8 @@ export const personalDefaults = (v: Volunteer): PersonalValues => ({
   referral_source: v.referral_source ?? '',
 })
 
-export function NationalIdCard({ volunteerId, canEditDirectly }: { volunteerId: string; canEditDirectly: boolean }) {
+/** Only HR changes a national id, and never their own. Birth date and gender come from it. */
+export function NationalIdCard({ volunteerId, canEdit }: { volunteerId: string; canEdit: boolean }) {
   const qc = useQueryClient()
   const q = useQuery({
     queryKey: ['private', volunteerId],
@@ -107,15 +108,15 @@ export function NationalIdCard({ volunteerId, canEditDirectly }: { volunteerId: 
   const form = useForm<{ nid: string }>()
   const save = useMutation({
     mutationFn: async (nid: string) => {
-      const patch = canEditDirectly ? { national_id: nid } : { requested_national_id: nid }
-      const { error } = await supabase.from('volunteer_private').update(patch).eq('volunteer_id', volunteerId)
+      const { error } = await supabase.from('volunteer_private').update({ national_id: nid }).eq('volunteer_id', volunteerId)
       if (error) throw error
     },
     onSuccess: () => {
-      toast.success(canEditDirectly ? 'الرقم القومي اتغيّر' : 'الطلب اتبعت للـ HR')
+      toast.success('الرقم القومي اتغيّر')
       form.reset({ nid: '' })
       qc.invalidateQueries({ queryKey: ['private', volunteerId] })
       qc.invalidateQueries({ queryKey: ['volunteer', volunteerId] })
+      qc.invalidateQueries({ queryKey: ['volunteers'] })
     },
     onError: toastError,
   })
@@ -125,34 +126,29 @@ export function NationalIdCard({ volunteerId, canEditDirectly }: { volunteerId: 
     <Card>
       <p className="font-bold">الرقم القومي</p>
       <p className="mb-2 text-xs text-muted">
-        {canEditDirectly
-          ? 'بصلاحيتك (أدمن أو ليدر نشاط أو HR) التعديل بيتحفظ على طول، وتاريخ الميلاد والنوع بيتحسبوا منه.'
-          : 'التغيير بيتبعت طلب، والأدمن أو ليدر النشاط أو الـ HR بيوافقوا عليه.'}
+        {canEdit ? 'التعديل بيتحفظ على طول، وتاريخ الميلاد والنوع بيتحسبوا منه.' : 'الرقم القومي بيعدّله الـ HR بس، ومحدش يقدر يغيّر رقمه بنفسه.'}
       </p>
       <p className="ltr text-start text-lg font-semibold tracking-wider">{q.data?.national_id ?? '—'}</p>
-      {q.data?.requested_national_id && (
-        <p className="mt-2 text-sm">
-          <Badge tone="orange">مستني موافقة</Badge> <span className="ltr">{q.data.requested_national_id}</span>
-        </p>
+      {canEdit && (
+        <form
+          className="mt-3 flex gap-2"
+          onSubmit={form.handleSubmit(({ nid }) => {
+            if (!/^[23]\d{13}$/.test(nid)) return toast.error('الرقم القومي 14 رقم ويبدأ بـ 2 أو 3')
+            save.mutate(nid)
+          })}
+        >
+          <Input {...form.register('nid')} inputMode="numeric" dir="ltr" placeholder="رقم قومي جديد" />
+          <Button type="submit" variant="secondary" loading={save.isPending}>
+            حفظ
+          </Button>
+        </form>
       )}
-      <form
-        className="mt-3 flex gap-2"
-        onSubmit={form.handleSubmit(({ nid }) => {
-          if (!/^[23]\d{13}$/.test(nid)) return toast.error('الرقم القومي 14 رقم ويبدأ بـ 2 أو 3')
-          save.mutate(nid)
-        })}
-      >
-        <Input {...form.register('nid')} inputMode="numeric" dir="ltr" placeholder={canEditDirectly ? 'رقم قومي جديد' : 'لو عايز تغيّره اكتبه هنا'} />
-        <Button type="submit" variant="secondary" loading={save.isPending}>
-          {canEditDirectly ? 'حفظ' : 'اطلب تغيير'}
-        </Button>
-      </form>
     </Card>
   )
 }
 
 export default function MyProfile() {
-  const { volunteerId, full } = usePermissions()
+  const { volunteerId } = usePermissions()
   const qc = useQueryClient()
   const groupLink = useSetting('whatsapp_group_link')
   const q = useQuery({
@@ -199,15 +195,16 @@ export default function MyProfile() {
             <p className="mb-3 font-bold">في النشاط</p>
             <dl className="space-y-2 text-sm">
               <Row label="الحالة"><StatusBadge status={v.status} /></Row>
+              <Row label="الوظيفة">{v.position}</Row>
               <Row label="اللجنة الأساسية">{v.main_committee ?? '—'}</Row>
               <Row label="اللجنة الفرعية">{v.sub_committee ?? '—'}</Row>
               <Row label="تاريخ الميلاد">{fmtDate(v.birth_date)}{age !== null && ` (${age} سنة)`}</Row>
               <Row label="اتسجلت">{fmtDate(v.registered_at)}</Row>
-              <Row label="الميني كامب">{v.attended_minicamp ? fmtDate(v.minicamp_date) : 'لسه'}</Row>
+              <Row label="الكامب / الميني كامب">{v.attended_minicamp ? fmtDate(v.minicamp_date) : 'لسه'}</Row>
               <Row label="التيشيرت">{v.bought_tshirt ? 'اشتريته' : 'لسه'}</Row>
             </dl>
           </Card>
-          <NationalIdCard volunteerId={v.id} canEditDirectly={full} />
+          <NationalIdCard volunteerId={v.id} canEdit={false} />
           {groupLink.data && !v.joined_group && (
             <a href={groupLink.data} target="_blank" rel="noreferrer">
               <Button className="w-full">ادخل جروب الواتساب</Button>

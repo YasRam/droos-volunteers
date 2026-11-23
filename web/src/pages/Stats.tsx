@@ -5,11 +5,11 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Badge, Card, Empty, PageHeader, Select, Spinner, Stat, Tabs } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
-import { cairoToday, fmtShort, useVolunteers, whatsappLink } from '@/lib/data'
+import { addDays, cairoToday, fmtShort, useVolunteers, whatsappLink } from '@/lib/data'
 import { supabase } from '@/lib/supabase'
 import type { MonthlyParticipation } from '@/lib/types'
 
-type Tab = 'overview' | 'responsible' | 'inactive' | 'birthdays'
+type Tab = 'overview' | 'lastMonth' | 'regular' | 'responsible' | 'inactive' | 'birthdays'
 const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
 const monthLabel = (ym: string) => `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(2, 4)}`
 
@@ -18,6 +18,8 @@ export default function Stats() {
   const [params, setParams] = useSearchParams()
   const tabs = [
     ...(p.staff ? [{ value: 'overview' as Tab, label: 'نظرة عامة' }] : []),
+    ...(p.full ? [{ value: 'lastMonth' as Tab, label: 'شاركوا الشهر اللي فات' }] : []),
+    ...(p.full ? [{ value: 'regular' as Tab, label: 'الأكثر انتظامًا' }] : []),
     ...(p.full ? [{ value: 'responsible' as Tab, label: 'المسئولين والمشروع' }] : []),
     ...(p.full ? [{ value: 'inactive' as Tab, label: 'مش بيشاركوا' }] : []),
     ...(p.full || p.leader ? [{ value: 'birthdays' as Tab, label: 'أعياد الميلاد' }] : []),
@@ -28,6 +30,8 @@ export default function Stats() {
       <PageHeader title="الإحصائيات" />
       <Tabs tabs={tabs} value={tab} onChange={(t) => setParams({ tab: t })} />
       {tab === 'overview' && <Overview />}
+      {tab === 'lastMonth' && <LastMonth />}
+      {tab === 'regular' && <Regular />}
       {tab === 'responsible' && <Responsible />}
       {tab === 'inactive' && <Inactive />}
       {tab === 'birthdays' && <Birthdays />}
@@ -229,6 +233,165 @@ function Birthdays() {
               )}
             </div>
           ))}
+        </Card>
+      )}
+    </>
+  )
+}
+
+interface DayRow {
+  volunteer_id: string
+  activity_date: string
+  participations: number
+}
+
+/** Accepted participations per volunteer per day, between two dates (inclusive). */
+function useDays(from: string, to: string) {
+  return useQuery({
+    queryKey: ['participation-days', from, to],
+    queryFn: async () => {
+      const out: DayRow[] = []
+      for (let i = 0; ; i += 1000) {
+        const { data, error } = await supabase
+          .from('participation_days')
+          .select('*')
+          .gte('activity_date', from)
+          .lte('activity_date', to)
+          .order('activity_date')
+          .order('volunteer_id')
+          .range(i, i + 999)
+        if (error) throw error
+        out.push(...(data as DayRow[]))
+        if (data.length < 1000) return out
+      }
+    },
+  })
+}
+
+function Rank({ n }: { n: number }) {
+  const medal = ['🥇', '🥈', '🥉'][n]
+  return <span className="w-8 shrink-0 text-center text-sm font-bold text-muted">{medal ?? n + 1}</span>
+}
+
+/** Who took part last month, most days first. */
+function LastMonth() {
+  const today = cairoToday()
+  const first = addDays(today.slice(0, 7) + '-01', -1).slice(0, 7) + '-01'
+  const last = addDays(today.slice(0, 7) + '-01', -1)
+  const vols = useVolunteers()
+  const q = useDays(first, last)
+  const names = useMemo(() => new Map((vols.data ?? []).map((v) => [v.id, v])), [vols.data])
+  const rows = useMemo(() => {
+    const m = new Map<string, { days: number; parts: number }>()
+    for (const r of q.data ?? []) {
+      const x = m.get(r.volunteer_id) ?? { days: 0, parts: 0 }
+      x.days += 1
+      x.parts += Number(r.participations)
+      m.set(r.volunteer_id, x)
+    }
+    return [...m.entries()].map(([id, x]) => ({ id, ...x })).sort((a, b) => b.days - a.days || b.parts - a.parts)
+  }, [q.data])
+  if (q.isLoading || vols.isLoading) return <Spinner />
+  if (!rows.length) return <Empty title={`مفيش مشاركات في ${monthLabel(first)}`} />
+  return (
+    <>
+      <p className="mb-2 text-sm text-muted">
+        {rows.length} متطوع شاركوا في {MONTHS[Number(first.slice(5, 7)) - 1]}، مترتبين بعدد الأيام
+      </p>
+      <Card className="divide-y divide-line p-0">
+        {rows.map((r, i) => {
+          const v = names.get(r.id)
+          return (
+            <div key={r.id} className="flex items-center gap-3 px-3 py-2.5">
+              <Rank n={i} />
+              <Link to={`/volunteers/${r.id}`} className="min-w-0 flex-1">
+                <p className="truncate font-semibold">{v?.full_name_ar ?? '—'}</p>
+                <p className="truncate text-xs text-muted">{v?.main_committee ?? 'بدون لجنة'}</p>
+              </Link>
+              <Badge tone="brand">{r.days} يوم</Badge>
+              <Badge tone="green">{r.parts} مشاركة</Badge>
+            </div>
+          )
+        })}
+      </Card>
+    </>
+  )
+}
+
+/** Saturday-based week number, so a week is Saturday → Friday. */
+const weekOf = (iso: string) => {
+  const d = Math.floor(Date.parse(iso + 'T00:00:00Z') / 864e5)
+  return d - ((d + 5) % 7)
+}
+
+/** The most regular: weeks with at least one participation, then days. */
+function Regular() {
+  const [weeks, setWeeks] = useState('12')
+  const today = cairoToday()
+  const from = addDays(today, -7 * Number(weeks) + 1)
+  const vols = useVolunteers()
+  const q = useDays(from, today)
+  const names = useMemo(() => new Map((vols.data ?? []).map((v) => [v.id, v])), [vols.data])
+  const total = Number(weeks)
+  const rows = useMemo(() => {
+    const m = new Map<string, { weeks: Set<number>; days: number; parts: number }>()
+    for (const r of q.data ?? []) {
+      const x = m.get(r.volunteer_id) ?? { weeks: new Set<number>(), days: 0, parts: 0 }
+      x.weeks.add(weekOf(r.activity_date))
+      x.days += 1
+      x.parts += Number(r.participations)
+      m.set(r.volunteer_id, x)
+    }
+    return [...m.entries()]
+      .map(([id, x]) => ({ id, weeks: Math.min(x.weeks.size, total), days: x.days, parts: x.parts }))
+      .sort((a, b) => b.weeks - a.weeks || b.days - a.days || b.parts - a.parts)
+      .slice(0, 100)
+  }, [q.data, total])
+  return (
+    <>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-sm font-semibold">الفترة:</span>
+        <Select
+          value={weeks}
+          onChange={(e) => setWeeks(e.target.value)}
+          className="w-44"
+          options={[
+            { value: '4', label: 'آخر 4 أسابيع' },
+            { value: '12', label: 'آخر 3 شهور' },
+            { value: '26', label: 'آخر 6 شهور' },
+            { value: '52', label: 'آخر سنة' },
+          ]}
+        />
+      </div>
+      <p className="mb-2 text-xs text-muted">الانتظام = عدد الأسابيع اللي شارك فيها ولو مرة، من {total} أسبوع. لو اتعادلوا بيتقدّم اللي أيامه أكتر.</p>
+      {q.isLoading || vols.isLoading ? (
+        <Spinner />
+      ) : !rows.length ? (
+        <Empty title="مفيش مشاركات في الفترة دي" />
+      ) : (
+        <Card className="divide-y divide-line p-0">
+          {rows.map((r, i) => {
+            const v = names.get(r.id)
+            const pct = Math.round((r.weeks / total) * 100)
+            return (
+              <div key={r.id} className="flex items-center gap-3 px-3 py-2.5">
+                <Rank n={i} />
+                <Link to={`/volunteers/${r.id}`} className="min-w-0 flex-1">
+                  <p className="truncate font-semibold">{v?.full_name_ar ?? '—'}</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface">
+                      <div className="h-full rounded-full bg-brand-600" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="shrink-0 text-xs text-muted">
+                      {r.weeks}/{total} أسبوع
+                    </span>
+                  </div>
+                </Link>
+                <Badge tone="brand">{r.days} يوم</Badge>
+                <Badge tone="green">{r.parts} مشاركة</Badge>
+              </div>
+            )
+          })}
         </Card>
       )}
     </>

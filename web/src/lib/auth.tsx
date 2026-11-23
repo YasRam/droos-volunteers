@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Session } from '@supabase/supabase-js'
 import { isDevAuth, supabase } from './supabase'
-import type { MyContext } from './types'
+import { ROLE_LABEL, type MyContext } from './types'
 
 interface AuthState {
   session: Session | null
@@ -77,6 +77,15 @@ export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth outside AuthProvider')
   return ctx
+}
+
+/** «HR + تنظيم»، or the position, or «متطوع». */
+export function useRoleLabel() {
+  const { me, isLeader } = useAuth()
+  const roles = (me?.roles ?? (me?.role ? [me.role] : [])).map((r) => ROLE_LABEL[r])
+  if (isLeader) roles.push('ليدر لجنة')
+  if (roles.length) return roles.join(' + ')
+  return me?.position ?? 'متطوع'
 }
 
 /** What the signed-in person may do, in one place for the screens. */

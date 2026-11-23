@@ -5,11 +5,11 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Button, Card } from '@/components/ui'
-import { useAuth, usePermissions } from '@/lib/auth'
+import { useAuth, usePermissions, useRoleLabel } from '@/lib/auth'
 import { addDays, cairoToday, fmtDate, fmtShort, useHrRows, useSetting, useVolunteers, whatsappLink, type VolunteerWithStats } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
-import { ROLE_LABEL, STATUSES, type MonthlyParticipation, type VolunteerStats } from '@/lib/types'
+import { STATUSES, type MonthlyParticipation, type VolunteerStats } from '@/lib/types'
 
 const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
 
@@ -22,7 +22,7 @@ export default function Home() {
   const vols = useVolunteers(seesVolunteers)
 
   const firstName = me?.full_name?.split(' ')[0] ?? me?.email?.split('@')[0]
-  const role = me?.role ? ROLE_LABEL[me.role] : p.leader ? 'ليدر لجنة' : 'متطوع'
+  const role = useRoleLabel()
 
   return (
     <div className="space-y-5">

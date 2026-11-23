@@ -29,7 +29,9 @@ grant execute on all functions in schema t to authenticated;
 insert into staff_roles (email, full_name, role) values
   ('admin@test.com', 'أدمن', 'admin'),
   ('hr@test.com', 'إتش آر', 'hr'),
-  ('org@test.com', 'تنظيم', 'organizer');
+  ('org@test.com', 'تنظيم', 'organizer'),
+  ('vol2@test.com', 'متطوع تاني', 'hr'),
+  ('vol2@test.com', 'متطوع تاني', 'organizer');
 insert into committee_leaders (email, committee, full_name) values ('leader@test.com', 'تدريس', 'ليدر التدريس');
 
 insert into volunteers (code, full_name_ar, phone, email, main_committee, status, registered_at) values
@@ -60,9 +62,9 @@ select t.fails($$update volunteers set status = 'مسئول' where code = 'V9001
 select t.fails($$update volunteers set bought_tshirt = true where code = 'V9001'$$, 'volunteer cannot change committee data');
 update volunteers set job = 'x' where code = 'V9002';
 select t.ok((select count(*) from volunteers where job = 'x') = 0, 'volunteer cannot touch another row');
-select t.fails($$update volunteer_private set national_id = '29911010202611'$$, 'volunteer cannot change national id directly');
-update volunteer_private set requested_national_id = '29511010202624';
-select t.ok((select requested_at is not null from volunteer_private), 'national id request saved');
+update volunteer_private set national_id = '29911010202611';
+select t.ok((select national_id from volunteer_private) = '29511010202616', 'volunteer cannot change own national id');
+select t.fails($$update volunteers set position = 'HR' where code = 'V9001'$$, 'volunteer cannot change own position');
 insert into participations (volunteer_id, activity_date, event, subject, grade)
   values (app.my_volunteer_id(), app.today(), 'تدريس', 'لغة عربية', '2 ع');
 select t.ok((select status from participations where volunteer_id = app.my_volunteer_id()) = 'pending', 'self check-in is pending');
@@ -119,8 +121,10 @@ set local role authenticated;
 select t.login('hr@test.com');
 select t.ok((select count(*) from volunteers) = 4, 'HR sees everyone');
 select t.ok((select count(*) from volunteer_hr) = 4, 'HR reads interview data');
-select public.review_national_id((select id from volunteers where code = 'V9001'), true);
-select t.ok((select national_id from volunteer_private p join volunteers v on v.id = p.volunteer_id where v.code = 'V9001') = '29511010202624', 'HR approves national id change');
+update volunteer_private set national_id = '29511010202624' where volunteer_id = (select id from volunteers where code = 'V9001');
+select t.ok((select national_id from volunteer_private p join volunteers v on v.id = p.volunteer_id where v.code = 'V9001') = '29511010202624', 'HR changes a national id');
+update volunteers set position = 'تنظيم' where code = 'V9001';
+select t.ok((select position from volunteers where code = 'V9001') = 'تنظيم', 'HR sets the position');
 update volunteers set status = 'مسئول' where code = 'V9002';
 select t.ok((select status_changed_at > now() - interval '1 minute' from volunteer_hr h join volunteers v on v.id = h.volunteer_id where v.code = 'V9002'), 'status change is timestamped');
 update volunteers set status = 'تحت المتابعة' where code = 'V9002';
@@ -128,19 +132,37 @@ select t.ok((select count(*) from audit_log) > 0, 'HR reads the log');
 select t.ok((select count(*) from group_activities) = 1, 'group activity recorded');
 commit;
 
+-- ---------- volunteer with two permissions (HR + تنظيم) ----------
+begin;
+set local role authenticated;
+select t.login('vol2@test.com');
+select t.ok((public.my_context() -> 'roles') = '["hr", "organizer"]'::jsonb, 'two permissions listed');
+select t.ok(app.is_full() and not app.is_organizer(), 'HR + تنظيم gets the HR rights without the 7-day limit');
+select t.ok((select count(*) from volunteers) = 4, 'HR volunteer sees everyone');
+select t.fails($$update volunteer_private set national_id = '29911010202611' where volunteer_id = app.my_volunteer_id()$$, 'nobody changes their own national id');
+insert into participations (volunteer_id, activity_date, event)
+  values ((select id from volunteers where code = 'V9003'), app.today() - 20, 'كامب');
+select t.ok((select attended_minicamp from volunteers where code = 'V9003'), 'camp counts like mini camp');
+insert into participations (volunteer_id, activity_date, event, subject, grade)
+  values ((select id from volunteers where code = 'V9003'), app.today() - 20, 'تأسيس', 'رياضيات، علوم', '1 ب، 2 ب');
+select t.ok((select count(*) from lookups where list = 'نوع الحدث' and value in ('رياضيات', 'علوم')) = 2, 'each subject joins the list');
+select t.ok((select participations from participation_days where volunteer_id = (select id from volunteers where code = 'V9003') and activity_date = app.today() - 20) = 2, 'participation days view');
+insert into lookups (list, value) values ('اللجنة', 'ميديا');
+select public.rename_lookup((select id from lookups where list = 'اللجنة' and value = 'ميديا'), 'الميديا');
+select t.ok((select main_committee from volunteers where code = 'V9002') = 'الميديا', 'renaming a committee moves its volunteers');
+commit;
+
 -- ---------- notifications ----------
 begin;
 set local role authenticated;
 select t.login('vol1@test.com');
 select t.ok((select count(*) from notifications where title = 'طلب الحضور اتقبل') = 1, 'volunteer notified of approval');
-select t.ok((select count(*) from notifications where title like 'تم تغيير الرقم القومي') = 1, 'volunteer notified of national id');
 select t.fails($$update notifications set title = 'x'$$, 'notification text is read-only');
 update notifications set read_at = now();
 commit;
 begin;
 set local role authenticated;
 select t.login('hr@test.com');
-select t.ok((select count(*) from notifications where title = 'طلب تغيير رقم قومي') = 1, 'HR notified of national id request');
 select t.ok((select count(*) from notifications where title = 'رجوع تحت المتابعة') = 1, 'HR notified of return to follow-up');
 commit;
 
