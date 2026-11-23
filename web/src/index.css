@@ -1,0 +1,36 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Cairo', system-ui, sans-serif;
+  --color-brand-50: #e0f7fa;
+  --color-brand-100: #b2ebf2;
+  --color-brand-500: #00acc1;
+  --color-brand-600: #0097a7;
+  --color-brand-700: #00838f;
+  --color-brand-800: #006064;
+  --color-ink: #1f2933;
+  --color-muted: #66737f;
+  --color-line: #e3e8ec;
+  --color-surface: #f4f7f8;
+}
+
+html,
+body {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+}
+
+/* Numbers and phone numbers read left to right inside Arabic text */
+.ltr {
+  direction: ltr;
+  unicode-bidi: embed;
+}

@@ -3,6 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 DB=${DB:-volunteers_test}
+sudo service postgresql start >/dev/null 2>&1 || true; sleep 1
 PSQL="psql -v ON_ERROR_STOP=1 -q -X"
 sudo -u postgres dropdb --if-exists "$DB"
 sudo -u postgres createdb "$DB"
