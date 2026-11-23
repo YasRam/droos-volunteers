@@ -484,7 +484,7 @@ function AddVolunteer({ onClose }: { onClose: () => void }) {
     <Modal open onClose={onClose} title="متطوع جديد">
       <form onSubmit={form.handleSubmit((v) => save.mutate(v))} className="space-y-4">
         <PersonalFields form={form} />
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label="الرقم القومي">
             <Input value={extra.national_id} onChange={(e) => setExtra({ ...extra, national_id: e.target.value })} dir="ltr" inputMode="numeric" />
           </Field>

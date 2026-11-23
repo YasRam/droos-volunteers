@@ -29,7 +29,7 @@ export function PersonalFields({ form }: { form: ReturnType<typeof useForm<Perso
   const { register, formState } = form
   const e = formState.errors
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Field label="الاسم رباعي بالعربي" error={e.full_name_ar?.message}>
         <Input {...register('full_name_ar')} />
       </Field>
@@ -183,7 +183,7 @@ export default function MyProfile() {
   return (
     <>
       <PageHeader title="بياناتي" subtitle={<span className="ltr">{v.code}</span>} />
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <Card>
             <form onSubmit={form.handleSubmit((vals) => save.mutate(vals))} className="space-y-5">

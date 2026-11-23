@@ -81,7 +81,7 @@ function Staff() {
 
   return (
     <div className="space-y-4">
-      <Card className="grid gap-3 sm:grid-cols-[2fr_2fr_1fr_auto] sm:items-end">
+      <Card className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_2fr_1fr_auto] sm:items-end">
         <Field label="إيميل جوجل">
           <Input type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
@@ -172,7 +172,7 @@ function Leaders() {
   })
   return (
     <div className="space-y-4">
-      <Card className="grid gap-3 sm:grid-cols-[2fr_2fr_1fr_auto] sm:items-end">
+      <Card className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_2fr_1fr_auto] sm:items-end">
         <Field label="إيميل جوجل">
           <Input type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>

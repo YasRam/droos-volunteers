@@ -87,7 +87,7 @@ function Overview() {
         <span className="text-sm font-semibold">الشهر:</span>
         <Select value={month} onChange={(e) => setMonth(e.target.value)} options={byMonth.map((b) => ({ value: b.key, label: b.month }))} className="w-40" />
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <HBars title="حسب الحدث" rows={sumBy('event')} color="#00acc1" />
         <HBars title="حسب اللجنة" rows={sumBy('committee')} color="#2e7d32" />
       </div>

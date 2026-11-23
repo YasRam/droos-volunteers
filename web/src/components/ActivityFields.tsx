@@ -57,7 +57,7 @@ export default function ActivityFields({
   const subjects = [...new Set([...(lookups.data?.list('نوع الحدث', event) ?? []), ...(lookups.data?.list('نوع الحدث') ?? [])])]
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Field label="التاريخ" error={errors.activity_date?.message}>
         <Input type="date" {...register('activity_date')} min={dateMin} max={dateMax} disabled={dateLocked} />
       </Field>

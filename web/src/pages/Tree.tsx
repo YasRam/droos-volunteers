@@ -80,7 +80,7 @@ export default function Tree() {
         <p className="mb-3 text-xs text-muted">
           {committees.length} لجنة · {total} متطوع في لجنتهم الأساسية
         </p>
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {committees.map((c) => (
             <CommitteeNode key={c.name} {...c} openByDefault={Boolean(search.trim())} />
           ))}

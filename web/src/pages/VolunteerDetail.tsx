@@ -97,7 +97,7 @@ export default function VolunteerDetail() {
       />
       <Tabs tabs={tabs} value={tab} onChange={setTab} />
       {tab === 'data' && (
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="lg:col-span-2">
             {p.full ? <EditPersonal v={v} /> : <ReadPersonal v={v} />}
           </div>
@@ -234,7 +234,7 @@ function Interview({ v }: { v: Volunteer }) {
   const committees = lookups.data?.list('اللجنة') ?? []
   return (
     <Card>
-      <form onSubmit={form.handleSubmit((f) => save.mutate(f))} className="grid gap-4 sm:grid-cols-2">
+      <form onSubmit={form.handleSubmit((f) => save.mutate(f))} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="حالة المتطوع">
           <Select {...form.register('status')} options={STATUSES} />
         </Field>
@@ -293,7 +293,7 @@ function Committee({ v, editable }: { v: Volunteer; editable: boolean }) {
   ]
   return (
     <Card className="space-y-3">
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {flags.map(([key, label]) => (
           <Toggle key={key} label={label} checked={Boolean(v[key])} disabled={!editable || save.isPending} onChange={(val) => save.mutate({ [key]: val })} />
         ))}

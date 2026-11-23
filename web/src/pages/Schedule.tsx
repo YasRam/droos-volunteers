@@ -79,7 +79,7 @@ export default function Schedule() {
       ) : !groups.length ? (
         <Empty title="مفيش حصص" />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {groups.map(([title, slots]) => (
             <Card key={title} className="p-0">
               <p className="border-b border-line px-4 py-2 font-bold text-brand-800">{title}</p>
@@ -162,7 +162,7 @@ function SlotForm({ slot, onClose }: { slot: ScheduleSlot | null; onClose: () =>
   const subjects = [...new Set(lookups.data?.list('نوع الحدث', 'تدريس') ?? [])]
   return (
     <Modal open onClose={onClose} title={slot ? 'تعديل حصة' : 'حصة جديدة'}>
-      <form onSubmit={form.handleSubmit((f) => save.mutate(f))} className="grid gap-4 sm:grid-cols-2">
+      <form onSubmit={form.handleSubmit((f) => save.mutate(f))} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="اليوم">
           <Select {...form.register('day')} options={WEEKDAYS} />
         </Field>
