@@ -6,7 +6,7 @@ export default function NotRegistered() {
   return (
     <div className="grid min-h-dvh place-items-center px-6">
       <div className="max-w-sm text-center">
-        <img src="/favicon.svg" alt="" className="mx-auto size-16" />
+        <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="mx-auto size-16" />
         <h1 className="mt-4 text-xl font-bold">الإيميل ده مش متسجل في النشاط</h1>
         <p className="mt-2 text-sm text-muted">
           دخلت بـ <span className="ltr font-semibold">{me?.email}</span>. اطلب من الـ HR يضيف الإيميل ده في بياناتك، أو ادخل بإيميل تاني.
