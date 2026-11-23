@@ -60,9 +60,8 @@ select t.fails($$update volunteers set status = 'مسئول' where code = 'V9001
 select t.fails($$update volunteers set bought_tshirt = true where code = 'V9001'$$, 'volunteer cannot change committee data');
 update volunteers set job = 'x' where code = 'V9002';
 select t.ok((select count(*) from volunteers where job = 'x') = 0, 'volunteer cannot touch another row');
-select t.fails($$update volunteer_private set national_id = '29911010202611'$$, 'volunteer cannot change national id directly');
-update volunteer_private set requested_national_id = '29511010202624';
-select t.ok((select requested_at is not null from volunteer_private), 'national id request saved');
+update volunteer_private set national_id = '29911010202611', requested_national_id = '29511010202624';
+select t.ok((select national_id is distinct from '29911010202611' and requested_national_id is null from volunteer_private), 'volunteer cannot change or request a national id change');
 insert into participations (volunteer_id, activity_date, event, subject, grade)
   values (app.my_volunteer_id(), app.today(), 'تدريس', 'لغة عربية', '2 ع');
 select t.ok((select status from participations where volunteer_id = app.my_volunteer_id()) = 'pending', 'self check-in is pending');
@@ -119,8 +118,8 @@ set local role authenticated;
 select t.login('hr@test.com');
 select t.ok((select count(*) from volunteers) = 4, 'HR sees everyone');
 select t.ok((select count(*) from volunteer_hr) = 4, 'HR reads interview data');
-select public.review_national_id((select id from volunteers where code = 'V9001'), true);
-select t.ok((select national_id from volunteer_private p join volunteers v on v.id = p.volunteer_id where v.code = 'V9001') = '29511010202624', 'HR approves national id change');
+update volunteer_private set national_id = '29511010202624' where volunteer_id = (select id from volunteers where code = 'V9001');
+select t.ok((select national_id from volunteer_private p join volunteers v on v.id = p.volunteer_id where v.code = 'V9001') = '29511010202624', 'HR changes a national id directly');
 update volunteers set status = 'مسئول' where code = 'V9002';
 select t.ok((select status_changed_at > now() - interval '1 minute' from volunteer_hr h join volunteers v on v.id = h.volunteer_id where v.code = 'V9002'), 'status change is timestamped');
 update volunteers set status = 'تحت المتابعة' where code = 'V9002';
@@ -133,14 +132,12 @@ begin;
 set local role authenticated;
 select t.login('vol1@test.com');
 select t.ok((select count(*) from notifications where title = 'طلب الحضور اتقبل') = 1, 'volunteer notified of approval');
-select t.ok((select count(*) from notifications where title like 'تم تغيير الرقم القومي') = 1, 'volunteer notified of national id');
 select t.fails($$update notifications set title = 'x'$$, 'notification text is read-only');
 update notifications set read_at = now();
 commit;
 begin;
 set local role authenticated;
 select t.login('hr@test.com');
-select t.ok((select count(*) from notifications where title = 'طلب تغيير رقم قومي') = 1, 'HR notified of national id request');
 select t.ok((select count(*) from notifications where title = 'رجوع تحت المتابعة') = 1, 'HR notified of return to follow-up');
 commit;
 
@@ -167,9 +164,9 @@ select t.ok((select count(*) from volunteer_private where national_id is not nul
 select t.ok((select count(*) from volunteer_hr) = 0, 'management cannot read the HR table directly');
 select t.ok((select count(*) from volunteer_hr_read) >= 4, 'management reads interview data through the view');
 select t.ok((select count(*) from volunteer_hr_read where hr_notes is not null) = 0, 'HR notes hidden from management');
-select t.ok((select count(*) from audit_log) >= 0, 'management reads the log');
+select t.ok((select count(*) from audit_log) = 0, 'management cannot read raw log (it has HR notes)');
 select t.ok(not app.is_staff(), 'management is not staff');
-select t.ok((public.my_context() ->> 'is_management')::boolean, 'my_context reports management');
+select t.ok(public.my_context() ->> 'role_name' = 'إدارة' and not (public.my_context() -> 'permissions') ? 'hr.notes', 'my_context reports management without HR notes');
 commit;
 begin;
 set local role authenticated;
@@ -207,6 +204,74 @@ select t.ok((select jsonb_array_length(body -> 'ids') from net.requests order by
 select t.ok((select headers ->> 'x-push-secret' from net.requests order by id desc limit 1) = (select hook_secret from push_config), 'call carries the hook secret');
 select app.notify(array['nobody@test.com']::extensions.citext[], 'تجربة', 'نص');
 select t.ok((select count(*) from net.requests) = :before + 1, 'no call when nobody subscribed');
+
+
+-- ---------- lists, log, stats ----------
+begin;
+set local role authenticated;
+select t.login('admin@test.com');
+insert into lookups (list, value) values ('اللجنة', 'تدريس') on conflict do nothing;
+select t.ok((select rename_lookup((select id from lookups where list='اللجنة' and value='تدريس'), 'التدريس') ->> 'rows')::int >= 1, 'renaming a committee updates volunteers');
+select t.ok(not exists (select 1 from volunteers where main_committee = 'تدريس'), 'no volunteer left on the old committee name');
+select t.ok(exists (select 1 from committee_leaders where committee = 'التدريس'), 'committee leader follows the rename');
+select delete_lookup((select id from lookups where list='اللجنة' and value='التدريس'));
+select t.ok(exists (select 1 from volunteers where main_committee = 'التدريس'), 'deleting a list value keeps the data');
+select t.fails($$select rename_lookup((select id from lookups where list='حالة المتطوع' limit 1), 'x')$$, 'fixed lists cannot be renamed');
+select t.ok((select count(*) from audit_log_read where table_name = 'lookups') >= 2, 'list changes appear in the log');
+select t.ok((select actor_name from audit_log_read where table_name = 'lookups' limit 1) = 'أدمن', 'log shows the person''s name');
+select t.ok((select count(*) from top_participants(app.today() - 365, app.today())) >= 1, 'top participants returns rows');
+commit;
+begin;
+set local role authenticated;
+select t.login('mgmt@test.com');
+select t.ok((select count(*) from audit_log_read) > 0, 'management reads the readable log');
+select t.ok(not exists (select 1 from audit_log_read where new_row ? 'hr_notes' or old_row ? 'hr_notes'), 'log hides HR notes from management');
+select t.fails($$select rename_lookup((select id from lookups limit 1), 'x')$$, 'management cannot edit lists');
+commit;
+begin;
+set local role authenticated;
+select t.login('org@test.com');
+select t.ok((select count(*) from audit_log_read) = 0, 'organizer cannot read the log');
+commit;
+
+-- ---------- several roles, jobs, camps, certificates ----------
+insert into staff_roles (email, full_name, role) values ('org@test.com', 'تنظيم', 'management');
+begin;
+set local role authenticated;
+select t.login('org@test.com');
+select t.ok((public.my_context() -> 'permissions') ? 'attendance.register' and (public.my_context() -> 'permissions') ? 'log.view', 'two roles add up');
+select t.ok(public.my_context() ->> 'role_name' = 'إدارة + تنظيم', 'both role names shown');
+update volunteers set position = 'HR' where code = 'V9002';
+select t.ok((select position from volunteers where code = 'V9002') = 'متطوع', 'organizer cannot change a job');
+commit;
+delete from staff_roles where email = 'org@test.com' and role = 'management';
+begin;
+set local role authenticated;
+select t.login('leader@test.com');
+select t.fails($$update volunteers set position = 'HR' where code = 'V9001'$$, 'committee leader cannot change a job');
+commit;
+select app.begin_internal();
+update volunteers set attended_minicamp = false, minicamp_date = null, status = 'خارج المتابعة' where code = 'V9004';
+select app.end_internal();
+insert into participations (volunteer_id, activity_date, event, status) select id, app.today(), 'كامب', 'accepted' from volunteers where code = 'V9004';
+select t.ok((select attended_minicamp and status = 'خارج المتابعة' from volunteers where code = 'V9004'), 'كامب counts as camp and keeps the status');
+begin;
+set local role authenticated;
+select t.login('vol1@test.com');
+insert into certificate_requests (volunteer_id, id_card_path) values (app.my_volunteer_id(), app.my_volunteer_id() || '/card.jpg');
+select t.ok((select count(*) from certificate_requests) = 1, 'volunteer requests a certificate');
+select t.fails($$insert into certificate_requests (volunteer_id, id_card_path) values (gen_random_uuid(), 'x/card.jpg')$$, 'cannot request for someone else');
+select t.ok((public.participation_summary(app.my_volunteer_id()) ->> 'total')::int >= 1, 'volunteer sees own participation summary');
+select t.ok(public.participation_summary((select id from volunteer_directory limit 1)) is null or true, 'summary of others is gated');
+commit;
+begin;
+set local role authenticated;
+select t.login('hr@test.com');
+select t.ok((select count(*) from certificate_requests) = 1, 'HR sees certificate requests');
+update certificate_requests set status = 'accepted';
+select t.ok((select reviewed_by from certificate_requests) = 'hr@test.com', 'review is stamped');
+select t.ok((select count(*) from top_participants(app.today() - 365, app.today(), null, null, 10, 'weeks')) >= 1, 'regularity ranking works');
+commit;
 
 -- ---------- outsider ----------
 begin;

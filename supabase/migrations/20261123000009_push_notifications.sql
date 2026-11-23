@@ -96,7 +96,7 @@ create trigger notifications_push
   for each statement execute function app.push_new_notifications();
 
 -- Lets the app (and Claude) ask the function to set itself up: generate the keys and
--- publish the public one in app_settings. Callable by full roles only.
+-- publish the public one in app_settings. Needs the settings permission.
 create or replace function public.push_setup()
 returns bigint
 language plpgsql
@@ -106,8 +106,8 @@ as $$
 declare
   cfg public.push_config;
 begin
-  if not (app.is_full() or app.is_internal()) then
-    raise exception 'للأدمن بس' using errcode = '42501';
+  if not (app.has_perm('settings.manage') or app.is_internal()) then
+    raise exception 'محتاج صلاحية الإعدادات' using errcode = '42501';
   end if;
   select * into cfg from public.push_config where id;
   return net.http_post(
