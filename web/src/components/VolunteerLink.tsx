@@ -54,7 +54,7 @@ function VolunteerCard({ id, onClose }: { id: string; onClose: () => void }) {
   const p = usePermissions()
   const dir = useDirectory()
   const v = dir.data?.find((x) => x.id === id)
-  const canOpenFile = p.full || p.leader
+  const canOpenFile = p.viewAll || p.leader
   return (
     <Modal open onClose={onClose} title={v?.full_name_ar ?? 'المتطوع'}>
       {!v ? (

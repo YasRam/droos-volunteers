@@ -42,17 +42,17 @@ export default function App() {
           <Route path="me" element={<Guard allow={Boolean(p.volunteerId)}><MyProfile /></Guard>} />
           <Route path="me/activities" element={<Guard allow={Boolean(p.volunteerId)}><MyActivities /></Guard>} />
           <Route path="volunteers" element={<Guard allow={p.canSeeVolunteers}><Volunteers /></Guard>} />
-          <Route path="volunteers/:id" element={<Guard allow={p.full || p.leader}><VolunteerDetail /></Guard>} />
+          <Route path="volunteers/:id" element={<Guard allow={p.viewAll || p.leader}><VolunteerDetail /></Guard>} />
           <Route path="check-in" element={<Guard allow={Boolean(p.volunteerId) || p.canRegisterActivity}><RegisterActivity /></Guard>} />
           <Route path="register" element={<Navigate to="/check-in" replace />} />
-          <Route path="followups" element={<Guard allow={p.full || p.organizer}><FollowUps /></Guard>} />
+          <Route path="followups" element={<Guard allow={p.viewAll || p.organizer}><FollowUps /></Guard>} />
           <Route path="requests/*" element={<Guard allow={p.canReview}><Requests /></Guard>} />
           <Route path="schedule" element={<Schedule />} />
-          <Route path="stats" element={<Guard allow={p.staff || p.leader}><Stats /></Guard>} />
-          <Route path="tree" element={<Guard allow={p.full || p.leader}><Tree /></Guard>} />
-          <Route path="data" element={<Guard allow={p.full}><DataTools /></Guard>} />
+          <Route path="stats" element={<Guard allow={p.staff || p.leader || p.viewAll}><Stats /></Guard>} />
+          <Route path="tree" element={<Guard allow={p.viewAll || p.leader}><Tree /></Guard>} />
+          <Route path="data" element={<Guard allow={p.viewAll}><DataTools /></Guard>} />
           <Route path="admin" element={<Guard allow={p.full}><Admin /></Guard>} />
-          <Route path="log" element={<Guard allow={p.full}><AuditLog /></Guard>} />
+          <Route path="log" element={<Guard allow={p.viewAll}><AuditLog /></Guard>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

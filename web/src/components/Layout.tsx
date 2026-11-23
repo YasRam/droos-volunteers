@@ -26,6 +26,7 @@ import { supabase } from '@/lib/supabase'
 import type { Notification } from '@/lib/types'
 import { ROLE_LABEL } from '@/lib/types'
 import { fmtDateTime } from '@/lib/data'
+import { PushSwitch } from './PushToggle'
 
 interface NavItem {
   to: string
@@ -107,15 +108,15 @@ export default function Layout() {
     if (p.volunteerId || p.canRegisterActivity) list.push({ to: '/check-in', label: 'تسجيل حضور', icon: Hand })
     if (p.canReview) list.push({ to: '/requests', label: 'الطلبات', icon: Inbox, badge: pending.data })
     if (p.canSeeVolunteers) list.push({ to: '/volunteers', label: 'المتطوعين', icon: Users })
-    if (p.full || p.leader) list.push({ to: '/tree', label: 'الهيكل', icon: Network })
-    if (p.full || p.organizer) list.push({ to: '/followups', label: 'المتابعة اليومية', icon: ClipboardList })
+    if (p.viewAll || p.leader) list.push({ to: '/tree', label: 'الهيكل', icon: Network })
+    if (p.viewAll || p.organizer) list.push({ to: '/followups', label: 'المتابعة اليومية', icon: ClipboardList })
     list.push({ to: '/schedule', label: 'جدول الحصص', icon: CalendarDays })
     if (p.volunteerId) list.push({ to: '/me/activities', label: 'أنشطتي', icon: UsersRound })
     if (p.volunteerId) list.push({ to: '/me', label: 'بياناتي', icon: UserRound })
-    if (p.staff || p.leader) list.push({ to: '/stats', label: 'الإحصائيات', icon: BarChart3 })
-    if (p.full) list.push({ to: '/data', label: 'البيانات وExcel', icon: FileSpreadsheet })
+    if (p.staff || p.leader || p.viewAll) list.push({ to: '/stats', label: 'الإحصائيات', icon: BarChart3 })
+    if (p.viewAll) list.push({ to: '/data', label: p.full ? 'البيانات وExcel' : 'تنزيل Excel', icon: FileSpreadsheet })
     if (p.full) list.push({ to: '/admin', label: 'الإعدادات', icon: Settings })
-    if (p.full) list.push({ to: '/log', label: 'السجل', icon: History })
+    if (p.viewAll) list.push({ to: '/log', label: 'السجل', icon: History })
     return list
   }, [p, pending.data])
 
@@ -192,6 +193,7 @@ export default function Layout() {
                     <p className="px-4 py-6 text-center text-sm text-muted">مفيش إشعارات</p>
                   )}
                 </div>
+                <PushSwitch />
               </div>
             )}
           </div>

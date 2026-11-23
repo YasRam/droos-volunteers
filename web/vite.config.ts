@@ -32,7 +32,11 @@ export default defineConfig({
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
-      workbox: { navigateFallback: `${base}index.html` },
+      workbox: {
+        navigateFallback: `${base}index.html`,
+        // Phone notifications: push + notificationclick handlers (public/push-sw.js)
+        importScripts: ['push-sw.js'],
+      },
     }),
   ],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },

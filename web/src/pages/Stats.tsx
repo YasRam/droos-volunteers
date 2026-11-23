@@ -5,7 +5,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Badge, Card, Empty, PageHeader, Select, Spinner, Stat, Tabs } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
-import { cairoToday, fmtShort, useVolunteers, whatsappLink } from '@/lib/data'
+import { addDays, cairoToday, fmtShort, useVolunteers, whatsappLink } from '@/lib/data'
 import { supabase } from '@/lib/supabase'
 import type { MonthlyParticipation } from '@/lib/types'
 
@@ -17,10 +17,10 @@ export default function Stats() {
   const p = usePermissions()
   const [params, setParams] = useSearchParams()
   const tabs = [
-    ...(p.staff ? [{ value: 'overview' as Tab, label: 'نظرة عامة' }] : []),
-    ...(p.full ? [{ value: 'responsible' as Tab, label: 'المسئولين والمشروع' }] : []),
-    ...(p.full ? [{ value: 'inactive' as Tab, label: 'مش بيشاركوا' }] : []),
-    ...(p.full || p.leader ? [{ value: 'birthdays' as Tab, label: 'أعياد الميلاد' }] : []),
+    ...(p.staff || p.viewAll ? [{ value: 'overview' as Tab, label: 'نظرة عامة' }] : []),
+    ...(p.viewAll ? [{ value: 'responsible' as Tab, label: 'المسئولين والمشروع' }] : []),
+    ...(p.viewAll ? [{ value: 'inactive' as Tab, label: 'مش بيشاركوا' }] : []),
+    ...(p.viewAll || p.leader ? [{ value: 'birthdays' as Tab, label: 'أعياد الميلاد' }] : []),
   ]
   const tab = (tabs.find((t) => t.value === params.get('tab'))?.value ?? tabs[0]?.value) as Tab
   return (
@@ -36,6 +36,7 @@ export default function Stats() {
 }
 
 function Overview() {
+  const p = usePermissions()
   const thisMonth = cairoToday().slice(0, 7)
   const [month, setMonth] = useState(thisMonth)
   const q = useQuery({
@@ -83,6 +84,7 @@ function Overview() {
           </ResponsiveContainer>
         </div>
       </Card>
+      {p.viewAll && <NewVolunteers />}
       <div className="flex items-center gap-2">
         <span className="text-sm font-semibold">الشهر:</span>
         <Select value={month} onChange={(e) => setMonth(e.target.value)} options={byMonth.map((b) => ({ value: b.key, label: b.month }))} className="w-40" />
@@ -92,6 +94,38 @@ function Overview() {
         <HBars title="حسب اللجنة" rows={sumBy('committee')} color="#2e7d32" />
       </div>
     </div>
+  )
+}
+
+/** How many volunteers registered each month, the last 12 months. */
+function NewVolunteers() {
+  const vols = useVolunteers()
+  const data = useMemo(() => {
+    const start = addDays(cairoToday().slice(0, 7) + '-01', -335).slice(0, 7)
+    const m = new Map<string, number>()
+    for (const v of vols.data ?? []) {
+      const k = v.registered_at?.slice(0, 7)
+      if (k && k >= start) m.set(k, (m.get(k) ?? 0) + 1)
+    }
+    return [...m.entries()].sort().map(([k, value]) => ({ month: monthLabel(k), value }))
+  }, [vols.data])
+  if (!vols.data) return null
+  return (
+    <Card>
+      <p className="mb-1 font-bold">المتطوعين الجداد كل شهر</p>
+      <p className="mb-3 text-xs text-muted">حسب تاريخ التسجيل، آخر 12 شهر</p>
+      <div className="h-56" dir="ltr">
+        <ResponsiveContainer>
+          <BarChart data={data}>
+            <CartesianGrid vertical={false} stroke="#e3e8ec" />
+            <XAxis dataKey="month" tick={{ fontSize: 11, fontFamily: 'Cairo' }} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={32} />
+            <Tooltip formatter={(v) => [v, 'متطوع جديد']} labelStyle={{ fontFamily: 'Cairo' }} />
+            <Bar dataKey="value" fill="#1e88e5" radius={[6, 6, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
   )
 }
 

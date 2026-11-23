@@ -54,10 +54,10 @@ export default function FollowUps() {
 
   return (
     <>
-      <PageHeader title="المتابعة اليومية" subtitle={p.full ? undefined : 'آخر 7 أيام'} />
+      <PageHeader title="المتابعة اليومية" subtitle={p.viewAll ? undefined : 'آخر 7 أيام'} />
       <Card className="mb-4 grid gap-3 sm:grid-cols-4">
         <Field label="من">
-          <Input type="date" value={from} min={p.full ? undefined : addDays(today, -7)} onChange={(e) => setFrom(e.target.value)} />
+          <Input type="date" value={from} min={p.viewAll ? undefined : addDays(today, -7)} onChange={(e) => setFrom(e.target.value)} />
         </Field>
         <Field label="إلى">
           <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />

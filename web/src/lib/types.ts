@@ -1,4 +1,4 @@
-export type AppRole = 'admin' | 'activity_leader' | 'hr' | 'organizer'
+export type AppRole = 'admin' | 'activity_leader' | 'hr' | 'organizer' | 'management'
 export type VolunteerStatus = 'تحت المتابعة' | 'مشروع مسئول' | 'مسئول' | 'مدرب' | 'خارج المتابعة'
 export type AcceptanceGrade = 'اختبار' | 'مقبول' | 'رفض الانترفيو' | 'مرفوض' | 'معتذر' | 'معتذر نهائى' | 'مفصول'
 export type RequestStatus = 'pending' | 'accepted' | 'rejected'
@@ -12,6 +12,7 @@ export const ROLE_LABEL: Record<AppRole, string> = {
   activity_leader: 'ليدر نشاط',
   hr: 'HR',
   organizer: 'تنظيم',
+  management: 'إدارة',
 }
 export const REQUEST_LABEL: Record<RequestStatus, string> = {
   pending: 'مستني موافقة',
@@ -24,6 +25,7 @@ export interface MyContext {
   full_name: string | null
   role: AppRole | null
   is_full: boolean
+  is_management?: boolean
   is_staff: boolean
   is_organizer: boolean
   committees: string[]

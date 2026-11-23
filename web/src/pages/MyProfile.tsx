@@ -94,7 +94,7 @@ export const personalDefaults = (v: Volunteer): PersonalValues => ({
   referral_source: v.referral_source ?? '',
 })
 
-export function NationalIdCard({ volunteerId, canEditDirectly }: { volunteerId: string; canEditDirectly: boolean }) {
+export function NationalIdCard({ volunteerId, canEditDirectly, readOnly = false }: { volunteerId: string; canEditDirectly: boolean; readOnly?: boolean }) {
   const qc = useQueryClient()
   const q = useQuery({
     queryKey: ['private', volunteerId],
@@ -125,7 +125,9 @@ export function NationalIdCard({ volunteerId, canEditDirectly }: { volunteerId: 
     <Card>
       <p className="font-bold">الرقم القومي</p>
       <p className="mb-2 text-xs text-muted">
-        {canEditDirectly
+        {readOnly
+          ? 'عرض بس.'
+          : canEditDirectly
           ? 'بصلاحيتك (أدمن أو ليدر نشاط أو HR) التعديل بيتحفظ على طول، وتاريخ الميلاد والنوع بيتحسبوا منه.'
           : 'التغيير بيتبعت طلب، والأدمن أو ليدر النشاط أو الـ HR بيوافقوا عليه.'}
       </p>
@@ -135,7 +137,7 @@ export function NationalIdCard({ volunteerId, canEditDirectly }: { volunteerId: 
           <Badge tone="orange">مستني موافقة</Badge> <span className="ltr">{q.data.requested_national_id}</span>
         </p>
       )}
-      <form
+      {!readOnly && <form
         className="mt-3 flex gap-2"
         onSubmit={form.handleSubmit(({ nid }) => {
           if (!/^[23]\d{13}$/.test(nid)) return toast.error('الرقم القومي 14 رقم ويبدأ بـ 2 أو 3')
@@ -146,7 +148,7 @@ export function NationalIdCard({ volunteerId, canEditDirectly }: { volunteerId: 
         <Button type="submit" variant="secondary" loading={save.isPending}>
           {canEditDirectly ? 'حفظ' : 'اطلب تغيير'}
         </Button>
-      </form>
+      </form>}
     </Card>
   )
 }

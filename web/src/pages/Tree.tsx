@@ -41,8 +41,8 @@ export default function Tree() {
     const orphans = active.filter((v) => !v.main_committee && !v.sub_committee && match(v))
     if (orphans.length) list.push({ name: NO_COMMITTEE, leaders: [], main: orphans, sub: [] })
     // A committee leader may only see their own committees
-    return list.filter((c) => p.full || c.main.length || c.sub.length)
-  }, [vols.data, lookups.data, people.data, search, p.full])
+    return list.filter((c) => p.viewAll || c.main.length || c.sub.length)
+  }, [vols.data, lookups.data, people.data, search, p.viewAll])
 
   const activityLeaders = (people.data?.staff ?? []).filter((s) => s.role === 'activity_leader' || s.role === 'admin')
   const total = committees.reduce((n, c) => n + c.main.length, 0)

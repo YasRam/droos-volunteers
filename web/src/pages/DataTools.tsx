@@ -3,18 +3,20 @@ import { AlertTriangle, Check, Download, FileSpreadsheet, Upload } from 'lucide-
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button, Card, PageHeader, Tabs } from '@/components/ui'
+import { usePermissions } from '@/lib/auth'
 import { cairoToday } from '@/lib/data'
 import { downloadTemplate, exportAll, importColumns, readImport, type ImportKind, type ParsedRow } from '@/lib/excel'
 import { toastError } from '@/lib/errors'
 import { importParticipations, importVolunteers, type ImportResult } from '@/lib/importer'
 
 export default function DataTools() {
+  const { full } = usePermissions()
   return (
     <>
       <PageHeader title="البيانات" subtitle="تنزيل كل البيانات Excel، أو إضافة متطوعين ومشاركات من ملف Excel" />
       <div className="space-y-4">
         <ExportCard />
-        <ImportCard />
+        {full && <ImportCard />}
       </div>
     </>
   )

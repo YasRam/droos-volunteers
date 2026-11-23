@@ -118,7 +118,7 @@ export async function exportAll(today: string) {
   const [vols, priv, hr, parts, slots] = await Promise.all([
     fetchAll<Volunteer>('volunteers', 'code'),
     fetchAll<VolunteerPrivate>('volunteer_private', 'volunteer_id'),
-    fetchAll<VolunteerHr>('volunteer_hr', 'volunteer_id'),
+    fetchAll<VolunteerHr>('volunteer_hr_read', 'volunteer_id'),
     fetchAll<Participation>('participations', 'activity_date'),
     fetchAll<ScheduleSlot>('schedule_slots', 'starts_at'),
   ])

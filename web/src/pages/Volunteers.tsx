@@ -26,12 +26,13 @@ interface Filters {
   job: string
   qualification: string
   inactive: boolean
+  recent: boolean
 }
-const EMPTY: Filters = { status: '', acceptance: '', committee: '', gender: '', birthMonth: '', job: '', qualification: '', inactive: false }
+const EMPTY: Filters = { status: '', acceptance: '', committee: '', gender: '', birthMonth: '', job: '', qualification: '', inactive: false, recent: false }
 
 export default function Volunteers() {
   const p = usePermissions()
-  if (!p.full && !p.leader) return <Directory />
+  if (!p.viewAll && !p.leader) return <Directory />
   return <FullList />
 }
 
@@ -57,14 +58,14 @@ function FullList() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const vols = useVolunteers()
-  const hr = useHrRows(p.full)
+  const hr = useHrRows(p.viewAll)
   const lookups = useLookups()
   const wide = useWide()
   const [view, setView] = useState<'auto' | 'table' | 'cards'>('auto')
   const asTable = view === 'table' || (view === 'auto' && wide)
   const [search, setSearch] = useState('')
-  const [filters, setFilters] = useState<Filters>(() => ({ ...EMPTY, status: params.get('status') ?? '', inactive: params.get('inactive') === '1' }))
-  const [showFilters, setShowFilters] = useState(Boolean(params.get('status') || params.get('inactive')))
+  const [filters, setFilters] = useState<Filters>(() => ({ ...EMPTY, status: params.get('status') ?? '', inactive: params.get('inactive') === '1', recent: params.get('new') === '30' }))
+  const [showFilters, setShowFilters] = useState(Boolean(params.get('status') || params.get('inactive') || params.get('new')))
   const [showLegend, setShowLegend] = useState(false)
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'name', dir: 1 })
   const [adding, setAdding] = useState(false)
@@ -83,6 +84,7 @@ function FullList() {
       if (filters.birthMonth && Number(v.birth_date?.slice(5, 7)) !== Number(filters.birthMonth)) return false
       if (filters.job && !v.job?.includes(filters.job)) return false
       if (filters.qualification && !v.qualification?.includes(filters.qualification)) return false
+      if (filters.recent && (v.registered_at ?? '').slice(0, 10) < month30) return false
       if (filters.inactive && (v.status === 'خارج المتابعة' || (v.stats?.last_participation ?? '') >= month30)) return false
       return true
     })
@@ -137,14 +139,14 @@ function FullList() {
         </div>
       </div>
 
-      {showLegend && <Legend full={p.full} />}
+      {showLegend && <Legend full={p.viewAll} />}
 
       {showFilters && (
         <Card className="mb-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <Field label="حالة المتطوع">
             <Select value={filters.status} onChange={(e) => set('status', e.target.value)} placeholder="الكل" options={STATUSES} />
           </Field>
-          {p.full && (
+          {p.viewAll && (
             <Field label="درجة القبول">
               <Select value={filters.acceptance} onChange={(e) => set('acceptance', e.target.value)} placeholder="الكل" options={[...ACCEPTANCE, 'لسه']} />
             </Field>
@@ -168,6 +170,10 @@ function FullList() {
             <input type="checkbox" checked={filters.inactive} onChange={(e) => set('inactive', e.target.checked)} className="size-4 accent-brand-700" />
             مشاركوش آخر 30 يوم
           </label>
+          <label className="flex items-end gap-2 pb-2 text-sm font-semibold">
+            <input type="checkbox" checked={filters.recent} onChange={(e) => set('recent', e.target.checked)} className="size-4 accent-brand-700" />
+            جداد (اتسجلوا آخر 30 يوم)
+          </label>
           {active > 0 && (
             <Button variant="ghost" onClick={() => setFilters(EMPTY)}>
               مسح الفلاتر
@@ -181,7 +187,7 @@ function FullList() {
       ) : !rows.length ? (
         <Empty title="مفيش نتايج" />
       ) : asTable ? (
-        <VolunteerTable rows={rows} hr={hr.data} full={p.full} sort={sort} onSort={sortBy} onOpen={(id) => navigate(`/volunteers/${id}`)} />
+        <VolunteerTable rows={rows} hr={hr.data} full={p.viewAll} sort={sort} onSort={sortBy} onOpen={(id) => navigate(`/volunteers/${id}`)} />
       ) : (
         <div className="space-y-5">
           <div className="flex items-center gap-2 text-xs text-muted">
@@ -200,7 +206,7 @@ function FullList() {
               </h2>
               <Card className="divide-y divide-line p-0">
                 {g.rows.map((v) => (
-                  <VolunteerRow key={v.id} v={v} acceptance={p.full ? hr.data?.get(v.id)?.acceptance : undefined} onOpen={() => navigate(`/volunteers/${v.id}`)} />
+                  <VolunteerRow key={v.id} v={v} acceptance={p.viewAll ? hr.data?.get(v.id)?.acceptance : undefined} onOpen={() => navigate(`/volunteers/${v.id}`)} />
                 ))}
               </Card>
             </section>

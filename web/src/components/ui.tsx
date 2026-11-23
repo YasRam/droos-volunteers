@@ -1,4 +1,8 @@
-import clsx from 'clsx'
+import clsx, { type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+
+/** Class names where a later Tailwind class wins over an earlier one (w-32 beats w-full). */
+export const cn = (...c: ClassValue[]) => twMerge(clsx(c))
 import { Loader2, X } from 'lucide-react'
 import {
   forwardRef,
@@ -27,7 +31,7 @@ export function Button({
     <button
       {...rest}
       disabled={disabled || loading}
-      className={clsx(
+      className={cn(
         'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition active:scale-[.98] disabled:opacity-50 disabled:pointer-events-none',
         size === 'sm' && 'h-8 px-3 text-sm',
         size === 'md' && 'h-10 px-4 text-sm',
@@ -47,7 +51,7 @@ export function Button({
 }
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={clsx('rounded-2xl border border-line bg-white p-4 shadow-sm', className)}>{children}</div>
+  return <div className={cn('rounded-2xl border border-line bg-white p-4 shadow-sm', className)}>{children}</div>
 }
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
@@ -80,14 +84,14 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
   { className, ...rest },
   ref,
 ) {
-  return <input ref={ref} {...rest} className={clsx(inputCls, 'h-10', className)} />
+  return <input ref={ref} {...rest} className={cn(inputCls, 'h-10', className)} />
 })
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea(
   { className, ...rest },
   ref,
 ) {
-  return <textarea ref={ref} rows={3} {...rest} className={clsx(inputCls, className)} />
+  return <textarea ref={ref} rows={3} {...rest} className={cn(inputCls, className)} />
 })
 
 export const Select = forwardRef<
@@ -95,7 +99,7 @@ export const Select = forwardRef<
   SelectHTMLAttributes<HTMLSelectElement> & { options: (string | { value: string; label: string })[]; placeholder?: string }
 >(function Select({ className, options, placeholder, ...rest }, ref) {
   return (
-    <select ref={ref} {...rest} className={clsx(inputCls, 'h-10', className)}>
+    <select ref={ref} {...rest} className={cn(inputCls, 'h-10', className)}>
       {placeholder !== undefined && <option value="">{placeholder}</option>}
       {options.map((o) =>
         typeof o === 'string' ? (
@@ -133,7 +137,7 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
 export function Badge({ tone = 'gray', children }: { tone?: 'gray' | 'brand' | 'green' | 'orange' | 'red' | 'purple' | 'blue'; children: ReactNode }) {
   return (
     <span
-      className={clsx(
+      className={cn(
         'inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold',
         tone === 'gray' && 'bg-gray-100 text-gray-600',
         tone === 'brand' && 'bg-brand-50 text-brand-800',
@@ -189,7 +193,7 @@ export function Tabs<T extends string>({
         <button
           key={t.value}
           onClick={() => onChange(t.value)}
-          className={clsx(
+          className={cn(
             'flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition',
             value === t.value ? 'bg-brand-700 text-white' : 'text-muted hover:bg-surface',
           )}
@@ -233,7 +237,7 @@ export function Stat({ label, value, tone = 'brand' }: { label: string; value: R
     <Card className="p-3">
       <p className="text-xs text-muted">{label}</p>
       <p
-        className={clsx(
+        className={cn(
           'mt-1 text-2xl font-bold',
           tone === 'brand' && 'text-brand-700',
           tone === 'orange' && 'text-orange-600',
@@ -252,14 +256,14 @@ export function Toggle({ checked, onChange, disabled, label }: { checked: boolea
       type="button"
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={clsx(
+      className={cn(
         'flex w-full items-center justify-between rounded-xl border px-3 py-2 text-sm transition disabled:opacity-60',
         checked ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-line bg-white text-muted',
       )}
     >
       <span className="font-semibold">{label}</span>
-      <span className={clsx('relative h-5 w-9 rounded-full transition', checked ? 'bg-emerald-500' : 'bg-gray-300')}>
-        <span className={clsx('absolute top-0.5 size-4 rounded-full bg-white shadow transition-all', checked ? 'start-4' : 'start-0.5')} />
+      <span className={cn('relative h-5 w-9 rounded-full transition', checked ? 'bg-emerald-500' : 'bg-gray-300')}>
+        <span className={cn('absolute top-0.5 size-4 rounded-full bg-white shadow transition-all', checked ? 'start-4' : 'start-0.5')} />
       </span>
     </button>
   )

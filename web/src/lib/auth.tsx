@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const me = meQuery.data ?? null
   const isLeader = (me?.committees.length ?? 0) > 0
-  const known = Boolean(me && (me.is_staff || me.volunteer_id || isLeader))
+  const known = Boolean(me && (me.is_staff || me.is_management || me.volunteer_id || isLeader))
 
   const value: AuthState = {
     session,
@@ -83,14 +83,21 @@ export function useAuth() {
 export function usePermissions() {
   const { me, isLeader } = useAuth()
   const full = Boolean(me?.is_full)
+  const management = Boolean(me?.is_management)
+  const viewAll = full || management
   const staff = Boolean(me?.is_staff)
   return {
+    /** admin, activity leader, HR: see and change everything */
     full,
+    /** إدارة: sees everything except HR notes, changes nothing */
+    management,
+    /** full or management: whoever may read the whole picture */
+    viewAll,
     staff,
     organizer: Boolean(me?.is_organizer),
     leader: isLeader,
     volunteerId: me?.volunteer_id ?? null,
-    canSeeVolunteers: full || isLeader || staff,
+    canSeeVolunteers: viewAll || isLeader || staff,
     canRegisterActivity: staff,
     canReview: staff,
     canEditSchedule: full,

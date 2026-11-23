@@ -56,7 +56,7 @@ export default function VolunteerDetail() {
   const age = ageFrom(v.birth_date)
   const tabs: { value: Tab; label: string }[] = [
     { value: 'data', label: 'البيانات' },
-    ...(p.full ? [{ value: 'interview' as Tab, label: 'المقابلة' }] : []),
+    ...(p.viewAll ? [{ value: 'interview' as Tab, label: 'المقابلة' }] : []),
     { value: 'committee', label: 'اللجنة' },
     { value: 'activities', label: 'المشاركات' },
   ]
@@ -102,7 +102,7 @@ export default function VolunteerDetail() {
             {p.full ? <EditPersonal v={v} /> : <ReadPersonal v={v} />}
           </div>
           <div className="space-y-4">
-            {p.full && <NationalIdCard volunteerId={v.id} canEditDirectly />}
+            {p.viewAll && <NationalIdCard volunteerId={v.id} canEditDirectly={p.full} readOnly={!p.full} />}
             <Card className="text-sm">
               <p>تاريخ الميلاد: {fmtDate(v.birth_date)}</p>
               <p className="mt-1">النوع: {v.gender ?? '—'}</p>
@@ -122,7 +122,7 @@ export default function VolunteerDetail() {
           </div>
         </div>
       )}
-      {tab === 'interview' && p.full && <Interview v={v} />}
+      {tab === 'interview' && p.viewAll && <Interview v={v} readOnly={!p.full} />}
       {tab === 'committee' && <Committee v={v} editable={canEditCommittee} />}
       {tab === 'activities' && <Activities volunteerId={v.id} />}
     </>
@@ -182,13 +182,13 @@ function EditPersonal({ v }: { v: Volunteer }) {
   )
 }
 
-function Interview({ v }: { v: Volunteer }) {
+function Interview({ v, readOnly }: { v: Volunteer; readOnly: boolean }) {
   const qc = useQueryClient()
   const lookups = useLookups()
   const hr = useQuery({
     queryKey: ['hr', v.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('volunteer_hr').select('*').eq('volunteer_id', v.id).maybeSingle()
+      const { data, error } = await supabase.from(readOnly ? 'volunteer_hr_read' : 'volunteer_hr').select('*').eq('volunteer_id', v.id).maybeSingle()
       if (error) throw error
       return data as VolunteerHr | null
     },
@@ -234,7 +234,9 @@ function Interview({ v }: { v: Volunteer }) {
   const committees = lookups.data?.list('اللجنة') ?? []
   return (
     <Card>
+      {readOnly && <p className="mb-3 text-xs text-muted">عرض بس. التعديل للأدمن وليدر النشاط والـ HR، وملاحظات الـ HR مش ظاهرة لصلاحية الإدارة.</p>}
       <form onSubmit={form.handleSubmit((f) => save.mutate(f))} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <fieldset disabled={readOnly} className="contents">
         <Field label="حالة المتطوع">
           <Select {...form.register('status')} options={STATUSES} />
         </Field>
@@ -256,16 +258,21 @@ function Interview({ v }: { v: Volunteer }) {
             {lookups.data?.list('القائم على المقابلة').map((n) => <option key={n} value={n} />)}
           </datalist>
         </Field>
-        <div className="sm:col-span-2">
-          <Field label="ملاحظات HR">
-            <Textarea {...form.register('hr_notes')} />
-          </Field>
-        </div>
-        <div className="sm:col-span-2">
-          <Button type="submit" loading={save.isPending}>
-            حفظ
-          </Button>
-        </div>
+        {!readOnly && (
+          <div className="sm:col-span-2">
+            <Field label="ملاحظات HR">
+              <Textarea {...form.register('hr_notes')} />
+            </Field>
+          </div>
+        )}
+        </fieldset>
+        {!readOnly && (
+          <div className="sm:col-span-2">
+            <Button type="submit" loading={save.isPending}>
+              حفظ
+            </Button>
+          </div>
+        )}
       </form>
     </Card>
   )

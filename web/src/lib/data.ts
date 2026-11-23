@@ -114,7 +114,7 @@ export function useHrRows(enabled: boolean) {
     queryKey: ['volunteer_hr'],
     enabled,
     queryFn: async () => {
-      const rows = await selectAll<VolunteerHr>('volunteer_hr', 'volunteer_id')
+      const rows = await selectAll<VolunteerHr>('volunteer_hr_read', 'volunteer_id')
       return new Map(rows.map((h) => [h.volunteer_id, h]))
     },
   })

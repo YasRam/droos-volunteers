@@ -153,6 +153,61 @@ select t.ok((select status from volunteers where code = 'V9001') = 'تحت ال�
 select t.ok((select acceptance from volunteer_hr h join volunteers v on v.id = h.volunteer_id where v.code = 'V9002') = 'مقبول', 'اختبار for 90 days → مقبول');
 select t.ok(app.run_monthly_summary() >= 1, 'monthly summary sent');
 
+
+-- ---------- management (إدارة): reads everything but HR notes, changes nothing ----------
+insert into staff_roles (email, full_name, role) values ('mgmt@test.com', 'إدارة', 'management');
+update volunteer_hr set hr_notes = 'ملاحظة سرية' where volunteer_id = (select id from volunteers where code = 'V9001');
+begin;
+set local role authenticated;
+select t.login('mgmt@test.com');
+select t.ok((select count(*) from volunteers) = (select count(*) from volunteer_directory), 'management sees every volunteer');
+select t.ok((select count(*) from volunteers) >= 4, 'management sees all volunteers');
+select t.ok((select count(*) from participations) > 0, 'management sees participations');
+select t.ok((select count(*) from volunteer_private where national_id is not null) >= 1, 'management sees national ids');
+select t.ok((select count(*) from volunteer_hr) = 0, 'management cannot read the HR table directly');
+select t.ok((select count(*) from volunteer_hr_read) >= 4, 'management reads interview data through the view');
+select t.ok((select count(*) from volunteer_hr_read where hr_notes is not null) = 0, 'HR notes hidden from management');
+select t.ok((select count(*) from audit_log) >= 0, 'management reads the log');
+select t.ok(not app.is_staff(), 'management is not staff');
+select t.ok((public.my_context() ->> 'is_management')::boolean, 'my_context reports management');
+commit;
+begin;
+set local role authenticated;
+select t.login('mgmt@test.com');
+update volunteers set job = 'تغيير' where code = 'V9001';
+select t.ok((select job from volunteers where code = 'V9001') is distinct from 'تغيير', 'management cannot edit volunteers');
+select t.fails($$insert into participations (volunteer_id, activity_date, event) select id, app.today(), 'تدريس' from volunteers where code = 'V9002'$$, 'management cannot register others');
+select t.fails($$insert into staff_roles (email, full_name, role) values ('x@test.com', 'x', 'admin')$$, 'management cannot grant roles');
+commit;
+begin;
+set local role authenticated;
+select t.login('hr@test.com');
+select t.ok((select hr_notes from volunteer_hr_read h join volunteers v on v.id = h.volunteer_id where v.code = 'V9001') = 'ملاحظة سرية', 'HR still sees notes through the view');
+commit;
+
+
+-- ---------- push notifications ----------
+begin;
+set local role authenticated;
+select t.login('hr@test.com');
+insert into push_subscriptions (endpoint, p256dh, auth) values ('https://push.example/hr', 'k', 'a');
+select t.ok((select email from push_subscriptions where endpoint = 'https://push.example/hr') = 'hr@test.com', 'subscription saved under my email');
+select t.fails($$insert into push_subscriptions (endpoint, email, p256dh, auth) values ('https://push.example/x', 'admin@test.com', 'k', 'a')$$, 'cannot subscribe for someone else');
+select t.fails($$select * from push_config$$, 'push config is server-only');
+commit;
+begin;
+set local role authenticated;
+select t.login('admin@test.com');
+select t.ok((select count(*) from push_subscriptions) = 0, 'others'' subscriptions are hidden');
+commit;
+select count(*) as before from net.requests \gset
+select app.notify(array['hr@test.com', 'nobody@test.com']::extensions.citext[], 'تجربة', 'نص');
+select t.ok((select count(*) from net.requests) = :before + 1, 'one push call per statement');
+select t.ok((select jsonb_array_length(body -> 'ids') from net.requests order by id desc limit 1) = 1, 'only recipients with a subscription are sent');
+select t.ok((select headers ->> 'x-push-secret' from net.requests order by id desc limit 1) = (select hook_secret from push_config), 'call carries the hook secret');
+select app.notify(array['nobody@test.com']::extensions.citext[], 'تجربة', 'نص');
+select t.ok((select count(*) from net.requests) = :before + 1, 'no call when nobody subscribed');
+
 -- ---------- outsider ----------
 begin;
 set local role authenticated;

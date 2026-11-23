@@ -4,6 +4,7 @@ import { Cake, ChevronLeft, Clock3, Hand, MessageCircle, Users } from 'lucide-re
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
+import { PushCard } from '@/components/PushToggle'
 import { Button, Card } from '@/components/ui'
 import { useAuth, usePermissions } from '@/lib/auth'
 import { addDays, cairoToday, fmtDate, fmtShort, useHrRows, useSetting, useVolunteers, whatsappLink, type VolunteerWithStats } from '@/lib/data'
@@ -18,7 +19,7 @@ export default function Home() {
   const p = usePermissions()
   const today = cairoToday()
   const groupLink = useSetting('whatsapp_group_link')
-  const seesVolunteers = p.full || p.leader
+  const seesVolunteers = p.viewAll || p.leader
   const vols = useVolunteers(seesVolunteers)
 
   const firstName = me?.full_name?.split(' ')[0] ?? me?.email?.split('@')[0]
@@ -32,6 +33,8 @@ export default function Home() {
           {fmtDate(today)} · دخلت بصلاحية <span className="font-semibold text-brand-700">{role}</span>
         </p>
       </div>
+
+      <PushCard />
 
       {(p.volunteerId || p.canRegisterActivity) && (
         <Card className="bg-gradient-to-l from-brand-700 to-brand-500 text-white">
@@ -48,10 +51,10 @@ export default function Home() {
       )}
 
       {p.volunteerId && <MyNumbers volunteerId={p.volunteerId} />}
-      {p.staff && <TodayNumbers today={today} full={p.full} />}
-      {seesVolunteers && <VolunteerNumbers vols={vols.data} full={p.full} leader={!p.full && p.leader} today={today} />}
+      {(p.staff || p.viewAll) && <TodayNumbers today={today} full={p.viewAll} canReview={p.canReview} />}
+      {seesVolunteers && <VolunteerNumbers vols={vols.data} full={p.viewAll} leader={!p.viewAll && p.leader} today={today} />}
       {seesVolunteers && <Birthdays vols={vols.data} today={today} />}
-      {p.full && <LongTest vols={vols.data} today={today} />}
+      {p.viewAll && <LongTest vols={vols.data} today={today} canEdit={p.full} />}
 
       {groupLink.data && (
         <a href={groupLink.data} target="_blank" rel="noreferrer" className="block">
@@ -134,7 +137,7 @@ function MyNumbers({ volunteerId }: { volunteerId: string }) {
   )
 }
 
-function TodayNumbers({ today, full }: { today: string; full: boolean }) {
+function TodayNumbers({ today, full, canReview }: { today: string; full: boolean; canReview: boolean }) {
   const q = useQuery({
     queryKey: ['home-today', today],
     queryFn: async () => {
@@ -151,7 +154,7 @@ function TodayNumbers({ today, full }: { today: string; full: boolean }) {
       <div className="grid grid-cols-3 gap-3">
         <Metric label="مشاركة" value={q.data?.participations} hint="اتسجلت واتقبلت" tone="green" to={full ? '/followups' : undefined} />
         <Metric label="متطوع" value={q.data?.people} hint="شاركوا النهارده" />
-        <Metric label="طلب مستني" value={q.data?.pending} hint="محتاج موافقة أو رفض" tone={q.data?.pending ? 'orange' : 'gray'} to="/requests" />
+        <Metric label="طلب مستني" value={q.data?.pending} hint="محتاج موافقة أو رفض" tone={q.data?.pending ? 'orange' : 'gray'} to={canReview ? '/requests' : undefined} />
       </div>
     </Section>
   )
@@ -186,6 +189,10 @@ function VolunteerNumbers({ vols, full, leader, today }: { vols?: VolunteerWithS
   const lastMonth = addDays(thisMonth + '-01', -1).slice(0, 7)
   const sum = (m: string) => (month.data ?? []).filter((r) => r.month === m).reduce((s, r) => s + Number(r.participations), 0)
   const count = (status: string) => vols?.filter((v) => v.status === status).length
+  const monthOf = (v: VolunteerWithStats) => v.registered_at?.slice(0, 7)
+  const newThisMonth = vols?.filter((v) => monthOf(v) === thisMonth).length
+  const newLastMonth = vols?.filter((v) => monthOf(v) === lastMonth).length
+  const new30 = vols?.filter((v) => v.registered_at && v.registered_at.slice(0, 10) >= addDays(today, -30)).length
   const quiet = vols?.filter((v) => v.status !== 'خارج المتابعة' && (!v.stats?.last_participation || v.stats.last_participation < addDays(today, -30))).length
 
   return (
@@ -196,6 +203,13 @@ function VolunteerNumbers({ vols, full, leader, today }: { vols?: VolunteerWithS
         ))}
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Metric
+          label={`جداد ${MONTHS[Number(thisMonth.slice(5)) - 1]}`}
+          value={newThisMonth}
+          hint={vols ? `اتسجلوا الشهر ده · الشهر اللي فات: ${newLastMonth} · آخر 30 يوم: ${new30}` : undefined}
+          tone="blue"
+          to="/volunteers?new=30"
+        />
         {full && <Metric label={`مشاركات ${MONTHS[Number(thisMonth.slice(5)) - 1]}`} value={month.data ? sum(thisMonth) : undefined} hint={month.data ? `الشهر اللي فات: ${sum(lastMonth)}` : undefined} tone="green" to="/stats" />}
         <Metric label="مشاركوش من شهر" value={quiet} hint="مش «خارج المتابعة»، ومالهمش مشاركة آخر 30 يوم" tone="orange" to="/volunteers?inactive=1" />
       </div>
@@ -256,7 +270,7 @@ function BirthdayRow({ v }: { v: VolunteerWithStats }) {
 }
 
 /** «اختبار» with no acceptance change for 90 days: the rule says they become «مقبول». */
-function LongTest({ vols, today }: { vols?: VolunteerWithStats[]; today: string }) {
+function LongTest({ vols, today, canEdit }: { vols?: VolunteerWithStats[]; today: string; canEdit: boolean }) {
   const qc = useQueryClient()
   const hr = useHrRows(true)
   const cutoff = addDays(today, -90)
@@ -287,7 +301,7 @@ function LongTest({ vols, today }: { vols?: VolunteerWithStats[]; today: string 
       title="في الاختبار من أكتر من 3 شهور"
       hint="درجة القبول «اختبار» ومتغيرتش من 90 يوم. القاعدة إنهم يبقوا «مقبول»."
       action={
-        list.length > 0 && (
+        canEdit && list.length > 0 && (
           <Button size="sm" variant="secondary" loading={accept.isPending} onClick={() => confirm(`تخلّي الـ ${list.length} دول «مقبول»؟`) && accept.mutate()}>
             اعتبرهم مقبولين
           </Button>
