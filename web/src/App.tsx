@@ -7,7 +7,6 @@ import Login from '@/pages/Login'
 import NotRegistered from '@/pages/NotRegistered'
 import Home from '@/pages/Home'
 
-const CheckIn = lazy(() => import('@/pages/CheckIn'))
 const MyActivities = lazy(() => import('@/pages/MyActivities'))
 const MyProfile = lazy(() => import('@/pages/MyProfile'))
 const Volunteers = lazy(() => import('@/pages/Volunteers'))
@@ -39,12 +38,12 @@ export default function App() {
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<Home />} />
-          <Route path="check-in" element={<Guard allow={Boolean(p.volunteerId)}><CheckIn /></Guard>} />
           <Route path="me" element={<Guard allow={Boolean(p.volunteerId)}><MyProfile /></Guard>} />
           <Route path="me/activities" element={<Guard allow={Boolean(p.volunteerId)}><MyActivities /></Guard>} />
           <Route path="volunteers" element={<Guard allow={p.canSeeVolunteers}><Volunteers /></Guard>} />
           <Route path="volunteers/:id" element={<Guard allow={p.full || p.leader}><VolunteerDetail /></Guard>} />
-          <Route path="register" element={<Guard allow={p.canRegisterActivity}><RegisterActivity /></Guard>} />
+          <Route path="check-in" element={<Guard allow={Boolean(p.volunteerId) || p.canRegisterActivity}><RegisterActivity /></Guard>} />
+          <Route path="register" element={<Navigate to="/check-in" replace />} />
           <Route path="followups" element={<Guard allow={p.full || p.organizer}><FollowUps /></Guard>} />
           <Route path="requests/*" element={<Guard allow={p.canReview}><Requests /></Guard>} />
           <Route path="schedule" element={<Schedule />} />

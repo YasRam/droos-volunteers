@@ -154,6 +154,21 @@ export function StatusBadge({ status }: { status: VolunteerStatus }) {
   return <Badge tone={tone[status]}>{status}</Badge>
 }
 
+export const ACCEPTANCE_TONE = {
+  اختبار: 'orange',
+  مقبول: 'green',
+  'رفض الانترفيو': 'red',
+  مرفوض: 'red',
+  معتذر: 'gray',
+  'معتذر نهائى': 'gray',
+  مفصول: 'red',
+} as const
+
+export function AcceptanceBadge({ value }: { value: keyof typeof ACCEPTANCE_TONE | null | undefined }) {
+  if (!value) return <Badge>لسه</Badge>
+  return <Badge tone={ACCEPTANCE_TONE[value]}>{value}</Badge>
+}
+
 export function RequestBadge({ status }: { status: RequestStatus }) {
   const tone = { pending: 'orange', accepted: 'green', rejected: 'red' } as const
   return <Badge tone={tone[status]}>{REQUEST_LABEL[status]}</Badge>

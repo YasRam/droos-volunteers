@@ -63,20 +63,26 @@ export function useSetting(key: string) {
   })
 }
 
+/** Every row the person may read. The API returns at most 1000 rows per request. */
+export async function selectAll<T>(table: string, order: string): Promise<T[]> {
+  const out: T[] = []
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.from(table).select('*').order(order).range(from, from + 999)
+    if (error) throw error
+    out.push(...(data as T[]))
+    if (data.length < 1000) return out
+  }
+}
+
 /** Volunteers the signed-in person may read, with their participation numbers. */
 export function useVolunteers(enabled = true) {
   return useQuery({
     queryKey: ['volunteers'],
     enabled,
     queryFn: async () => {
-      const [vols, stats] = await Promise.all([
-        supabase.from('volunteers').select('*').order('full_name_ar'),
-        supabase.from('volunteer_stats').select('*'),
-      ])
-      if (vols.error) throw vols.error
-      if (stats.error) throw stats.error
-      const byId = new Map((stats.data as VolunteerStats[]).map((s) => [s.volunteer_id, s]))
-      return (vols.data as Volunteer[]).map((v) => ({ ...v, stats: byId.get(v.id) ?? null }))
+      const [vols, stats] = await Promise.all([selectAll<Volunteer>('volunteers', 'full_name_ar'), selectAll<VolunteerStats>('volunteer_stats', 'volunteer_id')])
+      const byId = new Map(stats.map((s) => [s.volunteer_id, s]))
+      return vols.map((v) => ({ ...v, stats: byId.get(v.id) ?? null }))
     },
   })
 }
@@ -88,9 +94,7 @@ export function useDirectory(enabled = true) {
     queryKey: ['directory'],
     enabled,
     queryFn: async () => {
-      const { data, error } = await supabase.from('volunteer_directory').select('*').order('full_name_ar')
-      if (error) throw error
-      return data as VolunteerDirectoryRow[]
+      return selectAll<VolunteerDirectoryRow>('volunteer_directory', 'full_name_ar')
     },
   })
 }
@@ -100,9 +104,8 @@ export function useHrRows(enabled: boolean) {
     queryKey: ['volunteer_hr'],
     enabled,
     queryFn: async () => {
-      const { data, error } = await supabase.from('volunteer_hr').select('*')
-      if (error) throw error
-      return new Map((data as VolunteerHr[]).map((h) => [h.volunteer_id, h]))
+      const rows = await selectAll<VolunteerHr>('volunteer_hr', 'volunteer_id')
+      return new Map(rows.map((h) => [h.volunteer_id, h]))
     },
   })
 }

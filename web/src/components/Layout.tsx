@@ -3,7 +3,6 @@ import {
   Bell,
   BarChart3,
   CalendarDays,
-  ClipboardCheck,
   ClipboardList,
   Hand,
   History,
@@ -104,8 +103,7 @@ export default function Layout() {
 
   const items = useMemo<NavItem[]>(() => {
     const list: NavItem[] = [{ to: '/', label: 'الرئيسية', icon: Home }]
-    if (p.volunteerId) list.push({ to: '/check-in', label: 'حضرت النهارده', icon: Hand })
-    if (p.canRegisterActivity) list.push({ to: '/register', label: 'تسجيل نشاط', icon: ClipboardCheck })
+    if (p.volunteerId || p.canRegisterActivity) list.push({ to: '/check-in', label: 'تسجيل حضور', icon: Hand })
     if (p.canReview) list.push({ to: '/requests', label: 'الطلبات', icon: Inbox, badge: pending.data })
     if (p.canSeeVolunteers) list.push({ to: '/volunteers', label: 'المتطوعين', icon: Users })
     if (p.full || p.organizer) list.push({ to: '/followups', label: 'المتابعة اليومية', icon: ClipboardList })

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useId } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import { z } from 'zod'
 import { Field, Input, Select, Textarea } from './ui'
@@ -10,14 +10,14 @@ export const activitySchema = z
   .object({
     activity_date: z.string().min(1, 'اختار التاريخ'),
     event: z.string().min(1, 'اختار الحدث'),
-    subject: z.string().optional(),
+    subject: z.string().trim().optional(),
     place: z.string().optional(),
     grade: z.string().optional(),
     beneficiaries: z.string().optional(),
     notes: z.string().optional(),
   })
   .superRefine((v, ctx) => {
-    if (TEACHING.includes(v.event) && !v.subject) ctx.addIssue({ code: 'custom', path: ['subject'], message: 'اختار المادة' })
+    if (TEACHING.includes(v.event) && !v.subject) ctx.addIssue({ code: 'custom', path: ['subject'], message: 'اكتب نوع الحدث' })
     if (TEACHING.includes(v.event) && !v.grade) ctx.addIssue({ code: 'custom', path: ['grade'], message: 'اختار السنة' })
     if (v.beneficiaries && !(Number(v.beneficiaries) > 0)) ctx.addIssue({ code: 'custom', path: ['beneficiaries'], message: 'رقم أكبر من صفر' })
   })
@@ -48,17 +48,13 @@ export default function ActivityFields({
   dateLocked?: boolean
 }) {
   const lookups = useLookups()
-  const { register, watch, setValue, formState } = form
+  const { register, watch, formState } = form
   const event = watch('event')
   const teaching = TEACHING.includes(event)
   const errors = formState.errors
-  const subjects = lookups.data?.list('نوع الحدث', event) ?? []
-
-  // A subject picked for one event may not exist for the next one
-  useEffect(() => {
-    if (teaching && !subjects.includes(watch('subject') ?? '')) setValue('subject', '')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event])
+  const listId = useId()
+  // Types already used with this event first, then the ones used with other events
+  const subjects = [...new Set([...(lookups.data?.list('نوع الحدث', event) ?? []), ...(lookups.data?.list('نوع الحدث') ?? [])])]
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -68,12 +64,17 @@ export default function ActivityFields({
       <Field label="الحدث" error={errors.event?.message}>
         <Select {...register('event')} placeholder="اختار..." options={lookups.data?.list('الحدث') ?? []} />
       </Field>
-      <Field label={teaching ? 'المادة' : 'نوع الحدث (اختياري)'} error={errors.subject?.message}>
-        {teaching ? (
-          <Select {...register('subject')} placeholder="اختار المادة..." options={subjects} />
-        ) : (
-          <Input {...register('subject')} placeholder="مثلاً: ورشة إسعافات أولية" />
-        )}
+      <Field
+        label={teaching ? 'نوع الحدث (المادة)' : 'نوع الحدث (اختياري)'}
+        hint="اختار من الاقتراحات أو اكتب نوع جديد، وهيتضاف للقايمة للمرات الجاية"
+        error={errors.subject?.message}
+      >
+        <Input {...register('subject')} list={listId} autoComplete="off" placeholder={teaching ? 'مثلاً: رياضيات' : 'مثلاً: ورشة إسعافات أولية'} />
+        <datalist id={listId}>
+          {subjects.map((s) => (
+            <option key={s} value={s} />
+          ))}
+        </datalist>
       </Field>
       <Field label="المكان">
         <Select {...register('place')} placeholder="—" options={lookups.data?.list('المكان') ?? []} />

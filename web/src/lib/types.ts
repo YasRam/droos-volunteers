@@ -21,6 +21,7 @@ export const REQUEST_LABEL: Record<RequestStatus, string> = {
 
 export interface MyContext {
   email: string | null
+  full_name: string | null
   role: AppRole | null
   is_full: boolean
   is_staff: boolean
