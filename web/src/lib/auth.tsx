@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Session } from '@supabase/supabase-js'
 import { isDevAuth, supabase } from './supabase'
+import type { Permission } from './permissions'
 import type { MyContext } from './types'
 
 interface AuthState {
@@ -50,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const me = meQuery.data ?? null
   const isLeader = (me?.committees.length ?? 0) > 0
-  const known = Boolean(me && (me.is_staff || me.is_management || me.volunteer_id || isLeader))
+  const known = Boolean(me && (me.role || me.volunteer_id || isLeader))
 
   const value: AuthState = {
     session,
@@ -82,25 +83,25 @@ export function useAuth() {
 /** What the signed-in person may do, in one place for the screens. */
 export function usePermissions() {
   const { me, isLeader } = useAuth()
-  const full = Boolean(me?.is_full)
-  const management = Boolean(me?.is_management)
-  const viewAll = full || management
-  const staff = Boolean(me?.is_staff)
+  const perms = new Set<string>(me?.permissions ?? [])
+  const can = (p: Permission) => perms.has(p)
+  const viewAll = can('volunteers.view_all')
   return {
-    /** admin, activity leader, HR: see and change everything */
-    full,
-    /** إدارة: sees everything except HR notes, changes nothing */
-    management,
-    /** full or management: whoever may read the whole picture */
+    can,
+    /** may add, edit and delete volunteers */
+    full: can('volunteers.edit'),
+    /** reads the whole picture (every volunteer and participation) */
     viewAll,
-    staff,
-    organizer: Boolean(me?.is_organizer),
+    /** registers attendance for others */
+    staff: can('attendance.register'),
+    /** registers only within the last 7 days */
+    organizer: can('attendance.register') && !can('attendance.any_date'),
     leader: isLeader,
     volunteerId: me?.volunteer_id ?? null,
-    canSeeVolunteers: viewAll || isLeader || staff,
-    canRegisterActivity: staff,
-    canReview: staff,
-    canEditSchedule: full,
-    canManage: full,
+    canSeeVolunteers: viewAll || isLeader || can('directory.view'),
+    canRegisterActivity: can('attendance.register'),
+    canReview: can('attendance.review'),
+    canEditSchedule: can('schedule.edit'),
+    canManage: can('settings.manage') || can('roles.manage'),
   }
 }

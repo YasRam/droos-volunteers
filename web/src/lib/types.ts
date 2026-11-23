@@ -1,19 +1,16 @@
-export type AppRole = 'admin' | 'activity_leader' | 'hr' | 'organizer' | 'management'
+/** Key of a row in public.roles (built-in: admin, activity_leader, hr, management, organizer). */
+export type AppRole = string
 export type VolunteerStatus = 'تحت المتابعة' | 'مشروع مسئول' | 'مسئول' | 'مدرب' | 'خارج المتابعة'
 export type AcceptanceGrade = 'اختبار' | 'مقبول' | 'رفض الانترفيو' | 'مرفوض' | 'معتذر' | 'معتذر نهائى' | 'مفصول'
 export type RequestStatus = 'pending' | 'accepted' | 'rejected'
+/** الوظيفة: one per volunteer, drives the structure tree. */
+export type Position = 'متطوع' | 'HR' | 'تنظيم' | 'ليدر لجنة' | 'نائب ليدر النشاط' | 'ليدر النشاط'
+export const POSITIONS: Position[] = ['متطوع', 'HR', 'تنظيم', 'ليدر لجنة', 'نائب ليدر النشاط', 'ليدر النشاط']
 export type Weekday = 'السبت' | 'الأحد' | 'الاثنين' | 'الثلاثاء' | 'الأربعاء' | 'الخميس' | 'الجمعة'
 
 export const STATUSES: VolunteerStatus[] = ['تحت المتابعة', 'مشروع مسئول', 'مسئول', 'مدرب', 'خارج المتابعة']
 export const ACCEPTANCE: AcceptanceGrade[] = ['اختبار', 'مقبول', 'رفض الانترفيو', 'مرفوض', 'معتذر', 'معتذر نهائى', 'مفصول']
 export const WEEKDAYS: Weekday[] = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة']
-export const ROLE_LABEL: Record<AppRole, string> = {
-  admin: 'أدمن',
-  activity_leader: 'ليدر نشاط',
-  hr: 'HR',
-  organizer: 'تنظيم',
-  management: 'إدارة',
-}
 export const REQUEST_LABEL: Record<RequestStatus, string> = {
   pending: 'مستني موافقة',
   accepted: 'مقبول',
@@ -24,8 +21,11 @@ export interface MyContext {
   email: string | null
   full_name: string | null
   role: AppRole | null
+  role_name: string | null
+  roles: string[]
+  position: Position | null
+  permissions: string[]
   is_full: boolean
-  is_management?: boolean
   is_staff: boolean
   is_organizer: boolean
   committees: string[]
@@ -49,6 +49,7 @@ export interface Volunteer {
   gender: 'ذكر' | 'أنثى' | null
   registered_at: string
   status: VolunteerStatus
+  position: Position
   main_committee: string | null
   sub_committee: string | null
   contacted: boolean
@@ -133,19 +134,32 @@ export interface Lookup {
   parent: string | null
   sort_order: number
   is_active: boolean
+  link: string | null
+  form: 'teaching' | 'none' | 'optional' | null
 }
 
 export interface StaffRole {
   email: string
   full_name: string
   role: AppRole
+  volunteer_id: string | null
   created_at: string
+}
+
+export interface Role {
+  key: string
+  name: string
+  description: string | null
+  permissions: string[]
+  is_builtin: boolean
+  sort_order: number
 }
 
 export interface CommitteeLeader {
   email: string
   committee: string
   full_name: string
+  volunteer_id: string | null
 }
 
 export interface Notification {
@@ -166,6 +180,9 @@ export interface AuditRow {
   record_id: string | null
   old_row: Record<string, unknown> | null
   new_row: Record<string, unknown> | null
+  actor_name: string | null
+  target_name: string | null
+  target_volunteer_id: string | null
 }
 
 export interface MonthlyParticipation {

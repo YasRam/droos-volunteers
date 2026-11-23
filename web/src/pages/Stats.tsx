@@ -9,7 +9,7 @@ import { addDays, cairoToday, fmtShort, useVolunteers, whatsappLink } from '@/li
 import { supabase } from '@/lib/supabase'
 import type { MonthlyParticipation } from '@/lib/types'
 
-type Tab = 'overview' | 'responsible' | 'inactive' | 'birthdays'
+type Tab = 'overview' | 'top' | 'responsible' | 'inactive' | 'birthdays'
 const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
 const monthLabel = (ym: string) => `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(2, 4)}`
 
@@ -18,6 +18,7 @@ export default function Stats() {
   const [params, setParams] = useSearchParams()
   const tabs = [
     ...(p.staff || p.viewAll ? [{ value: 'overview' as Tab, label: 'نظرة عامة' }] : []),
+    ...(p.can('stats.view') || p.leader ? [{ value: 'top' as Tab, label: 'الأكتر مشاركة' }] : []),
     ...(p.viewAll ? [{ value: 'responsible' as Tab, label: 'المسئولين والمشروع' }] : []),
     ...(p.viewAll ? [{ value: 'inactive' as Tab, label: 'مش بيشاركوا' }] : []),
     ...(p.viewAll || p.leader ? [{ value: 'birthdays' as Tab, label: 'أعياد الميلاد' }] : []),
@@ -28,6 +29,7 @@ export default function Stats() {
       <PageHeader title="الإحصائيات" />
       <Tabs tabs={tabs} value={tab} onChange={(t) => setParams({ tab: t })} />
       {tab === 'overview' && <Overview />}
+      {tab === 'top' && <TopParticipants />}
       {tab === 'responsible' && <Responsible />}
       {tab === 'inactive' && <Inactive />}
       {tab === 'birthdays' && <Birthdays />}
@@ -263,6 +265,109 @@ function Birthdays() {
               )}
             </div>
           ))}
+        </Card>
+      )}
+    </>
+  )
+}
+
+type TopRow = {
+  volunteer_id: string
+  code: string
+  full_name_ar: string
+  main_committee: string | null
+  participations: number
+  active_days: number
+  active_weeks: number
+  beneficiaries: number
+  last_date: string | null
+}
+
+function periodRange(period: string): [string, string] {
+  const today = cairoToday()
+  const [y, m] = today.split('-').map(Number)
+  const first = (yy: number, mm: number) => `${yy}-${String(mm).padStart(2, '0')}-01`
+  const prev = m === 1 ? [y - 1, 12] : [y, m - 1]
+  if (period === 'this') return [first(y, m), today]
+  if (period === 'last') return [first(prev[0], prev[1]), addDays(first(y, m), -1)]
+  if (period === '3m') return [addDays(today, -90), today]
+  if (period === 'year') return [`${y}-01-01`, today]
+  return ['2000-01-01', today]
+}
+
+/** Most regular and most active volunteers in a period. */
+function TopParticipants() {
+  const [period, setPeriod] = useState('last')
+  const [order, setOrder] = useState('days')
+  const [committee, setCommittee] = useState('')
+  const [from, to] = periodRange(period)
+  const vols = useVolunteers()
+  const committees = useMemo(() => [...new Set((vols.data ?? []).map((v) => v.main_committee).filter((c): c is string => Boolean(c)))].sort(), [vols.data])
+  const q = useQuery({
+    queryKey: ['top', from, to, order, committee],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('top_participants', { p_from: from, p_to: to, p_committee: committee || null, p_event: null, p_limit: 50, p_order: order })
+      if (error) throw error
+      return data as TopRow[]
+    },
+  })
+  const max = Math.max(1, ...(q.data ?? []).map((r) => (order === 'days' ? r.active_days : order === 'weeks' ? r.active_weeks : r.participations)))
+  return (
+    <>
+      <Card className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Select
+          value={period}
+          onChange={(e) => setPeriod(e.target.value)}
+          options={[
+            { value: 'this', label: 'الشهر ده' },
+            { value: 'last', label: 'الشهر اللي فات' },
+            { value: '3m', label: 'آخر 3 شهور' },
+            { value: 'year', label: 'السنة دي' },
+            { value: 'all', label: 'من الأول' },
+          ]}
+        />
+        <Select
+          value={order}
+          onChange={(e) => setOrder(e.target.value)}
+          options={[
+            { value: 'days', label: 'ترتيب بعدد الأيام' },
+            { value: 'weeks', label: 'ترتيب بالانتظام (عدد الأسابيع)' },
+            { value: 'participations', label: 'ترتيب بعدد المشاركات' },
+          ]}
+        />
+        <Select value={committee} onChange={(e) => setCommittee(e.target.value)} placeholder="كل اللجان" options={committees} />
+      </Card>
+      <p className="mb-2 text-xs text-muted">
+        من {fmtShort(from)} لـ {fmtShort(to)} · المشاركات المقبولة بس. الانتظام = عدد الأسابيع المختلفة اللي شارك فيها.
+      </p>
+      {q.isLoading ? (
+        <Spinner />
+      ) : !q.data?.length ? (
+        <Empty title="مفيش مشاركات في الفترة دي" />
+      ) : (
+        <Card className="divide-y divide-line p-0">
+          {q.data.map((r, i) => {
+            const val = order === 'days' ? r.active_days : order === 'weeks' ? r.active_weeks : r.participations
+            return (
+              <div key={r.volunteer_id} className="flex items-center gap-3 px-4 py-2.5">
+                <span className={`w-6 shrink-0 text-center font-bold ${i < 3 ? 'text-amber-600' : 'text-muted'}`}>{i + 1}</span>
+                <div className="min-w-0 flex-1">
+                  <Link to={`/volunteers/${r.volunteer_id}`} className="block truncate font-semibold hover:text-brand-700">
+                    {r.full_name_ar}
+                  </Link>
+                  <div className="mt-1 h-1.5 rounded-full bg-surface">
+                    <div className="h-1.5 rounded-full bg-brand-500" style={{ width: `${(val / max) * 100}%` }} />
+                  </div>
+                  <p className="mt-1 text-xs text-muted">
+                    {r.main_committee ?? '—'} · {r.participations} مشاركة · {r.active_days} يوم · {r.active_weeks} أسبوع
+                    {r.beneficiaries ? ` · ${r.beneficiaries} طالب` : ''}
+                    {r.last_date ? ` · آخر مرة ${fmtShort(r.last_date)}` : ''}
+                  </p>
+                </div>
+                <Badge tone="brand">{val}</Badge>
+              </div>
+            )
+          })}
         </Card>
       )}
     </>

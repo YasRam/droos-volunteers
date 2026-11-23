@@ -1,17 +1,17 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Filter, Info, LayoutList, MessageCircle, Plus, Search, Star, Table2 } from 'lucide-react'
+import { Filter, Info, LayoutList, MessageCircle, Plus, Search, Shirt, Star, Table2 } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { AcceptanceBadge, Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Spinner, StatusBadge } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
 import { ageFrom, fmtShort, useDirectory, useHrRows, useLookups, useVolunteers, type VolunteerWithStats } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
-import { ACCEPTANCE, STATUSES, type VolunteerHr, type VolunteerStatus } from '@/lib/types'
+import { ACCEPTANCE, POSITIONS, STATUSES, type VolunteerHr, type VolunteerStatus } from '@/lib/types'
 import { ContactLinks, VolunteerName } from '@/components/VolunteerLink'
 import { PersonalFields, personalSchema, toPersonalPayload, type PersonalValues } from './MyProfile'
 
@@ -27,8 +27,9 @@ interface Filters {
   qualification: string
   inactive: boolean
   recent: boolean
+  position: string
 }
-const EMPTY: Filters = { status: '', acceptance: '', committee: '', gender: '', birthMonth: '', job: '', qualification: '', inactive: false, recent: false }
+const EMPTY: Filters = { status: '', acceptance: '', committee: '', gender: '', birthMonth: '', job: '', qualification: '', inactive: false, recent: false, position: '' }
 
 export default function Volunteers() {
   const p = usePermissions()
@@ -58,7 +59,7 @@ function FullList() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const vols = useVolunteers()
-  const hr = useHrRows(p.viewAll)
+  const hr = useHrRows(p.can('hr.view'))
   const lookups = useLookups()
   const wide = useWide()
   const [view, setView] = useState<'auto' | 'table' | 'cards'>('auto')
@@ -69,6 +70,7 @@ function FullList() {
   const [showLegend, setShowLegend] = useState(false)
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'name', dir: 1 })
   const [adding, setAdding] = useState(false)
+  const [tshirts, setTshirts] = useState(false)
   const active = Object.entries(filters).filter(([, v]) => v).length
 
   const rows = useMemo(() => {
@@ -78,6 +80,7 @@ function FullList() {
       if (s && !(v.full_name_ar.includes(s) || v.code.includes(s.toUpperCase()) || v.phone?.includes(s) || v.full_name_en?.toLowerCase().includes(s.toLowerCase())))
         return false
       if (filters.status && v.status !== filters.status) return false
+      if (filters.position && v.position !== filters.position) return false
       if (filters.acceptance && (hr.data?.get(v.id)?.acceptance ?? 'لسه') !== filters.acceptance) return false
       if (filters.committee && v.main_committee !== filters.committee && v.sub_committee !== filters.committee) return false
       if (filters.gender && v.gender !== filters.gender) return false
@@ -111,11 +114,18 @@ function FullList() {
         title="المتطوعين"
         subtitle={vols.data ? `بيظهر ${rows.length} من ${vols.data.length}` : undefined}
         actions={
-          p.full && (
-            <Button onClick={() => setAdding(true)}>
-              <Plus className="size-4" /> متطوع جديد
-            </Button>
-          )
+          <>
+            {(p.full || p.leader) && (
+              <Button variant="secondary" onClick={() => setTshirts(true)}>
+                <Shirt className="size-4" /> شراء تيشيرت
+              </Button>
+            )}
+            {p.full && (
+              <Button onClick={() => setAdding(true)}>
+                <Plus className="size-4" /> متطوع جديد
+              </Button>
+            )}
+          </>
         }
       />
       <div className="mb-3 flex flex-wrap gap-2">
@@ -151,6 +161,9 @@ function FullList() {
               <Select value={filters.acceptance} onChange={(e) => set('acceptance', e.target.value)} placeholder="الكل" options={[...ACCEPTANCE, 'لسه']} />
             </Field>
           )}
+          <Field label="الوظيفة">
+            <Select value={filters.position} onChange={(e) => set('position', e.target.value)} placeholder="الكل" options={POSITIONS} />
+          </Field>
           <Field label="اللجنة">
             <Select value={filters.committee} onChange={(e) => set('committee', e.target.value)} placeholder="الكل" options={lookups.data?.list('اللجنة') ?? []} />
           </Field>
@@ -206,7 +219,7 @@ function FullList() {
               </h2>
               <Card className="divide-y divide-line p-0">
                 {g.rows.map((v) => (
-                  <VolunteerRow key={v.id} v={v} acceptance={p.viewAll ? hr.data?.get(v.id)?.acceptance : undefined} onOpen={() => navigate(`/volunteers/${v.id}`)} />
+                  <VolunteerRow key={v.id} v={v} acceptance={p.can('hr.view') ? hr.data?.get(v.id)?.acceptance : undefined} onOpen={() => navigate(`/volunteers/${v.id}`)} />
                 ))}
               </Card>
             </section>
@@ -214,6 +227,7 @@ function FullList() {
         </div>
       )}
       {adding && <AddVolunteer onClose={() => setAdding(false)} />}
+      {tshirts && vols.data && <TshirtForm vols={vols.data} onClose={() => setTshirts(false)} />}
     </>
   )
 }
@@ -376,6 +390,7 @@ function VolunteerTable({
             <Th>الكود</Th>
             <Th k="name">الاسم</Th>
             <Th>الحالة</Th>
+            <Th>الوظيفة</Th>
             {full && <Th>القبول</Th>}
             <Th>اللجنة</Th>
             <Th>التليفون</Th>
@@ -396,6 +411,7 @@ function VolunteerTable({
                 <td className="px-3 py-2">
                   <StatusBadge status={v.status} />
                 </td>
+                <td className="whitespace-nowrap px-3 py-2 text-xs">{v.position === 'متطوع' ? <span className="text-muted">متطوع</span> : <Badge tone="brand">{v.position}</Badge>}</td>
                 {full && (
                   <td className="px-3 py-2">
                     <AcceptanceBadge value={hr?.get(v.id)?.acceptance} />
@@ -456,23 +472,21 @@ function Directory() {
   )
 }
 
+/** New volunteer: only what the person tells us. Status, committees and interview come later. */
 function AddVolunteer({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient()
   const navigate = useNavigate()
-  const lookups = useLookups()
+  const p = usePermissions()
   const form = useForm<PersonalValues>({ resolver: zodResolver(personalSchema), defaultValues: { full_name_ar: '', phone: '' } })
-  const [extra, setExtra] = useState({ national_id: '', main_committee: '', sub_committee: '' })
+  const [nationalId, setNationalId] = useState('')
   const save = useMutation({
     mutationFn: async (v: PersonalValues) => {
-      if (extra.national_id && !/^[23]\d{13}$/.test(extra.national_id)) throw { message: 'الرقم القومي 14 رقم ويبدأ بـ 2 أو 3' }
-      const { data, error } = await supabase
-        .from('volunteers')
-        .insert({ ...toPersonalPayload(v), main_committee: extra.main_committee || null, sub_committee: extra.sub_committee || null })
-        .select('id')
-        .single()
+      const nid = nationalId.replace(/\D/g, '')
+      if (nid && !/^[23]\d{13}$/.test(nid)) throw { message: 'الرقم القومي 14 رقم ويبدأ بـ 2 أو 3' }
+      const { data, error } = await supabase.from('volunteers').insert(toPersonalPayload(v)).select('id').single()
       if (error) throw error
-      if (extra.national_id) {
-        const r = await supabase.from('volunteer_private').update({ national_id: extra.national_id }).eq('volunteer_id', data.id)
+      if (nid && p.can('national_id.edit')) {
+        const r = await supabase.from('volunteer_private').update({ national_id: nid }).eq('volunteer_id', data.id)
         if (r.error) throw r.error
       }
       return data.id as string
@@ -485,29 +499,66 @@ function AddVolunteer({ onClose }: { onClose: () => void }) {
     },
     onError: toastError,
   })
-  const committees = lookups.data?.list('اللجنة') ?? []
   return (
     <Modal open onClose={onClose} title="متطوع جديد">
       <form onSubmit={form.handleSubmit((v) => save.mutate(v))} className="space-y-4">
         <PersonalFields form={form} />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Field label="الرقم القومي">
-            <Input value={extra.national_id} onChange={(e) => setExtra({ ...extra, national_id: e.target.value })} dir="ltr" inputMode="numeric" />
+        {p.can('national_id.edit') && (
+          <Field label="الرقم القومي" hint="تاريخ الميلاد والنوع بيتحسبوا منه">
+            <Input value={nationalId} onChange={(e) => setNationalId(e.target.value)} dir="ltr" inputMode="numeric" />
           </Field>
-          <Field label="اللجنة الأساسية">
-            <Select value={extra.main_committee} onChange={(e) => setExtra({ ...extra, main_committee: e.target.value })} placeholder="—" options={committees} />
-          </Field>
-          <Field label="اللجنة الفرعية">
-            <Select value={extra.sub_committee} onChange={(e) => setExtra({ ...extra, sub_committee: e.target.value })} placeholder="—" options={committees} />
-          </Field>
-        </div>
+        )}
         <Button type="submit" className="w-full" loading={save.isPending}>
           إضافة
         </Button>
-        <p className="text-center text-xs text-muted">
-          بيانات المقابلة تتكمّل من صفحة المتطوع. <Link to="/admin" className="text-brand-700">القوايم</Link>
-        </p>
+        <p className="text-center text-xs text-muted">الحالة واللجان والوظيفة وبيانات المقابلة بتتحدد بعدين من ملف المتطوع.</p>
       </form>
+    </Modal>
+  )
+}
+
+/** Mark many volunteers at once as having bought the t-shirt. */
+function TshirtForm({ vols, onClose }: { vols: VolunteerWithStats[]; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [search, setSearch] = useState('')
+  const [picked, setPicked] = useState<string[]>([])
+  const without = vols.filter((v) => !v.bought_tshirt && v.status !== 'خارج المتابعة')
+  const shown = without.filter((v) => !search.trim() || v.full_name_ar.includes(search.trim()) || v.code.includes(search.trim().toUpperCase()))
+  const save = useMutation({
+    mutationFn: async () => {
+      if (!picked.length) throw { message: 'اختار حد واحد على الأقل' }
+      const { error } = await supabase.from('volunteers').update({ bought_tshirt: true }).in('id', picked)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success(`اتسجل شراء ${picked.length} تيشيرت`)
+      qc.invalidateQueries({ queryKey: ['volunteers'] })
+      onClose()
+    },
+    onError: toastError,
+  })
+  return (
+    <Modal open onClose={onClose} title="تسجيل شراء تيشيرت">
+      <div className="space-y-3">
+        <p className="text-sm text-muted">علّم على كل اللي اشتروا، واحفظ مرة واحدة. القايمة فيها اللي لسه ما اشتروش بس ({without.length}).</p>
+        <div className="relative">
+          <Search className="absolute start-3 top-2.5 size-5 text-muted" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="دوّر بالاسم أو الكود" className="ps-10" />
+        </div>
+        <div className="max-h-80 divide-y divide-line overflow-y-auto rounded-xl border border-line">
+          {shown.map((v) => (
+            <label key={v.id} className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-surface">
+              <input type="checkbox" className="size-4 accent-brand-700" checked={picked.includes(v.id)} onChange={(e) => setPicked((x) => (e.target.checked ? [...x, v.id] : x.filter((i) => i !== v.id)))} />
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold">{v.full_name_ar}</span>
+              <span className="ltr text-xs text-muted">{v.code}</span>
+            </label>
+          ))}
+          {!shown.length && <p className="px-3 py-4 text-center text-sm text-muted">مفيش</p>}
+        </div>
+        <Button className="w-full" onClick={() => save.mutate()} loading={save.isPending} disabled={!picked.length}>
+          حفظ ({picked.length})
+        </Button>
+      </div>
     </Modal>
   )
 }

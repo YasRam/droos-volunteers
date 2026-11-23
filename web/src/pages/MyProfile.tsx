@@ -3,9 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
-import { Badge, Button, Card, Field, Input, PageHeader, Spinner, StatusBadge, Textarea } from '@/components/ui'
+import { CertificateCard } from '@/components/CertificateCard'
+import { VolunteerFacts } from '@/components/VolunteerFacts'
+import { Button, Card, Field, Input, PageHeader, Spinner, Textarea } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
-import { ageFrom, fmtDate, useSetting } from '@/lib/data'
+import { useSetting } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import type { Volunteer, VolunteerPrivate } from '@/lib/types'
@@ -94,7 +96,8 @@ export const personalDefaults = (v: Volunteer): PersonalValues => ({
   referral_source: v.referral_source ?? '',
 })
 
-export function NationalIdCard({ volunteerId, canEditDirectly, readOnly = false }: { volunteerId: string; canEditDirectly: boolean; readOnly?: boolean }) {
+/** National ID: read-only unless the person has national_id.edit. No change requests. */
+export function NationalIdCard({ volunteerId, canEdit }: { volunteerId: string; canEdit: boolean }) {
   const qc = useQueryClient()
   const q = useQuery({
     queryKey: ['private', volunteerId],
@@ -107,15 +110,15 @@ export function NationalIdCard({ volunteerId, canEditDirectly, readOnly = false 
   const form = useForm<{ nid: string }>()
   const save = useMutation({
     mutationFn: async (nid: string) => {
-      const patch = canEditDirectly ? { national_id: nid } : { requested_national_id: nid }
-      const { error } = await supabase.from('volunteer_private').update(patch).eq('volunteer_id', volunteerId)
+      const { error } = await supabase.from('volunteer_private').update({ national_id: nid }).eq('volunteer_id', volunteerId)
       if (error) throw error
     },
     onSuccess: () => {
-      toast.success(canEditDirectly ? 'الرقم القومي اتغيّر' : 'الطلب اتبعت للـ HR')
+      toast.success('الرقم القومي اتغيّر، وتاريخ الميلاد والنوع اتحسبوا منه')
       form.reset({ nid: '' })
       qc.invalidateQueries({ queryKey: ['private', volunteerId] })
       qc.invalidateQueries({ queryKey: ['volunteer', volunteerId] })
+      qc.invalidateQueries({ queryKey: ['volunteers'] })
     },
     onError: toastError,
   })
@@ -124,37 +127,30 @@ export function NationalIdCard({ volunteerId, canEditDirectly, readOnly = false 
   return (
     <Card>
       <p className="font-bold">الرقم القومي</p>
-      <p className="mb-2 text-xs text-muted">
-        {readOnly
-          ? 'عرض بس.'
-          : canEditDirectly
-          ? 'بصلاحيتك (أدمن أو ليدر نشاط أو HR) التعديل بيتحفظ على طول، وتاريخ الميلاد والنوع بيتحسبوا منه.'
-          : 'التغيير بيتبعت طلب، والأدمن أو ليدر النشاط أو الـ HR بيوافقوا عليه.'}
-      </p>
-      <p className="ltr text-start text-lg font-semibold tracking-wider">{q.data?.national_id ?? '—'}</p>
-      {q.data?.requested_national_id && (
-        <p className="mt-2 text-sm">
-          <Badge tone="orange">مستني موافقة</Badge> <span className="ltr">{q.data.requested_national_id}</span>
-        </p>
+      <p className="ltr mt-1 text-start text-lg font-semibold tracking-wider">{q.data?.national_id ?? '—'}</p>
+      {canEdit ? (
+        <form
+          className="mt-3 flex gap-2"
+          onSubmit={form.handleSubmit(({ nid }) => {
+            const clean = nid.replace(/\D/g, '')
+            if (!/^[23]\d{13}$/.test(clean)) return toast.error('الرقم القومي 14 رقم ويبدأ بـ 2 أو 3')
+            save.mutate(clean)
+          })}
+        >
+          <Input {...form.register('nid')} inputMode="numeric" dir="ltr" placeholder="رقم قومي جديد" />
+          <Button type="submit" variant="secondary" loading={save.isPending}>
+            حفظ
+          </Button>
+        </form>
+      ) : (
+        <p className="mt-1 text-xs text-muted">الرقم القومي بيتعدّل من الإدارة بس. لو فيه غلط كلّم الـ HR.</p>
       )}
-      {!readOnly && <form
-        className="mt-3 flex gap-2"
-        onSubmit={form.handleSubmit(({ nid }) => {
-          if (!/^[23]\d{13}$/.test(nid)) return toast.error('الرقم القومي 14 رقم ويبدأ بـ 2 أو 3')
-          save.mutate(nid)
-        })}
-      >
-        <Input {...form.register('nid')} inputMode="numeric" dir="ltr" placeholder={canEditDirectly ? 'رقم قومي جديد' : 'لو عايز تغيّره اكتبه هنا'} />
-        <Button type="submit" variant="secondary" loading={save.isPending}>
-          {canEditDirectly ? 'حفظ' : 'اطلب تغيير'}
-        </Button>
-      </form>}
     </Card>
   )
 }
 
 export default function MyProfile() {
-  const { volunteerId, full } = usePermissions()
+  const { volunteerId, can } = usePermissions()
   const qc = useQueryClient()
   const groupLink = useSetting('whatsapp_group_link')
   const q = useQuery({
@@ -180,7 +176,6 @@ export default function MyProfile() {
 
   if (q.isLoading || !q.data) return <Spinner />
   const v = q.data
-  const age = ageFrom(v.birth_date)
 
   return (
     <>
@@ -197,19 +192,9 @@ export default function MyProfile() {
           </Card>
         </div>
         <div className="space-y-4">
-          <Card>
-            <p className="mb-3 font-bold">في النشاط</p>
-            <dl className="space-y-2 text-sm">
-              <Row label="الحالة"><StatusBadge status={v.status} /></Row>
-              <Row label="اللجنة الأساسية">{v.main_committee ?? '—'}</Row>
-              <Row label="اللجنة الفرعية">{v.sub_committee ?? '—'}</Row>
-              <Row label="تاريخ الميلاد">{fmtDate(v.birth_date)}{age !== null && ` (${age} سنة)`}</Row>
-              <Row label="اتسجلت">{fmtDate(v.registered_at)}</Row>
-              <Row label="الميني كامب">{v.attended_minicamp ? fmtDate(v.minicamp_date) : 'لسه'}</Row>
-              <Row label="التيشيرت">{v.bought_tshirt ? 'اشتريته' : 'لسه'}</Row>
-            </dl>
-          </Card>
-          <NationalIdCard volunteerId={v.id} canEditDirectly={full} />
+          <VolunteerFacts v={v} />
+          <NationalIdCard volunteerId={v.id} canEdit={can('national_id.edit')} />
+          <CertificateCard volunteerId={v.id} />
           {groupLink.data && !v.joined_group && (
             <a href={groupLink.data} target="_blank" rel="noreferrer">
               <Button className="w-full">ادخل جروب الواتساب</Button>
@@ -221,11 +206,4 @@ export default function MyProfile() {
   )
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <dt className="text-muted">{label}</dt>
-      <dd className="font-semibold">{children}</dd>
-    </div>
-  )
-}
+

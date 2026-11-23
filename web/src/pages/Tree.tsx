@@ -7,7 +7,7 @@ import { Badge, Card, Input, PageHeader, Spinner, StatusBadge } from '@/componen
 import { usePermissions } from '@/lib/auth'
 import { useLookups, useVolunteers, type VolunteerWithStats } from '@/lib/data'
 import { supabase } from '@/lib/supabase'
-import type { CommitteeLeader, StaffRole } from '@/lib/types'
+import type { CommitteeLeader } from '@/lib/types'
 
 const NO_COMMITTEE = 'من غير لجنة'
 
@@ -17,13 +17,13 @@ export default function Tree() {
   const lookups = useLookups()
   const vols = useVolunteers()
   const [search, setSearch] = useState('')
+  // Committee leaders count only when linked to a volunteer: the tree is people, not accounts.
   const people = useQuery({
     queryKey: ['tree-people'],
     queryFn: async () => {
-      const [staff, leaders] = await Promise.all([supabase.from('staff_roles').select('*'), supabase.from('committee_leaders').select('*')])
-      if (staff.error) throw staff.error
-      if (leaders.error) throw leaders.error
-      return { staff: staff.data as StaffRole[], leaders: leaders.data as CommitteeLeader[] }
+      const { data, error } = await supabase.from('committee_leaders').select('*').not('volunteer_id', 'is', null)
+      if (error) throw error
+      return { leaders: data as CommitteeLeader[] }
     },
   })
 
@@ -44,7 +44,9 @@ export default function Tree() {
     return list.filter((c) => p.viewAll || c.main.length || c.sub.length)
   }, [vols.data, lookups.data, people.data, search, p.viewAll])
 
-  const activityLeaders = (people.data?.staff ?? []).filter((s) => s.role === 'activity_leader' || s.role === 'admin')
+  const byPosition = (pos: string) => (vols.data ?? []).filter((v) => v.position === pos)
+  const top = [...byPosition('ليدر النشاط'), ...byPosition('نائب ليدر النشاط')]
+  const team = [...byPosition('HR'), ...byPosition('تنظيم')]
   const total = committees.reduce((n, c) => n + c.main.length, 0)
 
   if (vols.isLoading || people.isLoading) return <Spinner />
@@ -56,23 +58,25 @@ export default function Tree() {
         <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="دوّر على متطوع في الشجرة" className="ps-10" />
       </div>
 
-      {/* Root */}
+      {/* Root: activity leader and deputy, then HR and organizers */}
       <Card className="border-brand-200 bg-brand-50/60">
         <p className="mb-2 flex items-center gap-2 font-bold text-brand-800">
-          <Crown className="size-5" /> ليدر النشاط
+          <Crown className="size-5" /> قيادة النشاط
         </p>
         <div className="flex flex-wrap gap-2">
-          {activityLeaders.length ? (
-            activityLeaders.map((s) => (
-              <span key={s.email} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-sm font-semibold ring-1 ring-brand-200">
-                {s.full_name}
-                <Badge tone={s.role === 'admin' ? 'purple' : 'brand'}>{s.role === 'admin' ? 'أدمن' : 'ليدر نشاط'}</Badge>
-              </span>
-            ))
+          {top.length ? (
+            top.map((v) => <Person key={v.id} v={v} tone={v.position === 'ليدر النشاط' ? 'purple' : 'brand'} />)
           ) : (
-            <span className="text-sm text-muted">مفيش ليدر نشاط متسجل. ضيفه من الإعدادات ← الصلاحيات.</span>
+            <span className="text-sm text-muted">مفيش حد وظيفته «ليدر النشاط». حددها من ملف المتطوع ← الحالة والمقابلة.</span>
           )}
         </div>
+        {team.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2 border-t border-brand-100 pt-3">
+            {team.map((v) => (
+              <Person key={v.id} v={v} tone="gray" />
+            ))}
+          </div>
+        )}
       </Card>
 
       {/* Branches */}
@@ -127,7 +131,7 @@ function CommitteeNode({
             <div className="mb-3 flex flex-wrap gap-2">
               {leaders.map((l) => (
                 <span key={l.email} className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
-                  <Shield className="size-3.5" /> {l.full_name}
+                  <Shield className="size-3.5" /> <VolunteerName id={l.volunteer_id!} name={l.full_name} />
                 </span>
               ))}
             </div>
@@ -151,6 +155,15 @@ function CommitteeNode({
         </div>
       )}
     </Card>
+  )
+}
+
+function Person({ v, tone }: { v: VolunteerWithStats; tone: 'purple' | 'brand' | 'gray' }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-white py-1 ps-3 pe-1.5 text-sm font-semibold ring-1 ring-brand-200">
+      <VolunteerName id={v.id} name={v.full_name_ar} />
+      <Badge tone={tone}>{v.position}</Badge>
+    </span>
   )
 }
 

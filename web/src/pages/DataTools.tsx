@@ -10,13 +10,13 @@ import { toastError } from '@/lib/errors'
 import { importParticipations, importVolunteers, type ImportResult } from '@/lib/importer'
 
 export default function DataTools() {
-  const { full } = usePermissions()
+  const { can } = usePermissions()
   return (
     <>
       <PageHeader title="البيانات" subtitle="تنزيل كل البيانات Excel، أو إضافة متطوعين ومشاركات من ملف Excel" />
       <div className="space-y-4">
         <ExportCard />
-        {full && <ImportCard />}
+        {can('data.import') && <ImportCard />}
       </div>
     </>
   )

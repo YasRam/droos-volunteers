@@ -5,13 +5,14 @@ import { useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Button, Card, Empty, Field, Input, PageHeader, RequestBadge, Select, Spinner, StatusBadge, Tabs, Textarea, Toggle } from '@/components/ui'
+import { Badge, Button, Card, Empty, Field, Input, PageHeader, RequestBadge, Select, Spinner, StatusBadge, Tabs, Textarea, Toggle } from '@/components/ui'
+import { VolunteerFacts } from '@/components/VolunteerFacts'
 import { ContactLinks } from '@/components/VolunteerLink'
 import { useAuth, usePermissions } from '@/lib/auth'
-import { ageFrom, fmtDate, fmtShort, useLookups, whatsappLink } from '@/lib/data'
+import { ageFrom, fmtShort, useLookups, whatsappLink } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
-import { ACCEPTANCE, STATUSES, type Participation, type Volunteer, type VolunteerHr } from '@/lib/types'
+import { ACCEPTANCE, POSITIONS, STATUSES, type Participation, type Volunteer, type VolunteerHr } from '@/lib/types'
 import { NationalIdCard, PersonalFields, personalDefaults, personalSchema, toPersonalPayload, type PersonalValues } from './MyProfile'
 
 type Tab = 'data' | 'interview' | 'committee' | 'activities'
@@ -56,7 +57,7 @@ export default function VolunteerDetail() {
   const age = ageFrom(v.birth_date)
   const tabs: { value: Tab; label: string }[] = [
     { value: 'data', label: 'البيانات' },
-    ...(p.viewAll ? [{ value: 'interview' as Tab, label: 'المقابلة' }] : []),
+    ...(p.can('hr.view') || p.full ? [{ value: 'interview' as Tab, label: 'الحالة والمقابلة' }] : []),
     { value: 'committee', label: 'اللجنة' },
     { value: 'activities', label: 'المشاركات' },
   ]
@@ -71,6 +72,7 @@ export default function VolunteerDetail() {
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
             <StatusBadge status={v.status} />
+            <Badge tone="brand">{v.position}</Badge>
             <span className="ltr">{v.code}</span>
             {v.main_committee && <span>· {v.main_committee}</span>}
             {age !== null && <span>· {age} سنة</span>}
@@ -102,13 +104,8 @@ export default function VolunteerDetail() {
             {p.full ? <EditPersonal v={v} /> : <ReadPersonal v={v} />}
           </div>
           <div className="space-y-4">
-            {p.viewAll && <NationalIdCard volunteerId={v.id} canEditDirectly={p.full} readOnly={!p.full} />}
-            <Card className="text-sm">
-              <p>تاريخ الميلاد: {fmtDate(v.birth_date)}</p>
-              <p className="mt-1">النوع: {v.gender ?? '—'}</p>
-              <p className="mt-1">اتسجل: {fmtDate(v.registered_at)}</p>
-              {v.updated_by && <p className="mt-1 text-xs text-muted">آخر تعديل: {v.updated_by}</p>}
-            </Card>
+            <VolunteerFacts v={v} />
+            {p.can('national_id.view') && <NationalIdCard volunteerId={v.id} canEdit={p.can('national_id.edit')} />}
             {p.full && (
               <Button
                 variant="ghost"
@@ -122,7 +119,7 @@ export default function VolunteerDetail() {
           </div>
         </div>
       )}
-      {tab === 'interview' && p.viewAll && <Interview v={v} readOnly={!p.full} />}
+      {tab === 'interview' && <Interview v={v} />}
       {tab === 'committee' && <Committee v={v} editable={canEditCommittee} />}
       {tab === 'activities' && <Activities volunteerId={v.id} />}
     </>
@@ -182,13 +179,20 @@ function EditPersonal({ v }: { v: Volunteer }) {
   )
 }
 
-function Interview({ v, readOnly }: { v: Volunteer; readOnly: boolean }) {
+/** Status, job and committees (volunteers.edit) and the interview data (hr.*). */
+function Interview({ v }: { v: Volunteer }) {
   const qc = useQueryClient()
+  const p = usePermissions()
   const lookups = useLookups()
+  const canEditStatus = p.can('volunteers.edit')
+  const seesHr = p.can('hr.view')
+  const canEditHr = p.can('hr.edit')
+  const seesNotes = p.can('hr.notes')
   const hr = useQuery({
     queryKey: ['hr', v.id],
+    enabled: seesHr,
     queryFn: async () => {
-      const { data, error } = await supabase.from(readOnly ? 'volunteer_hr_read' : 'volunteer_hr').select('*').eq('volunteer_id', v.id).maybeSingle()
+      const { data, error } = await supabase.from(seesNotes ? 'volunteer_hr' : 'volunteer_hr_read').select('*').eq('volunteer_id', v.id).maybeSingle()
       if (error) throw error
       return data as VolunteerHr | null
     },
@@ -196,6 +200,7 @@ function Interview({ v, readOnly }: { v: Volunteer; readOnly: boolean }) {
   const form = useForm({
     values: {
       status: v.status,
+      position: v.position,
       main_committee: v.main_committee ?? '',
       sub_committee: v.sub_committee ?? '',
       acceptance: hr.data?.acceptance ?? '',
@@ -206,72 +211,85 @@ function Interview({ v, readOnly }: { v: Volunteer; readOnly: boolean }) {
   })
   const save = useMutation({
     mutationFn: async (f: Parameters<Parameters<typeof form.handleSubmit>[0]>[0]) => {
-      const a = await supabase
-        .from('volunteers')
-        .update({ status: f.status, main_committee: f.main_committee || null, sub_committee: f.sub_committee || null })
-        .eq('id', v.id)
-      if (a.error) throw a.error
-      const b = await supabase
-        .from('volunteer_hr')
-        .update({
-          acceptance: f.acceptance || null,
-          interview_date: f.interview_date || null,
-          interviewer: f.interviewer || null,
-          hr_notes: f.hr_notes || null,
-        })
-        .eq('volunteer_id', v.id)
-      if (b.error) throw b.error
+      if (canEditStatus) {
+        const a = await supabase
+          .from('volunteers')
+          .update({ status: f.status, position: f.position, main_committee: f.main_committee || null, sub_committee: f.sub_committee || null })
+          .eq('id', v.id)
+        if (a.error) throw a.error
+      }
+      if (canEditHr) {
+        const b = await supabase
+          .from('volunteer_hr')
+          .update({
+            acceptance: f.acceptance || null,
+            interview_date: f.interview_date || null,
+            interviewer: f.interviewer || null,
+            ...(seesNotes ? { hr_notes: f.hr_notes || null } : {}),
+          })
+          .eq('volunteer_id', v.id)
+        if (b.error) throw b.error
+      }
     },
     onSuccess: () => {
-      toast.success('بيانات المقابلة اتحفظت')
+      toast.success('اتحفظت')
       qc.invalidateQueries({ queryKey: ['volunteer', v.id] })
       qc.invalidateQueries({ queryKey: ['hr', v.id] })
       qc.invalidateQueries({ queryKey: ['volunteers'] })
+      qc.invalidateQueries({ queryKey: ['volunteer_hr'] })
     },
     onError: toastError,
   })
-  if (hr.isLoading) return <Spinner />
+  if (seesHr && hr.isLoading) return <Spinner />
   const committees = lookups.data?.list('اللجنة') ?? []
   return (
     <Card>
-      {readOnly && <p className="mb-3 text-xs text-muted">عرض بس. التعديل للأدمن وليدر النشاط والـ HR، وملاحظات الـ HR مش ظاهرة لصلاحية الإدارة.</p>}
-      <form onSubmit={form.handleSubmit((f) => save.mutate(f))} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <fieldset disabled={readOnly} className="contents">
-        <Field label="حالة المتطوع">
-          <Select {...form.register('status')} options={STATUSES} />
-        </Field>
-        <Field label="درجة القبول" hint={hr.data?.status_changed_at ? `آخر تغيير ${fmtShort(hr.data.status_changed_at)}` : undefined}>
-          <Select {...form.register('acceptance')} placeholder="—" options={ACCEPTANCE} />
-        </Field>
-        <Field label="اللجنة الأساسية">
-          <Select {...form.register('main_committee')} placeholder="—" options={committees} />
-        </Field>
-        <Field label="اللجنة الفرعية">
-          <Select {...form.register('sub_committee')} placeholder="—" options={committees} />
-        </Field>
-        <Field label="تاريخ المقابلة">
-          <Input type="date" {...form.register('interview_date')} />
-        </Field>
-        <Field label="القائم على المقابلة">
-          <Input {...form.register('interviewer')} list="interviewers" />
-          <datalist id="interviewers">
-            {lookups.data?.list('القائم على المقابلة').map((n) => <option key={n} value={n} />)}
-          </datalist>
-        </Field>
-        {!readOnly && (
-          <div className="sm:col-span-2">
-            <Field label="ملاحظات HR">
-              <Textarea {...form.register('hr_notes')} />
-            </Field>
-          </div>
-        )}
+      <form onSubmit={form.handleSubmit((f) => save.mutate(f))} className="space-y-5">
+        <fieldset disabled={!canEditStatus} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <legend className="mb-2 text-sm font-bold text-brand-800 sm:col-span-2">الحالة والوظيفة واللجان</legend>
+          <Field label="حالة المتطوع">
+            <Select {...form.register('status')} options={STATUSES} />
+          </Field>
+          <Field label="الوظيفة" hint="بتحدد مكانه في الهيكل">
+            <Select {...form.register('position')} options={POSITIONS} />
+          </Field>
+          <Field label="اللجنة الأساسية">
+            <Select {...form.register('main_committee')} placeholder="—" options={committees} />
+          </Field>
+          <Field label="اللجنة الفرعية">
+            <Select {...form.register('sub_committee')} placeholder="—" options={committees} />
+          </Field>
         </fieldset>
-        {!readOnly && (
-          <div className="sm:col-span-2">
-            <Button type="submit" loading={save.isPending}>
-              حفظ
-            </Button>
-          </div>
+        {seesHr && (
+          <fieldset disabled={!canEditHr} className="grid grid-cols-1 gap-4 border-t border-line pt-4 sm:grid-cols-2">
+            <legend className="mb-2 text-sm font-bold text-brand-800 sm:col-span-2">المقابلة</legend>
+            <Field label="درجة القبول" hint={hr.data?.status_changed_at ? `آخر تغيير ${fmtShort(hr.data.status_changed_at)}` : undefined}>
+              <Select {...form.register('acceptance')} placeholder="—" options={ACCEPTANCE} />
+            </Field>
+            <Field label="تاريخ المقابلة">
+              <Input type="date" {...form.register('interview_date')} />
+            </Field>
+            <Field label="القائم على المقابلة">
+              <Input {...form.register('interviewer')} list="interviewers" />
+              <datalist id="interviewers">
+                {lookups.data?.list('القائم على المقابلة').map((n) => <option key={n} value={n} />)}
+              </datalist>
+            </Field>
+            {seesNotes && (
+              <div className="sm:col-span-2">
+                <Field label="ملاحظات HR">
+                  <Textarea {...form.register('hr_notes')} />
+                </Field>
+              </div>
+            )}
+          </fieldset>
+        )}
+        {(canEditStatus || canEditHr) ? (
+          <Button type="submit" loading={save.isPending}>
+            حفظ
+          </Button>
+        ) : (
+          <p className="text-xs text-muted">عرض بس. التعديل محتاج صلاحية تعديل المتطوعين أو المقابلة.</p>
         )}
       </form>
     </Card>

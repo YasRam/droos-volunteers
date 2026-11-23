@@ -5,10 +5,10 @@ import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
-import ActivityFields, { activitySchema, toActivityPayload, type ActivityValues } from '@/components/ActivityFields'
+import ActivityFields, { activitySchema, checkActivity, eventForm, toActivityPayload, type ActivityValues } from '@/components/ActivityFields'
 import { Button, Card, Input, PageHeader } from '@/components/ui'
 import { useAuth, usePermissions } from '@/lib/auth'
-import { addDays, cairoToday, fmtDate, useDirectory } from '@/lib/data'
+import { addDays, cairoToday, fmtDate, useDirectory, useLookups } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 
@@ -30,6 +30,7 @@ export default function RegisterActivity() {
   const today = cairoToday()
   const canPickOthers = p.canRegisterActivity
   const dir = useDirectory(canPickOthers)
+  const lookups = useLookups()
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<string[]>(() => (p.volunteerId ? [p.volunteerId] : []))
   const [outcome, setOutcome] = useState<Outcome | null>(null)
@@ -55,14 +56,14 @@ export default function RegisterActivity() {
       if (!canPickOthers) {
         const { data, error } = await supabase
           .from('participations')
-          .insert({ ...toActivityPayload(v), activity_date: today, volunteer_id: p.volunteerId })
+          .insert({ ...toActivityPayload(v, eventForm(lookups.data?.rows, v.event)), activity_date: today, volunteer_id: p.volunteerId })
           .select('status')
           .single()
         if (error) throw error
         return { inserted: 1, skipped: [], pending: data.status === 'pending' }
       }
       if (!selected.length) throw { message: 'اختار متطوع واحد على الأقل' }
-      const { data, error } = await supabase.rpc('register_activity', { p_activity: toActivityPayload(v), p_volunteer_ids: selected })
+      const { data, error } = await supabase.rpc('register_activity', { p_activity: toActivityPayload(v, eventForm(lookups.data?.rows, v.event)), p_volunteer_ids: selected })
       if (error) throw error
       const r = data as { inserted: number; skipped_ids: string[] }
       return { inserted: r.inserted, skipped: r.skipped_ids, pending: false }
@@ -129,7 +130,7 @@ export default function RegisterActivity() {
             : `${fmtDate(today)} · بتسجّل لنفسك، والطلب بيستنى موافقة الإدارة`
         }
       />
-      <form onSubmit={form.handleSubmit((v) => save.mutate(v))} className="space-y-4">
+      <form onSubmit={form.handleSubmit((v) => checkActivity(form, lookups.data?.rows) && save.mutate(v))} className="space-y-4">
         <Card>
           <p className="mb-3 font-bold">مين حضر؟ {canPickOthers && <span className="font-normal text-muted">({selected.length})</span>}</p>
           {canPickOthers ? (

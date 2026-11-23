@@ -7,10 +7,10 @@ import { toast } from 'sonner'
 import { PushCard } from '@/components/PushToggle'
 import { Button, Card } from '@/components/ui'
 import { useAuth, usePermissions } from '@/lib/auth'
-import { addDays, cairoToday, fmtDate, fmtShort, useHrRows, useSetting, useVolunteers, whatsappLink, type VolunteerWithStats } from '@/lib/data'
+import { addDays, cairoToday, fmtDate, fmtShort, useHrRows, useLookups, useSetting, useVolunteers, whatsappLink, type VolunteerWithStats } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
-import { ROLE_LABEL, STATUSES, type MonthlyParticipation, type VolunteerStats } from '@/lib/types'
+import { STATUSES, type MonthlyParticipation, type VolunteerStats } from '@/lib/types'
 
 const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
 
@@ -23,7 +23,7 @@ export default function Home() {
   const vols = useVolunteers(seesVolunteers)
 
   const firstName = me?.full_name?.split(' ')[0] ?? me?.email?.split('@')[0]
-  const role = me?.role ? ROLE_LABEL[me.role] : p.leader ? 'ليدر لجنة' : 'متطوع'
+  const role = me?.role_name ?? (p.leader ? 'ليدر لجنة' : 'متطوع')
 
   return (
     <div className="space-y-5">
@@ -54,15 +54,43 @@ export default function Home() {
       {(p.staff || p.viewAll) && <TodayNumbers today={today} full={p.viewAll} canReview={p.canReview} />}
       {seesVolunteers && <VolunteerNumbers vols={vols.data} full={p.viewAll} leader={!p.viewAll && p.leader} today={today} />}
       {seesVolunteers && <Birthdays vols={vols.data} today={today} />}
-      {p.viewAll && <LongTest vols={vols.data} today={today} canEdit={p.full} />}
+      {p.viewAll && <LongTest vols={vols.data} today={today} canEdit={p.can('hr.edit')} />}
 
-      {groupLink.data && (
-        <a href={groupLink.data} target="_blank" rel="noreferrer" className="block">
+      <WhatsAppGroups general={groupLink.data ?? null} volunteerId={me?.volunteer_id ?? null} leaderOf={p.leader ? (me?.committees ?? []) : []} />
+    </div>
+  )
+}
+
+/** General group plus the groups of the person's own committees (and the ones they lead). */
+function WhatsAppGroups({ general, volunteerId, leaderOf }: { general: string | null; volunteerId: string | null; leaderOf: string[] }) {
+  const lookups = useLookups()
+  const mine = useQuery({
+    queryKey: ['my-committees', volunteerId],
+    enabled: Boolean(volunteerId),
+    queryFn: async () => {
+      const { data, error } = await supabase.from('volunteers').select('main_committee, sub_committee').eq('id', volunteerId!).maybeSingle()
+      if (error) throw error
+      return data as { main_committee: string | null; sub_committee: string | null } | null
+    },
+  })
+  const names = [...new Set([mine.data?.main_committee, mine.data?.sub_committee, ...leaderOf].filter((c): c is string => Boolean(c)))]
+  const groups = [
+    ...(general ? [{ name: 'الجروب العام', link: general }] : []),
+    ...names.flatMap((n) => {
+      const link = lookups.data?.rows.find((r) => r.list === 'اللجنة' && r.value === n)?.link
+      return link ? [{ name: `جروب ${n}`, link }] : []
+    }),
+  ]
+  if (!groups.length) return null
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {groups.map((g) => (
+        <a key={g.link} href={g.link} target="_blank" rel="noreferrer" className="block">
           <Button variant="secondary" className="w-full">
-            <MessageCircle className="size-4" /> جروب الواتساب
+            <MessageCircle className="size-4 text-emerald-600" /> {g.name}
           </Button>
         </a>
-      )}
+      ))}
     </div>
   )
 }

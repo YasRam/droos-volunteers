@@ -16,6 +16,8 @@ import {
   Users,
   UsersRound,
   FileSpreadsheet,
+  Award,
+  ShieldCheck,
   Network,
 } from 'lucide-react'
 import { useEffect, useMemo, useState, type ComponentType } from 'react'
@@ -24,7 +26,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth, usePermissions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import type { Notification } from '@/lib/types'
-import { ROLE_LABEL } from '@/lib/types'
 import { fmtDateTime } from '@/lib/data'
 import { PushSwitch } from './PushToggle'
 
@@ -109,20 +110,23 @@ export default function Layout() {
     if (p.canReview) list.push({ to: '/requests', label: 'الطلبات', icon: Inbox, badge: pending.data })
     if (p.canSeeVolunteers) list.push({ to: '/volunteers', label: 'المتطوعين', icon: Users })
     if (p.viewAll || p.leader) list.push({ to: '/tree', label: 'الهيكل', icon: Network })
-    if (p.viewAll || p.organizer) list.push({ to: '/followups', label: 'المتابعة اليومية', icon: ClipboardList })
+    if (p.can('attendance.view_all') || p.can('attendance.register')) list.push({ to: '/followups', label: 'المتابعة اليومية', icon: ClipboardList })
     list.push({ to: '/schedule', label: 'جدول الحصص', icon: CalendarDays })
     if (p.volunteerId) list.push({ to: '/me/activities', label: 'أنشطتي', icon: UsersRound })
     if (p.volunteerId) list.push({ to: '/me', label: 'بياناتي', icon: UserRound })
-    if (p.staff || p.leader || p.viewAll) list.push({ to: '/stats', label: 'الإحصائيات', icon: BarChart3 })
-    if (p.viewAll) list.push({ to: '/data', label: p.full ? 'البيانات وExcel' : 'تنزيل Excel', icon: FileSpreadsheet })
-    if (p.full) list.push({ to: '/admin', label: 'الإعدادات', icon: Settings })
-    if (p.viewAll) list.push({ to: '/log', label: 'السجل', icon: History })
+    if (p.can('stats.view') || p.leader) list.push({ to: '/stats', label: 'الإحصائيات', icon: BarChart3 })
+    if (p.can('certificates.review')) list.push({ to: '/certificates', label: 'شهادات التطوع', icon: Award })
+    if (p.can('data.export')) list.push({ to: '/data', label: p.can('data.import') ? 'البيانات وExcel' : 'تنزيل Excel', icon: FileSpreadsheet })
+    if (p.can('roles.manage')) list.push({ to: '/permissions', label: 'الصلاحيات', icon: ShieldCheck })
+    if (p.can('settings.manage')) list.push({ to: '/admin', label: 'الإعدادات', icon: Settings })
+    if (p.can('log.view')) list.push({ to: '/log', label: 'السجل', icon: History })
     return list
   }, [p, pending.data])
 
   // Bottom bar: the four most used for this person, the rest under "المزيد"
   const bottom = items.slice(0, 4)
-  const roleLabel = me?.role ? ROLE_LABEL[me.role] : p.leader ? 'ليدر لجنة' : 'متطوع'
+  const roleLabel = me?.role_name ?? me?.position ?? (p.leader ? 'ليدر لجنة' : 'متطوع')
+  const displayName = me?.full_name || me?.email || ''
 
   return (
     <div className="min-h-dvh lg:flex">
@@ -141,7 +145,7 @@ export default function Layout() {
           ))}
         </nav>
         <div className="border-t border-line p-4">
-          <p className="truncate text-sm font-semibold">{me?.email}</p>
+          <p className="truncate text-sm font-semibold">{displayName}</p>
           <p className="text-xs text-muted">{roleLabel}</p>
           <button onClick={signOut} className="mt-2 flex items-center gap-1 text-sm text-red-600">
             <LogOut className="size-4" /> خروج
@@ -154,9 +158,15 @@ export default function Layout() {
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-white/90 px-4 backdrop-blur">
           <div className="flex items-center gap-2 lg:hidden">
             <img src={`${import.meta.env.BASE_URL}favicon.svg`} className="size-8" alt="" />
-            <span className="font-bold">دروس التقوية</span>
+            <div className="min-w-0 leading-tight">
+              <p className="truncate text-sm font-bold">{displayName}</p>
+              <p className="truncate text-[11px] text-muted">{roleLabel}</p>
+            </div>
           </div>
-          <div className="hidden text-sm text-muted lg:block">{roleLabel}</div>
+          <div className="hidden min-w-0 lg:block">
+            <span className="font-bold">{displayName}</span>
+            <span className="ms-2 text-sm text-muted">{roleLabel}</span>
+          </div>
           <div className="relative">
             <button
               onClick={() => {
@@ -221,7 +231,7 @@ export default function Layout() {
             <div className="mb-3 flex items-center gap-3 rounded-xl bg-surface p-3">
               <User className="size-5 text-muted" />
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{me?.email}</p>
+                <p className="truncate text-sm font-semibold">{displayName}</p>
                 <p className="text-xs text-muted">{roleLabel}</p>
               </div>
             </div>
