@@ -1,11 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, MessageCircle, Phone, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Button, Card, Empty, Field, Input, PageHeader, RequestBadge, Select, Spinner, StatusBadge, Tabs, Textarea, Toggle } from '@/components/ui'
+import { ContactLinks } from '@/components/VolunteerLink'
 import { useAuth, usePermissions } from '@/lib/auth'
 import { ageFrom, fmtDate, fmtShort, useLookups, whatsappLink } from '@/lib/data'
 import { toastError } from '@/lib/errors'
@@ -129,10 +130,10 @@ export default function VolunteerDetail() {
 }
 
 function ReadPersonal({ v }: { v: Volunteer }) {
-  const rows: [string, string | null][] = [
+  const rows: [string, ReactNode][] = [
     ['الاسم بالإنجليزي', v.full_name_en],
-    ['الهاتف', v.phone],
-    ['الواتساب', v.whatsapp],
+    ['الهاتف', v.phone && <ContactLinks phone={v.phone} />],
+    ['الواتساب', (v.whatsapp || v.phone) && <ContactLinks whatsapp={v.whatsapp || v.phone} phone={null} />],
     ['الإيميل', v.email],
     ['المؤهل', v.qualification],
     ['الوظيفة', v.job],

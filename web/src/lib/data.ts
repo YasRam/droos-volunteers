@@ -17,7 +17,17 @@ const dateFmt = new Intl.DateTimeFormat('ar-EG', { day: 'numeric', month: 'long'
 const shortFmt = new Intl.DateTimeFormat('ar-EG', { day: 'numeric', month: 'short' })
 export const fmtDate = (iso?: string | null) => (iso ? dateFmt.format(new Date(iso.slice(0, 10) + 'T00:00:00')) : '—')
 export const fmtShort = (iso?: string | null) => (iso ? shortFmt.format(new Date(iso.slice(0, 10) + 'T00:00:00')) : '—')
-export const fmtTime = (t?: string | null) => (t ? t.slice(0, 5) : '')
+/** «HH:MM:SS» from the database → 12-hour clock, e.g. «3:15 م». */
+export function fmtTime(t?: string | null) {
+  if (!t) return ''
+  const [h, m] = t.split(':').map(Number)
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'ص' : 'م'}`
+}
+/** «HH:MM» for <input type="time">. */
+export const timeInput = (t?: string | null) => (t ? t.slice(0, 5) : '')
+const dateTimeFmt = new Intl.DateTimeFormat('ar-EG', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Africa/Cairo' })
+/** Timestamp → «٢٣ نوفمبر، ٣:١٥ م» in Cairo time. */
+export const fmtDateTime = (iso?: string | null) => (iso ? dateTimeFmt.format(new Date(iso)) : '—')
 
 export function ageFrom(birth?: string | null): number | null {
   if (!birth) return null

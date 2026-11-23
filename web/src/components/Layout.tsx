@@ -16,6 +16,7 @@ import {
   Users,
   UsersRound,
   FileSpreadsheet,
+  Network,
 } from 'lucide-react'
 import { useEffect, useMemo, useState, type ComponentType } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -24,7 +25,7 @@ import { useAuth, usePermissions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import type { Notification } from '@/lib/types'
 import { ROLE_LABEL } from '@/lib/types'
-import { fmtShort } from '@/lib/data'
+import { fmtDateTime } from '@/lib/data'
 
 interface NavItem {
   to: string
@@ -106,6 +107,7 @@ export default function Layout() {
     if (p.volunteerId || p.canRegisterActivity) list.push({ to: '/check-in', label: 'تسجيل حضور', icon: Hand })
     if (p.canReview) list.push({ to: '/requests', label: 'الطلبات', icon: Inbox, badge: pending.data })
     if (p.canSeeVolunteers) list.push({ to: '/volunteers', label: 'المتطوعين', icon: Users })
+    if (p.full || p.leader) list.push({ to: '/tree', label: 'الهيكل', icon: Network })
     if (p.full || p.organizer) list.push({ to: '/followups', label: 'المتابعة اليومية', icon: ClipboardList })
     list.push({ to: '/schedule', label: 'جدول الحصص', icon: CalendarDays })
     if (p.volunteerId) list.push({ to: '/me/activities', label: 'أنشطتي', icon: UsersRound })
@@ -183,7 +185,7 @@ export default function Layout() {
                       >
                         <p className="text-sm font-semibold">{n.title}</p>
                         {n.body && <p className="text-xs text-muted">{n.body}</p>}
-                        <p className="mt-0.5 text-[11px] text-muted">{fmtShort(n.created_at)}</p>
+                        <p className="mt-0.5 text-[11px] text-muted">{fmtDateTime(n.created_at)}</p>
                       </button>
                     ))
                   ) : (

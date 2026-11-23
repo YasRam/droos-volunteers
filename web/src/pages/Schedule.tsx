@@ -4,9 +4,10 @@ import { Pencil, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
+import { VolunteerName } from '@/components/VolunteerLink'
 import { Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Spinner, Tabs } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
-import { fmtTime, useDirectory, useLookups } from '@/lib/data'
+import { fmtTime, timeInput, useDirectory, useLookups } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import { WEEKDAYS, type ScheduleSlot, type Weekday } from '@/lib/types'
@@ -85,7 +86,7 @@ export default function Schedule() {
               <div className="divide-y divide-line">
                 {slots.map((s) => (
                   <div key={s.id} className={clsx('flex items-center gap-3 px-4 py-2.5', mine(s) && 'bg-brand-50')}>
-                    <span className="ltr w-24 shrink-0 text-xs font-semibold text-muted">
+                    <span className="w-28 shrink-0 text-xs font-semibold text-muted">
                       {fmtTime(s.starts_at)} – {fmtTime(s.ends_at)}
                     </span>
                     <div className="min-w-0 flex-1">
@@ -93,7 +94,7 @@ export default function Schedule() {
                         {s.subject} · {view === 'grade' ? s.day : s.grade}
                       </p>
                       <p className={clsx('truncate text-xs', s.teacher_name ? 'text-muted' : 'italic text-gray-400')}>
-                        {view === 'teacher' ? s.day : s.teacher_name || 'من غير مدرس'}
+                        {view === 'teacher' ? s.day : s.volunteer_id ? <VolunteerName id={s.volunteer_id} name={s.teacher_name} /> : s.teacher_name || 'من غير مدرس'}
                         {mine(s) && ' · حصتك'}
                       </p>
                     </div>
@@ -125,8 +126,8 @@ function SlotForm({ slot, onClose }: { slot: ScheduleSlot | null; onClose: () =>
       subject: slot?.subject ?? '',
       volunteer_id: slot?.volunteer_id ?? '',
       teacher_name: slot?.teacher_name ?? '',
-      starts_at: slot ? fmtTime(slot.starts_at) : '15:00',
-      ends_at: slot ? fmtTime(slot.ends_at) : '16:00',
+      starts_at: slot ? timeInput(slot.starts_at) : '15:00',
+      ends_at: slot ? timeInput(slot.ends_at) : '16:00',
     },
   })
   const invalidate = () => qc.invalidateQueries({ queryKey: ['schedule'] })

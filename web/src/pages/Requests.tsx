@@ -3,6 +3,7 @@ import { Check, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
+import { VolunteerName } from '@/components/VolunteerLink'
 import { Button, Card, Empty, PageHeader, Spinner, Tabs } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
 import { fmtShort, useDirectory } from '@/lib/data'
@@ -71,7 +72,7 @@ function Attendance() {
         {q.data.map((r) => (
           <div key={r.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
             <div className="min-w-0 flex-1">
-              <p className="font-semibold">{names.get(r.volunteer_id) ?? '—'}</p>
+              <p className="font-semibold"><VolunteerName id={r.volunteer_id} name={names.get(r.volunteer_id)} /></p>
               <p className="text-xs text-muted">
                 {fmtShort(r.activity_date)} · {r.event}
                 {r.subject && ` · ${r.subject}`}
@@ -126,7 +127,7 @@ function NationalIds() {
       {q.data.map((r) => (
         <div key={r.volunteer_id} className="flex flex-wrap items-center gap-3 px-4 py-3">
           <div className="min-w-0 flex-1">
-            <p className="font-semibold">{names.get(r.volunteer_id) ?? '—'}</p>
+            <p className="font-semibold"><VolunteerName id={r.volunteer_id} name={names.get(r.volunteer_id)} /></p>
             <p className="text-xs text-muted">
               الحالي <span className="ltr">{r.national_id ?? '—'}</span> ← المطلوب <span className="ltr font-semibold text-ink">{r.requested_national_id}</span>
             </p>

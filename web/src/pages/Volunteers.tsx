@@ -1,17 +1,18 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Filter, Info, LayoutList, MessageCircle, Phone, Plus, Search, Star, Table2 } from 'lucide-react'
+import { Filter, Info, LayoutList, MessageCircle, Plus, Search, Star, Table2 } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { AcceptanceBadge, Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Spinner, StatusBadge } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
-import { ageFrom, fmtShort, useDirectory, useHrRows, useLookups, useVolunteers, whatsappLink, type VolunteerWithStats } from '@/lib/data'
+import { ageFrom, fmtShort, useDirectory, useHrRows, useLookups, useVolunteers, type VolunteerWithStats } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import { ACCEPTANCE, STATUSES, type VolunteerHr, type VolunteerStatus } from '@/lib/types'
+import { ContactLinks, VolunteerName } from '@/components/VolunteerLink'
 import { PersonalFields, personalSchema, toPersonalPayload, type PersonalValues } from './MyProfile'
 
 const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
@@ -310,7 +311,6 @@ function NameCell({ v }: { v: VolunteerWithStats }) {
 }
 
 function VolunteerRow({ v, acceptance, onOpen }: { v: VolunteerWithStats; acceptance?: VolunteerHr['acceptance']; onOpen: () => void }) {
-  const wa = whatsappLink(v.whatsapp ?? v.phone)
   const age = ageFrom(v.birth_date)
   return (
     <div className="flex items-center gap-3 px-4 py-3 hover:bg-surface">
@@ -329,11 +329,7 @@ function VolunteerRow({ v, acceptance, onOpen }: { v: VolunteerWithStats; accept
           {v.stats && v.stats.total > 0 && <Badge>{v.stats.total} إجمالي</Badge>}
         </div>
       </button>
-      {wa && (
-        <a href={wa} target="_blank" rel="noreferrer" className="rounded-lg p-2 text-emerald-600 hover:bg-emerald-50" aria-label="واتساب">
-          <MessageCircle className="size-5" />
-        </a>
-      )}
+      <ContactLinks phone={v.phone} whatsapp={v.whatsapp} showNumber={false} />
     </div>
   )
 }
@@ -385,7 +381,6 @@ function VolunteerTable({
         </thead>
         <tbody className="divide-y divide-line">
           {rows.slice(0, limit).map((v) => {
-            const wa = whatsappLink(v.whatsapp ?? v.phone)
             return (
               <tr key={v.id} onClick={() => onOpen(v.id)} className="cursor-pointer hover:bg-surface">
                 <td className="ltr px-3 py-2 text-xs text-muted">{v.code}</td>
@@ -404,22 +399,7 @@ function VolunteerTable({
                   {v.main_committee ?? '—'}
                   {v.sub_committee && <span className="text-muted"> + {v.sub_committee}</span>}
                 </td>
-                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                  {v.phone ? (
-                    <span className="flex items-center gap-1">
-                      <a href={`tel:${v.phone}`} className="ltr text-xs hover:text-brand-700">
-                        {v.phone}
-                      </a>
-                      {wa && (
-                        <a href={wa} target="_blank" rel="noreferrer" className="text-emerald-600" aria-label="واتساب">
-                          <MessageCircle className="size-4" />
-                        </a>
-                      )}
-                    </span>
-                  ) : (
-                    '—'
-                  )}
-                </td>
+                <td className="px-2 py-1">{v.phone || v.whatsapp ? <ContactLinks phone={v.phone} whatsapp={v.whatsapp} /> : '—'}</td>
                 <td className="px-3 py-2 text-xs">{ageFrom(v.birth_date) ?? '—'}</td>
                 <td className="px-3 py-2 text-center font-bold text-emerald-700">{v.stats?.this_month || ''}</td>
                 <td className="px-3 py-2 text-center">{v.stats?.total || ''}</td>
@@ -458,19 +438,10 @@ function Directory() {
           {rows.map((v) => (
             <div key={v.id} className="flex items-center gap-3 px-4 py-3">
               <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold">{v.full_name_ar}</p>
-                <p className="ltr text-start text-xs text-muted">{v.phone}</p>
+                <VolunteerName id={v.id} name={v.full_name_ar} className="block truncate font-semibold" />
+                <p className="ltr text-start text-xs text-muted">{v.code}</p>
               </div>
-              {v.phone && (
-                <a href={`tel:${v.phone}`} className="rounded-lg p-2 text-brand-700 hover:bg-brand-50" aria-label="اتصال">
-                  <Phone className="size-5" />
-                </a>
-              )}
-              {whatsappLink(v.whatsapp) && (
-                <a href={whatsappLink(v.whatsapp)!} target="_blank" rel="noreferrer" className="rounded-lg p-2 text-emerald-600 hover:bg-emerald-50" aria-label="واتساب">
-                  <MessageCircle className="size-5" />
-                </a>
-              )}
+              <ContactLinks phone={v.phone} whatsapp={v.whatsapp} />
             </div>
           ))}
         </Card>

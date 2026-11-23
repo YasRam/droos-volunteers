@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Badge, Card, Empty, PageHeader, Select, Spinner } from '@/components/ui'
+import { fmtDateTime } from '@/lib/data'
 import { supabase } from '@/lib/supabase'
 import type { AuditRow } from '@/lib/types'
 
@@ -58,7 +59,7 @@ export default function AuditLog() {
                 <Badge tone={ACTIONS[r.action].tone}>{ACTIONS[r.action].label}</Badge>
                 <span className="font-semibold">{TABLES[r.table_name] ?? r.table_name}</span>
                 <span className="text-xs text-muted">
-                  {new Date(r.at).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })} · {r.actor_email ?? 'النظام'}
+                  {fmtDateTime(r.at)} · {r.actor_email ?? 'النظام'}
                 </span>
               </div>
               <p className="mt-1 break-words text-xs text-muted">{changes(r)}</p>

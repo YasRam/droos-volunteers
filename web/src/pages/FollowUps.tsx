@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { VolunteerName } from '@/components/VolunteerLink'
 import { Button, Card, Empty, Field, Input, PageHeader, RequestBadge, Select, Spinner } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
 import { addDays, cairoToday, fmtShort, useDirectory, useLookups } from '@/lib/data'
@@ -92,7 +93,7 @@ export default function FollowUps() {
                 {rows.map((r) => (
                   <div key={r.id} className="flex items-center gap-3 px-4 py-3">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold">{names.get(r.volunteer_id) ?? '—'}</p>
+                      <p className="truncate font-semibold"><VolunteerName id={r.volunteer_id} name={names.get(r.volunteer_id)} /></p>
                       <p className="truncate text-xs text-muted">
                         {r.event}
                         {r.subject && ` · ${r.subject}`}
