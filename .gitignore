@@ -1,0 +1,5 @@
+data/source/
+data/seed_data.sql
+data/seed_data_report.json
+node_modules/
+.env*
