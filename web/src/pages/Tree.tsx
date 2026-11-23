@@ -9,6 +9,7 @@ import { useLookups, useVolunteers, type VolunteerWithStats } from '@/lib/data'
 import { supabase } from '@/lib/supabase'
 import type { CommitteeLeader, StaffRole } from '@/lib/types'
 
+
 const NO_COMMITTEE = 'من غير لجنة'
 
 /** ليدر النشاط ← ليدر اللجان ← متطوعين كل لجنة (اللي مش خارج المتابعة). */
@@ -32,9 +33,13 @@ export default function Tree() {
     const names = [...new Set([...(lookups.data?.list('اللجنة') ?? []), ...active.flatMap((v) => [v.main_committee, v.sub_committee]).filter((c): c is string => Boolean(c))])]
     const s = search.trim()
     const match = (v: VolunteerWithStats) => !s || v.full_name_ar.includes(s) || v.code.includes(s.toUpperCase())
+    // Only volunteers appear in the tree: a permission given to an outside email stays out of it
+    const volByEmail = new Map((vols.data ?? []).filter((v) => v.email).map((v) => [v.email!.toLowerCase(), v]))
     const list = names.map((name) => ({
       name,
-      leaders: (people.data?.leaders ?? []).filter((l) => l.committee === name),
+      leaders: (people.data?.leaders ?? [])
+        .filter((l) => l.committee === name && volByEmail.has(l.email.toLowerCase()))
+        .map((l) => ({ ...l, full_name: volByEmail.get(l.email.toLowerCase())!.full_name_ar })),
       main: active.filter((v) => v.main_committee === name && match(v)),
       sub: active.filter((v) => v.sub_committee === name && v.main_committee !== name && match(v)),
     }))
@@ -44,13 +49,15 @@ export default function Tree() {
     return list.filter((c) => p.full || c.main.length || c.sub.length)
   }, [vols.data, lookups.data, people.data, search, p.full])
 
-  const activityLeaders = (people.data?.staff ?? []).filter((s) => s.role === 'activity_leader' || s.role === 'admin')
+  const byPosition = (pos: string) => (vols.data ?? []).filter((v) => v.position === pos)
+  const activityLeaders = [...byPosition('ليدر النشاط'), ...byPosition('نائب ليدر النشاط')]
+  const support = [...byPosition('HR'), ...byPosition('تنظيم')]
   const total = committees.reduce((n, c) => n + c.main.length, 0)
 
   if (vols.isLoading || people.isLoading) return <Spinner />
   return (
     <>
-      <PageHeader title="الهيكل" subtitle="ليدر النشاط، وتحته ليدر كل لجنة، وتحت كل لجنة متطوعينها اللي مش خارج المتابعة" />
+      <PageHeader title="الهيكل" subtitle="ليدر النشاط ونائبه والـ HR والتنظيم، وتحتهم ليدر كل لجنة، وتحت كل لجنة متطوعينها اللي مش خارج المتابعة" />
       <div className="relative mb-4">
         <Search className="absolute start-3 top-2.5 size-5 text-muted" />
         <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="دوّر على متطوع في الشجرة" className="ps-10" />
@@ -63,16 +70,26 @@ export default function Tree() {
         </p>
         <div className="flex flex-wrap gap-2">
           {activityLeaders.length ? (
-            activityLeaders.map((s) => (
-              <span key={s.email} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-sm font-semibold ring-1 ring-brand-200">
-                {s.full_name}
-                <Badge tone={s.role === 'admin' ? 'purple' : 'brand'}>{s.role === 'admin' ? 'أدمن' : 'ليدر نشاط'}</Badge>
+            activityLeaders.map((v) => (
+              <span key={v.id} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-sm font-semibold ring-1 ring-brand-200">
+                <VolunteerName id={v.id} name={v.full_name_ar} />
+                <Badge tone={v.position === 'ليدر النشاط' ? 'purple' : 'brand'}>{v.position}</Badge>
               </span>
             ))
           ) : (
-            <span className="text-sm text-muted">مفيش ليدر نشاط متسجل. ضيفه من الإعدادات ← الصلاحيات.</span>
+            <span className="text-sm text-muted">مفيش متطوع وظيفته ليدر النشاط. حددها من شاشة الصلاحيات.</span>
           )}
         </div>
+        {support.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2 border-t border-brand-200 pt-3">
+            {support.map((v) => (
+              <span key={v.id} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-sm font-semibold ring-1 ring-line">
+                <VolunteerName id={v.id} name={v.full_name_ar} />
+                <Badge tone={v.position === 'HR' ? 'blue' : 'orange'}>{v.position}</Badge>
+              </span>
+            ))}
+          </div>
+        )}
       </Card>
 
       {/* Branches */}
@@ -158,6 +175,7 @@ function Leaf({ v }: { v: VolunteerWithStats }) {
   return (
     <div className="flex items-center gap-2 py-1">
       <VolunteerName id={v.id} name={v.full_name_ar} className="min-w-0 flex-1 truncate text-sm font-semibold" />
+      {v.position !== 'متطوع' && <Badge tone="purple">{v.position}</Badge>}
       {v.status !== 'تحت المتابعة' && <StatusBadge status={v.status} />}
       <ContactLinks phone={v.phone} whatsapp={v.whatsapp} showNumber={false} />
     </div>

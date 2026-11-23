@@ -20,6 +20,8 @@ const Admin = lazy(() => import('@/pages/Admin'))
 const DataTools = lazy(() => import('@/pages/DataTools'))
 const Tree = lazy(() => import('@/pages/Tree'))
 const AuditLog = lazy(() => import('@/pages/AuditLog'))
+const Permissions = lazy(() => import('@/pages/Permissions'))
+const Tshirts = lazy(() => import('@/pages/Tshirts'))
 
 function Guard({ allow, children }: { allow: boolean; children: ReactNode }) {
   return allow ? <>{children}</> : <Navigate to="/" replace />
@@ -52,6 +54,8 @@ export default function App() {
           <Route path="tree" element={<Guard allow={p.full || p.leader}><Tree /></Guard>} />
           <Route path="data" element={<Guard allow={p.full}><DataTools /></Guard>} />
           <Route path="admin" element={<Guard allow={p.full}><Admin /></Guard>} />
+          <Route path="permissions" element={<Guard allow={p.full}><Permissions /></Guard>} />
+          <Route path="tshirts" element={<Guard allow={p.full || p.leader}><Tshirts /></Guard>} />
           <Route path="log" element={<Guard allow={p.full}><AuditLog /></Guard>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

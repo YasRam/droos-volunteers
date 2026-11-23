@@ -17,14 +17,15 @@ import {
   UsersRound,
   FileSpreadsheet,
   Network,
+  Shield,
+  Shirt,
 } from 'lucide-react'
 import { useEffect, useMemo, useState, type ComponentType } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useAuth, usePermissions } from '@/lib/auth'
+import { useAuth, usePermissions, useRoleLabel } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import type { Notification } from '@/lib/types'
-import { ROLE_LABEL } from '@/lib/types'
 import { fmtDateTime } from '@/lib/data'
 
 interface NavItem {
@@ -105,7 +106,7 @@ export default function Layout() {
   const items = useMemo<NavItem[]>(() => {
     const list: NavItem[] = [{ to: '/', label: 'الرئيسية', icon: Home }]
     if (p.volunteerId || p.canRegisterActivity) list.push({ to: '/check-in', label: 'تسجيل حضور', icon: Hand })
-    if (p.canReview) list.push({ to: '/requests', label: 'الطلبات', icon: Inbox, badge: pending.data })
+    if (p.canReview) list.push({ to: '/requests', label: 'طلبات الحضور', icon: Inbox, badge: pending.data })
     if (p.canSeeVolunteers) list.push({ to: '/volunteers', label: 'المتطوعين', icon: Users })
     if (p.full || p.leader) list.push({ to: '/tree', label: 'الهيكل', icon: Network })
     if (p.full || p.organizer) list.push({ to: '/followups', label: 'المتابعة اليومية', icon: ClipboardList })
@@ -113,6 +114,8 @@ export default function Layout() {
     if (p.volunteerId) list.push({ to: '/me/activities', label: 'أنشطتي', icon: UsersRound })
     if (p.volunteerId) list.push({ to: '/me', label: 'بياناتي', icon: UserRound })
     if (p.staff || p.leader) list.push({ to: '/stats', label: 'الإحصائيات', icon: BarChart3 })
+    if (p.full || p.leader) list.push({ to: '/tshirts', label: 'التيشيرت', icon: Shirt })
+    if (p.full) list.push({ to: '/permissions', label: 'الصلاحيات', icon: Shield })
     if (p.full) list.push({ to: '/data', label: 'البيانات وExcel', icon: FileSpreadsheet })
     if (p.full) list.push({ to: '/admin', label: 'الإعدادات', icon: Settings })
     if (p.full) list.push({ to: '/log', label: 'السجل', icon: History })
@@ -121,7 +124,7 @@ export default function Layout() {
 
   // Bottom bar: the four most used for this person, the rest under "المزيد"
   const bottom = items.slice(0, 4)
-  const roleLabel = me?.role ? ROLE_LABEL[me.role] : p.leader ? 'ليدر لجنة' : 'متطوع'
+  const roleLabel = useRoleLabel()
 
   return (
     <div className="min-h-dvh lg:flex">

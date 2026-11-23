@@ -4,6 +4,15 @@ export type AcceptanceGrade = 'اختبار' | 'مقبول' | 'رفض الانت
 export type RequestStatus = 'pending' | 'accepted' | 'rejected'
 export type Weekday = 'السبت' | 'الأحد' | 'الاثنين' | 'الثلاثاء' | 'الأربعاء' | 'الخميس' | 'الجمعة'
 
+export type VolunteerPosition = 'متطوع' | 'HR' | 'تنظيم' | 'ليدر لجنة' | 'ليدر النشاط' | 'نائب ليدر النشاط'
+export const POSITIONS: VolunteerPosition[] = ['متطوع', 'HR', 'تنظيم', 'ليدر لجنة', 'ليدر النشاط', 'نائب ليدر النشاط']
+/** The permission that usually comes with a position (the screen ticks it for you). */
+export const POSITION_ROLE: Partial<Record<VolunteerPosition, AppRole>> = {
+  HR: 'hr',
+  تنظيم: 'organizer',
+  'ليدر النشاط': 'activity_leader',
+  'نائب ليدر النشاط': 'activity_leader',
+}
 export const STATUSES: VolunteerStatus[] = ['تحت المتابعة', 'مشروع مسئول', 'مسئول', 'مدرب', 'خارج المتابعة']
 export const ACCEPTANCE: AcceptanceGrade[] = ['اختبار', 'مقبول', 'رفض الانترفيو', 'مرفوض', 'معتذر', 'معتذر نهائى', 'مفصول']
 export const WEEKDAYS: Weekday[] = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة']
@@ -23,6 +32,8 @@ export interface MyContext {
   email: string | null
   full_name: string | null
   role: AppRole | null
+  roles: AppRole[]
+  position: VolunteerPosition | null
   is_full: boolean
   is_staff: boolean
   is_organizer: boolean
@@ -49,6 +60,7 @@ export interface Volunteer {
   status: VolunteerStatus
   main_committee: string | null
   sub_committee: string | null
+  position: VolunteerPosition
   contacted: boolean
   passed_committee_test: boolean
   joined_group: boolean
@@ -72,8 +84,6 @@ export interface VolunteerDirectoryRow {
 export interface VolunteerPrivate {
   volunteer_id: string
   national_id: string | null
-  requested_national_id: string | null
-  requested_at: string | null
 }
 
 export interface VolunteerHr {

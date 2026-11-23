@@ -5,13 +5,13 @@ import { useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Button, Card, Empty, Field, Input, PageHeader, RequestBadge, Select, Spinner, StatusBadge, Tabs, Textarea, Toggle } from '@/components/ui'
+import { Badge, Button, Card, Empty, Field, Input, PageHeader, RequestBadge, Select, Spinner, StatusBadge, Tabs, Textarea, Toggle } from '@/components/ui'
 import { ContactLinks } from '@/components/VolunteerLink'
 import { useAuth, usePermissions } from '@/lib/auth'
-import { ageFrom, fmtDate, fmtShort, useLookups, whatsappLink } from '@/lib/data'
+import { ageFrom, cairoToday, fmtDate, fmtShort, useLookups, whatsappLink } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
-import { ACCEPTANCE, STATUSES, type Participation, type Volunteer, type VolunteerHr } from '@/lib/types'
+import { ACCEPTANCE, POSITIONS, STATUSES, type Participation, type Volunteer, type VolunteerHr, type VolunteerStats } from '@/lib/types'
 import { NationalIdCard, PersonalFields, personalDefaults, personalSchema, toPersonalPayload, type PersonalValues } from './MyProfile'
 
 type Tab = 'data' | 'interview' | 'committee' | 'activities'
@@ -71,6 +71,7 @@ export default function VolunteerDetail() {
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
             <StatusBadge status={v.status} />
+            {v.position !== 'متطوع' && <Badge tone="purple">{v.position}</Badge>}
             <span className="ltr">{v.code}</span>
             {v.main_committee && <span>· {v.main_committee}</span>}
             {age !== null && <span>· {age} سنة</span>}
@@ -95,6 +96,7 @@ export default function VolunteerDetail() {
           </>
         }
       />
+      <Summary v={v} />
       <Tabs tabs={tabs} value={tab} onChange={setTab} />
       {tab === 'data' && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -102,13 +104,7 @@ export default function VolunteerDetail() {
             {p.full ? <EditPersonal v={v} /> : <ReadPersonal v={v} />}
           </div>
           <div className="space-y-4">
-            {p.full && <NationalIdCard volunteerId={v.id} canEditDirectly />}
-            <Card className="text-sm">
-              <p>تاريخ الميلاد: {fmtDate(v.birth_date)}</p>
-              <p className="mt-1">النوع: {v.gender ?? '—'}</p>
-              <p className="mt-1">اتسجل: {fmtDate(v.registered_at)}</p>
-              {v.updated_by && <p className="mt-1 text-xs text-muted">آخر تعديل: {v.updated_by}</p>}
-            </Card>
+            {p.full && <NationalIdCard volunteerId={v.id} canEdit={v.id !== p.volunteerId} />}
             {p.full && (
               <Button
                 variant="ghost"
@@ -196,6 +192,7 @@ function Interview({ v }: { v: Volunteer }) {
   const form = useForm({
     values: {
       status: v.status,
+      position: v.position,
       main_committee: v.main_committee ?? '',
       sub_committee: v.sub_committee ?? '',
       acceptance: hr.data?.acceptance ?? '',
@@ -208,7 +205,7 @@ function Interview({ v }: { v: Volunteer }) {
     mutationFn: async (f: Parameters<Parameters<typeof form.handleSubmit>[0]>[0]) => {
       const a = await supabase
         .from('volunteers')
-        .update({ status: f.status, main_committee: f.main_committee || null, sub_committee: f.sub_committee || null })
+        .update({ status: f.status, position: f.position, main_committee: f.main_committee || null, sub_committee: f.sub_committee || null })
         .eq('id', v.id)
       if (a.error) throw a.error
       const b = await supabase
@@ -237,6 +234,9 @@ function Interview({ v }: { v: Volunteer }) {
       <form onSubmit={form.handleSubmit((f) => save.mutate(f))} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="حالة المتطوع">
           <Select {...form.register('status')} options={STATUSES} />
+        </Field>
+        <Field label="الوظيفة" hint="وظيفة واحدة بس. الصلاحيات من شاشة الصلاحيات">
+          <Select {...form.register('position')} options={POSITIONS} />
         </Field>
         <Field label="درجة القبول" hint={hr.data?.status_changed_at ? `آخر تغيير ${fmtShort(hr.data.status_changed_at)}` : undefined}>
           <Select {...form.register('acceptance')} placeholder="—" options={ACCEPTANCE} />
@@ -298,14 +298,14 @@ function Committee({ v, editable }: { v: Volunteer; editable: boolean }) {
           <Toggle key={key} label={label} checked={Boolean(v[key])} disabled={!editable || save.isPending} onChange={(val) => save.mutate({ [key]: val })} />
         ))}
         <Toggle
-          label="حضر الميني كامب"
+          label="حضر الكامب / الميني كامب"
           checked={v.attended_minicamp}
           disabled={!editable || save.isPending}
           onChange={(val) => save.mutate({ attended_minicamp: val, minicamp_date: val ? (v.minicamp_date ?? new Date().toISOString().slice(0, 10)) : null })}
         />
       </div>
       {v.attended_minicamp && (
-        <Field label="موعد الميني كامب">
+        <Field label="موعد الكامب / الميني كامب">
           <Input type="date" defaultValue={v.minicamp_date ?? ''} disabled={!editable} onBlur={(e) => e.target.value !== v.minicamp_date && save.mutate({ minicamp_date: e.target.value || null })} />
         </Field>
       )}
@@ -344,6 +344,53 @@ function Activities({ volunteerId }: { volunteerId: string }) {
           <RequestBadge status={p.status} />
         </div>
       ))}
+    </Card>
+  )
+}
+
+/** What the system works out for this volunteer: from the national id, and from their participations. */
+function Summary({ v }: { v: Volunteer }) {
+  const month = cairoToday().slice(0, 7)
+  const q = useQuery({
+    queryKey: ['volunteer-summary', v.id],
+    queryFn: async () => {
+      const [stats, days] = await Promise.all([
+        supabase.from('volunteer_stats').select('*').eq('volunteer_id', v.id).maybeSingle(),
+        supabase.from('participation_days').select('activity_date').eq('volunteer_id', v.id),
+      ])
+      if (stats.error) throw stats.error
+      if (days.error) throw days.error
+      const dates = (days.data as { activity_date: string }[]).map((d) => d.activity_date)
+      return { stats: stats.data as VolunteerStats | null, days: dates.length, daysThisMonth: dates.filter((d) => d.startsWith(month)).length }
+    },
+  })
+  const age = ageFrom(v.birth_date)
+  const s = q.data?.stats
+  const items: [string, ReactNode][] = [
+    ['السن', age !== null ? `${age} سنة` : '—'],
+    ['تاريخ الميلاد', fmtDate(v.birth_date)],
+    ['النوع', v.gender ?? '—'],
+    ['اتسجل', fmtDate(v.registered_at)],
+    ['مشاركات الشهر ده', s?.this_month ?? 0],
+    ['أيام الشهر ده', q.data?.daysThisMonth ?? 0],
+    ['الشهر اللي فات', s?.last_month ?? 0],
+    ['إجمالي المشاركات', s?.total ?? 0],
+    ['إجمالي الأيام', q.data?.days ?? 0],
+    ['آخر مشاركة', fmtShort(s?.last_participation)],
+  ]
+  return (
+    <Card className="mb-4 p-3">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-5">
+        {items.map(([k, val]) => (
+          <div key={k}>
+            <dt className="text-xs text-muted">{k}</dt>
+            <dd className="font-bold">{q.isLoading && typeof val === 'number' ? '…' : val}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-2 text-[11px] text-muted">
+        السن والميلاد والنوع من الرقم القومي، والأرقام من المشاركات المقبولة.{v.updated_by && ` آخر تعديل: ${v.updated_by}`}
+      </p>
     </Card>
   )
 }

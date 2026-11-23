@@ -1,39 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Check, CheckCircle2, X } from 'lucide-react'
+import { useMemo } from 'react'
 import { toast } from 'sonner'
 import { VolunteerName } from '@/components/VolunteerLink'
-import { Button, Card, Empty, PageHeader, Spinner, Tabs } from '@/components/ui'
-import { usePermissions } from '@/lib/auth'
+import { Button, Card, Empty, PageHeader, Spinner } from '@/components/ui'
 import { fmtShort, useDirectory } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
-import type { Participation, VolunteerPrivate } from '@/lib/types'
+import type { Participation } from '@/lib/types'
 
+const describe = (r: Participation) =>
+  [r.event, r.subject, r.grade, r.beneficiaries ? `${r.beneficiaries} طالب` : null].filter(Boolean).join(' · ')
+
+/** Attendance requests. Each one shows what is already accepted for the same person on the same day. */
 export default function Requests() {
-  const p = usePermissions()
-  const location = useLocation()
-  const [tab, setTab] = useState<'attendance' | 'nid'>(location.pathname.endsWith('national-id') && p.full ? 'nid' : 'attendance')
-  return (
-    <>
-      <PageHeader title="الطلبات" />
-      {p.full && (
-        <Tabs
-          value={tab}
-          onChange={setTab}
-          tabs={[
-            { value: 'attendance', label: 'طلبات الحضور' },
-            { value: 'nid', label: 'تغيير الرقم القومي' },
-          ]}
-        />
-      )}
-      {tab === 'attendance' ? <Attendance /> : <NationalIds />}
-    </>
-  )
-}
-
-function Attendance() {
   const qc = useQueryClient()
   const dir = useDirectory()
   const names = useMemo(() => new Map((dir.data ?? []).map((v) => [v.id, v.full_name_ar])), [dir.data])
@@ -42,7 +22,18 @@ function Attendance() {
     queryFn: async () => {
       const { data, error } = await supabase.from('participations').select('*').eq('status', 'pending').order('created_at')
       if (error) throw error
-      return data as Participation[]
+      const pending = data as Participation[]
+      if (!pending.length) return { pending, sameDay: new Map<string, Participation[]>() }
+      const dates = [...new Set(pending.map((r) => r.activity_date))]
+      const ids = [...new Set(pending.map((r) => r.volunteer_id))]
+      const acc = await supabase.from('participations').select('*').eq('status', 'accepted').in('activity_date', dates).in('volunteer_id', ids)
+      if (acc.error) throw acc.error
+      const sameDay = new Map<string, Participation[]>()
+      for (const a of acc.data as Participation[]) {
+        const k = a.volunteer_id + a.activity_date
+        sameDay.set(k, [...(sameDay.get(k) ?? []), a])
+      }
+      return { pending, sameDay }
     },
   })
   const review = useMutation({
@@ -59,87 +50,68 @@ function Attendance() {
     onError: toastError,
   })
 
-  if (q.isLoading) return <Spinner />
-  if (!q.data?.length) return <Empty title="مفيش طلبات مستنية" />
+  const rows = q.data?.pending ?? []
   return (
     <>
-      <div className="mb-3 flex justify-end">
-        <Button variant="success" size="sm" loading={review.isPending} onClick={() => review.mutate({ ids: q.data!.map((r) => r.id), status: 'accepted' })}>
-          <Check className="size-4" /> قبول الكل ({q.data.length})
-        </Button>
-      </div>
-      <Card className="divide-y divide-line p-0">
-        {q.data.map((r) => (
-          <div key={r.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold"><VolunteerName id={r.volunteer_id} name={names.get(r.volunteer_id)} /></p>
-              <p className="text-xs text-muted">
-                {fmtShort(r.activity_date)} · {r.event}
-                {r.subject && ` · ${r.subject}`}
-                {r.grade && ` · ${r.grade}`}
-                {r.beneficiaries && ` · ${r.beneficiaries} طالب`}
-              </p>
-              {r.notes && <p className="mt-1 text-xs">{r.notes}</p>}
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="success" onClick={() => review.mutate({ ids: [r.id], status: 'accepted' })}>
-                <Check className="size-4" /> قبول
-              </Button>
-              <Button size="sm" variant="secondary" className="text-red-600" onClick={() => review.mutate({ ids: [r.id], status: 'rejected' })}>
-                <X className="size-4" /> رفض
-              </Button>
-            </div>
+      <PageHeader title="طلبات الحضور" subtitle="تحت كل طلب بيظهر اللي اتقبل للشخص ده في نفس اليوم" />
+      {q.isLoading ? (
+        <Spinner />
+      ) : !rows.length ? (
+        <Empty title="مفيش طلبات مستنية" />
+      ) : (
+        <>
+          <div className="mb-3 flex justify-end">
+            <Button variant="success" size="sm" loading={review.isPending} onClick={() => review.mutate({ ids: rows.map((r) => r.id), status: 'accepted' })}>
+              <Check className="size-4" /> قبول الكل ({rows.length})
+            </Button>
           </div>
-        ))}
-      </Card>
+          <Card className="divide-y divide-line p-0">
+            {rows.map((r) => {
+              const same = q.data?.sameDay.get(r.volunteer_id + r.activity_date) ?? []
+              return (
+                <div key={r.id} className="px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold">
+                        <VolunteerName id={r.volunteer_id} name={names.get(r.volunteer_id)} />
+                      </p>
+                      <p className="text-xs text-muted">
+                        {fmtShort(r.activity_date)} · {describe(r)}
+                      </p>
+                      {r.notes && <p className="mt-1 text-xs">{r.notes}</p>}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="success" onClick={() => review.mutate({ ids: [r.id], status: 'accepted' })}>
+                        <Check className="size-4" /> قبول
+                      </Button>
+                      <Button size="sm" variant="secondary" className="text-red-600" onClick={() => review.mutate({ ids: [r.id], status: 'rejected' })}>
+                        <X className="size-4" /> رفض
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="mt-2 rounded-xl bg-surface px-3 py-2 text-xs">
+                    {same.length ? (
+                      <>
+                        <p className="mb-1 font-bold text-emerald-700">متقبل له في نفس اليوم ({same.length}):</p>
+                        <ul className="space-y-0.5">
+                          {same.map((a) => (
+                            <li key={a.id} className="flex items-center gap-1.5">
+                              <CheckCircle2 className="size-3.5 shrink-0 text-emerald-600" />
+                              {describe(a)}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    ) : (
+                      <p className="text-muted">مفيش حاجة متقبلة له في اليوم ده</p>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </Card>
+        </>
+      )}
     </>
-  )
-}
-
-function NationalIds() {
-  const qc = useQueryClient()
-  const dir = useDirectory()
-  const names = useMemo(() => new Map((dir.data ?? []).map((v) => [v.id, v.full_name_ar])), [dir.data])
-  const q = useQuery({
-    queryKey: ['nid-requests'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('volunteer_private').select('*').not('requested_national_id', 'is', null).order('requested_at')
-      if (error) throw error
-      return data as VolunteerPrivate[]
-    },
-  })
-  const review = useMutation({
-    mutationFn: async ({ id, approve }: { id: string; approve: boolean }) => {
-      const { error } = await supabase.rpc('review_national_id', { p_volunteer_id: id, p_approve: approve })
-      if (error) throw error
-      return approve
-    },
-    onSuccess: (approve) => {
-      toast.success(approve ? 'الرقم القومي اتغيّر' : 'الطلب اترفض')
-      qc.invalidateQueries({ queryKey: ['nid-requests'] })
-    },
-    onError: toastError,
-  })
-  if (q.isLoading) return <Spinner />
-  if (!q.data?.length) return <Empty title="مفيش طلبات تغيير رقم قومي" />
-  return (
-    <Card className="divide-y divide-line p-0">
-      {q.data.map((r) => (
-        <div key={r.volunteer_id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold"><VolunteerName id={r.volunteer_id} name={names.get(r.volunteer_id)} /></p>
-            <p className="text-xs text-muted">
-              الحالي <span className="ltr">{r.national_id ?? '—'}</span> ← المطلوب <span className="ltr font-semibold text-ink">{r.requested_national_id}</span>
-            </p>
-          </div>
-          <Button size="sm" variant="success" onClick={() => review.mutate({ id: r.volunteer_id, approve: true })}>
-            موافقة
-          </Button>
-          <Button size="sm" variant="secondary" className="text-red-600" onClick={() => review.mutate({ id: r.volunteer_id, approve: false })}>
-            رفض
-          </Button>
-        </div>
-      ))}
-    </Card>
   )
 }
