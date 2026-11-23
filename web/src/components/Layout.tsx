@@ -16,6 +16,7 @@ import {
   UserRound,
   Users,
   UsersRound,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { useEffect, useMemo, useState, type ComponentType } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -112,6 +113,7 @@ export default function Layout() {
     if (p.volunteerId) list.push({ to: '/me/activities', label: 'أنشطتي', icon: UsersRound })
     if (p.volunteerId) list.push({ to: '/me', label: 'بياناتي', icon: UserRound })
     if (p.staff || p.leader) list.push({ to: '/stats', label: 'الإحصائيات', icon: BarChart3 })
+    if (p.full) list.push({ to: '/data', label: 'البيانات وExcel', icon: FileSpreadsheet })
     if (p.full) list.push({ to: '/admin', label: 'الإعدادات', icon: Settings })
     if (p.full) list.push({ to: '/log', label: 'السجل', icon: History })
     return list

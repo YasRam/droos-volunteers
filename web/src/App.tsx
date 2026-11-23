@@ -18,6 +18,7 @@ const Requests = lazy(() => import('@/pages/Requests'))
 const Schedule = lazy(() => import('@/pages/Schedule'))
 const Stats = lazy(() => import('@/pages/Stats'))
 const Admin = lazy(() => import('@/pages/Admin'))
+const DataTools = lazy(() => import('@/pages/DataTools'))
 const AuditLog = lazy(() => import('@/pages/AuditLog'))
 
 function Guard({ allow, children }: { allow: boolean; children: ReactNode }) {
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="requests/*" element={<Guard allow={p.canReview}><Requests /></Guard>} />
           <Route path="schedule" element={<Schedule />} />
           <Route path="stats" element={<Guard allow={p.staff || p.leader}><Stats /></Guard>} />
+          <Route path="data" element={<Guard allow={p.full}><DataTools /></Guard>} />
           <Route path="admin" element={<Guard allow={p.full}><Admin /></Guard>} />
           <Route path="log" element={<Guard allow={p.full}><AuditLog /></Guard>} />
           <Route path="*" element={<Navigate to="/" replace />} />
