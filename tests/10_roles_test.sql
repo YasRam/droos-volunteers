@@ -282,4 +282,19 @@ select t.ok((select count(*) from participations) = 0, 'unknown account sees no 
 select t.ok((select count(*) from schedule_slots) = 0, 'schedule readable (empty here)');
 commit;
 
+-- ---------- backups ----------
+begin;
+set local role authenticated;
+select t.login('mgmt@test.com');
+select t.fails($$select set_backup_link(repeat('a', 64))$$, 'management cannot link the backup script');
+select t.fails($$select * from backup_config$$, 'nobody reads the backup config');
+select t.login('admin@test.com');
+select t.fails($$select set_backup_link('not-a-hash')$$, 'bad link code refused');
+select set_backup_link(upper(repeat('ab', 32)));
+select t.ok(backup_linked(), 'admin linked the backup script');
+select t.ok((select count(*) from backup_runs) = 0, 'admin can read backup runs');
+select t.fails($$insert into backup_runs (ok) values (true)$$, 'users cannot write backup runs');
+commit;
+select t.ok((select token_hash from backup_config) = repeat('ab', 32), 'hash stored lowercase');
+
 \echo ALL ROLE TESTS PASSED

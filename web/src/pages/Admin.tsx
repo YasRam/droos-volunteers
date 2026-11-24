@@ -1,30 +1,33 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Check, Eye, EyeOff, Link2, Lock, MessageCircle, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { Check, CircleAlert, CircleCheck, Eye, EyeOff, HardDrive, Link2, Lock, MessageCircle, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Badge, Button, Card, Field, Input, Modal, PageHeader, Select, Spinner, Tabs } from '@/components/ui'
+import { fmtDateTime } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import type { Lookup } from '@/lib/types'
 
-type Tab = 'lists' | 'groups'
+type Tab = 'lists' | 'groups' | 'backup'
 
 export default function Admin() {
   const [tab, setTab] = useState<Tab>('lists')
   return (
     <>
-      <PageHeader title="الإعدادات" subtitle="القوايم اللي بتظهر في الاختيارات، وجروبات الواتساب" />
+      <PageHeader title="الإعدادات" subtitle="القوايم اللي بتظهر في الاختيارات، وجروبات الواتساب، والنسخ الاحتياطي" />
       <Tabs
         value={tab}
         onChange={setTab}
         tabs={[
           { value: 'lists', label: 'القوائم' },
           { value: 'groups', label: 'جروبات الواتساب' },
+          { value: 'backup', label: 'النسخ الاحتياطي' },
         ]}
       />
       {tab === 'lists' && <Lists />}
       {tab === 'groups' && <Groups />}
+      {tab === 'backup' && <Backups />}
     </>
   )
 }
@@ -328,6 +331,117 @@ function Groups() {
       <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!Object.keys(draft).length}>
         <Check className="size-4" /> حفظ اللينكات
       </Button>
+    </div>
+  )
+}
+
+type BackupRun = { id: number; at: string; ok: boolean; rows: number | null; bytes: number | null; file_name: string | null; error: string | null }
+
+const SCRIPT_URL = 'https://github.com/YasRam/droos-volunteers/blob/main/backup/apps-script/Code.gs'
+
+/** Daily copy of all data into the owner's Google Drive (via an Apps Script there). */
+function Backups() {
+  const qc = useQueryClient()
+  const [code, setCode] = useState('')
+  const linked = useQuery({
+    queryKey: ['backup-linked'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('backup_linked')
+      if (error) throw error
+      return Boolean(data)
+    },
+  })
+  const runs = useQuery({
+    queryKey: ['backup-runs'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('backup_runs').select('*').order('at', { ascending: false }).limit(15)
+      if (error) throw error
+      return data as BackupRun[]
+    },
+  })
+  const link = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('set_backup_link', { p_hash: code })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('اتربط. أول نسخة هتتعمل الساعة 3 الفجر، أو شغّل backup من السكريبت دلوقتي')
+      setCode('')
+      qc.invalidateQueries({ queryKey: ['backup-linked'] })
+    },
+    onError: toastError,
+  })
+  const last = runs.data?.[0]
+  const lastOk = runs.data?.find((r) => r.ok)
+  const stale = !lastOk || Date.now() - new Date(lastOk.at).getTime() > 2 * 86_400_000
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="flex items-start gap-3">
+          <HardDrive className="mt-0.5 size-6 shrink-0 text-brand-700" />
+          <div className="min-w-0 flex-1">
+            <p className="font-bold">نسخة كاملة كل يوم في جوجل درايف</p>
+            <p className="mt-1 text-sm text-muted">
+              كل البيانات (المتطوعين، المشاركات، المقابلات، الصلاحيات، السجل...) بتتحفظ في ملف في الدرايف بتاعك الساعة 3 الفجر. بيتحفظ آخر 30 يوم + أول نسخة في كل شهر. صور البطايق مش ضمن النسخة.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+              {linked.isLoading ? null : linked.data ? <Badge tone="green">مربوط</Badge> : <Badge tone="orange">لسه مش مربوط</Badge>}
+              {lastOk && (
+                <span className={clsx('flex items-center gap-1', stale ? 'text-orange-700' : 'text-emerald-700')}>
+                  {stale ? <CircleAlert className="size-4" /> : <CircleCheck className="size-4" />} آخر نسخة ناجحة: {fmtDateTime(lastOk.at)}
+                </span>
+              )}
+              {last && !last.ok && <span className="text-red-600">آخر محاولة فشلت</span>}
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card>
+        <p className="mb-2 font-bold">{linked.data ? 'تغيير الربط' : 'الربط (مرة واحدة)'}</p>
+        <ol className="mb-3 list-decimal space-y-1 ps-5 text-sm text-muted">
+          <li>
+            افتح <a className="text-brand-700 underline" href="https://script.google.com/home/projects/create" target="_blank" rel="noreferrer">مشروع Apps Script جديد</a> بحساب جوجل اللي عايز النسخ تتحفظ فيه.
+          </li>
+          <li>
+            امسح اللي فيه والصق <a className="text-brand-700 underline" href={SCRIPT_URL} target="_blank" rel="noreferrer">كود السكريبت</a>، واحفظ.
+          </li>
+          <li>اختار الدالة setup ودوس تشغيل، واقبل الصلاحيات.</li>
+          <li>هيطبع «كود الربط» (64 حرف). الصقه هنا.</li>
+        </ol>
+        <div className="flex gap-2">
+          <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="كود الربط" dir="ltr" className="font-mono text-xs" />
+          <Button onClick={() => link.mutate()} loading={link.isPending} disabled={code.trim().length !== 64}>
+            <Link2 className="size-4" /> ربط
+          </Button>
+        </div>
+        <p className="mt-2 text-xs text-muted">الكود ده بصمة مش كلمة سر، والسر نفسه بيفضل في السكريبت بس.</p>
+      </Card>
+
+      <Card className="p-0">
+        <p className="border-b border-line px-4 py-3 font-bold">آخر المحاولات</p>
+        {runs.isLoading ? (
+          <Spinner />
+        ) : !runs.data?.length ? (
+          <p className="px-4 py-4 text-sm text-muted">لسه مفيش نسخ.</p>
+        ) : (
+          <div className="divide-y divide-line">
+            {runs.data.map((r) => (
+              <div key={r.id} className="flex flex-wrap items-center gap-2 px-4 py-2 text-sm">
+                {r.ok ? <CircleCheck className="size-4 text-emerald-600" /> : <CircleAlert className="size-4 text-red-600" />}
+                <span className="font-semibold">{fmtDateTime(r.at)}</span>
+                {r.ok ? (
+                  <span className="text-muted">
+                    {r.rows?.toLocaleString('ar-EG')} صف · {r.bytes ? `${Math.round(r.bytes / 1024).toLocaleString('ar-EG')} ك.ب` : ''}
+                  </span>
+                ) : (
+                  <span className="text-red-600">{r.error}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
   )
 }
