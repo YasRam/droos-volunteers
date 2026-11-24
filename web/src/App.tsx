@@ -14,6 +14,7 @@ const VolunteerDetail = lazy(() => import('@/pages/VolunteerDetail'))
 const RegisterActivity = lazy(() => import('@/pages/RegisterActivity'))
 const FollowUps = lazy(() => import('@/pages/FollowUps'))
 const Requests = lazy(() => import('@/pages/Requests'))
+const Camps = lazy(() => import('@/pages/Camps'))
 const Schedule = lazy(() => import('@/pages/Schedule'))
 const Stats = lazy(() => import('@/pages/Stats'))
 const Reports = lazy(() => import('@/pages/Reports'))
@@ -49,7 +50,8 @@ export default function App() {
           <Route path="check-in" element={<Guard allow={Boolean(p.volunteerId) || p.canRegisterActivity}><RegisterActivity /></Guard>} />
           <Route path="register" element={<Navigate to="/check-in" replace />} />
           <Route path="followups" element={<Guard allow={p.can('attendance.view_all') || p.can('attendance.register')}><FollowUps /></Guard>} />
-          <Route path="requests/*" element={<Guard allow={p.canReview}><Requests /></Guard>} />
+          <Route path="requests/*" element={<Guard allow={p.canReview || p.can('stages.manage')}><Requests /></Guard>} />
+          <Route path="camps" element={<Guard allow={p.can('stages.manage') || p.can('stats.view')}><Camps /></Guard>} />
           <Route path="schedule" element={<Schedule />} />
           <Route path="stats" element={<Guard allow={p.can('stats.view') || p.leader}><Stats /></Guard>} />
           <Route path="reports" element={<Guard allow={p.can('stats.view')}><Reports /></Guard>} />
@@ -58,7 +60,7 @@ export default function App() {
           <Route path="data" element={<Navigate to="/admin?tab=data" replace />} />
           <Route path="certificates" element={<Guard allow={p.can('certificates.review')}><Certificates /></Guard>} />
           <Route path="permissions" element={<Guard allow={p.can('roles.manage')}><Permissions /></Guard>} />
-          <Route path="admin" element={<Guard allow={p.can('settings.manage') || p.can('data.export') || p.can('backup.manage')}><Admin /></Guard>} />
+          <Route path="admin" element={<Guard allow={p.can('settings.manage') || p.can('data.export') || p.can('backup.manage') || p.can('stages.manage')}><Admin /></Guard>} />
           <Route path="log" element={<Guard allow={p.can('log.view')}><AuditLog /></Guard>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { Badge, Button, Card, Empty, Field, Input, PageHeader, RequestBadge, Select, Spinner, StatusBadge, Tabs, Textarea, Toggle } from '@/components/ui'
 import { VolunteerFacts } from '@/components/VolunteerFacts'
 import { VolunteerSelect } from '@/components/VolunteerPick'
+import { StagesCard } from '@/components/StagesCard'
 import { ContactLinks } from '@/components/VolunteerLink'
 import { useAuth, usePermissions } from '@/lib/auth'
 import { ageFrom, fmtShort, useLookups, useStatusOptions, whatsappLink, withCurrent } from '@/lib/data'
@@ -106,6 +107,7 @@ export default function VolunteerDetail() {
           </div>
           <div className="space-y-4">
             <VolunteerFacts v={v} />
+            <StagesCard volunteerId={v.id} self={false} />
             {p.can('national_id.view') && <NationalIdCard volunteerId={v.id} canEdit={p.can('national_id.edit')} />}
             {p.full && (
               <Button

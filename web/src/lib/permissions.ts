@@ -42,6 +42,7 @@ export const PERMISSION_GROUPS = [
       { key: 'data.import', label: 'يضيف بيانات من Excel' },
       { key: 'backup.manage', label: 'ينزّل نسخة احتياطية كاملة ويسترجعها (فيها الرقم القومي وملاحظات HR)' },
       { key: 'log.view', label: 'يشوف السجل' },
+      { key: 'stages.manage', label: 'يدير مراحل التطوع والكامبات وطلبات التيشيرت وقواعد النشاط' },
       { key: 'settings.manage', label: 'يعدّل القوائم والإعدادات وجروبات الواتساب' },
       { key: 'roles.manage', label: 'يدّي ويشيل صلاحيات' },
     ],

@@ -3,7 +3,9 @@ import { Check, X } from 'lucide-react'
 import { useMemo } from 'react'
 import { toast } from 'sonner'
 import { VolunteerName } from '@/components/VolunteerLink'
-import { Badge, Button, Card, Empty, PageHeader, Spinner } from '@/components/ui'
+import { Badge, Button, Card, Empty, PageHeader, Spinner, Tabs } from '@/components/ui'
+import { usePermissions } from '@/lib/auth'
+import { useSearchParams } from 'react-router-dom'
 import { fmtShort, useDirectory } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
@@ -11,8 +13,26 @@ import type { Participation } from '@/lib/types'
 
 const describe = (r: Participation) => [r.event, r.subject, r.grade, r.beneficiaries ? `${r.beneficiaries} طالب` : null].filter(Boolean).join(' · ')
 
-/** Attendance requests. Each one shows what's already accepted for that person on that day. */
+/** Requests: attendance (with what's already accepted that day) and t-shirts. */
 export default function Requests() {
+  const p = usePermissions()
+  const [params, setParams] = useSearchParams()
+  const tabs = [
+    ...(p.canReview ? [{ value: 'attendance', label: 'الحضور' }] : []),
+    ...(p.can('stages.manage') ? [{ value: 'tshirts', label: 'التيشيرتات' }] : []),
+  ]
+  const tab = tabs.find((t) => t.value === params.get('tab'))?.value ?? tabs[0]?.value
+  return (
+    <>
+      <PageHeader title="الطلبات" subtitle="طلبات الحضور وطلبات التيشيرت" />
+      {tabs.length > 1 && <Tabs tabs={tabs} value={tab} onChange={(t) => setParams({ tab: t })} />}
+      {tab === 'attendance' && <Attendance />}
+      {tab === 'tshirts' && <Tshirts />}
+    </>
+  )
+}
+
+function Attendance() {
   const qc = useQueryClient()
   const dir = useDirectory()
   const names = useMemo(() => new Map((dir.data ?? []).map((v) => [v.id, v.full_name_ar])), [dir.data])
@@ -57,7 +77,7 @@ export default function Requests() {
   const pending = q.data?.pending ?? []
   return (
     <>
-      <PageHeader title="طلبات الحضور" subtitle="المتطوعين اللي سجّلوا حضورهم بنفسهم ومستنيين موافقة" />
+      <p className="mb-3 text-sm text-muted">المتطوعين اللي سجّلوا حضورهم بنفسهم ومستنيين موافقة</p>
       {q.isLoading ? (
         <Spinner />
       ) : !pending.length ? (
@@ -108,5 +128,77 @@ export default function Requests() {
         </>
       )}
     </>
+  )
+}
+
+type TshirtRequest = { id: string; volunteer_id: string; size: string | null; notes: string | null; status: 'pending' | 'accepted' | 'rejected'; created_at: string }
+
+function Tshirts() {
+  const qc = useQueryClient()
+  const dir = useDirectory()
+  const names = useMemo(() => new Map((dir.data ?? []).map((v) => [v.id, v.full_name_ar])), [dir.data])
+  const q = useQuery({
+    queryKey: ['tshirt-requests'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('tshirt_requests').select('*').order('created_at', { ascending: false }).limit(200)
+      if (error) throw error
+      return data as TshirtRequest[]
+    },
+  })
+  const review = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: 'accepted' | 'rejected' }) => {
+      const { error } = await supabase.from('tshirt_requests').update({ status }).eq('id', id)
+      if (error) throw error
+      return status
+    },
+    onSuccess: (s) => {
+      toast.success(s === 'accepted' ? 'اتسجل إنه اشترى التيشيرت' : 'اترفض')
+      qc.invalidateQueries({ queryKey: ['tshirt-requests'] })
+      qc.invalidateQueries({ queryKey: ['volunteers'] })
+    },
+    onError: toastError,
+  })
+  const pending = (q.data ?? []).filter((r) => r.status === 'pending')
+  const sizes = pending.reduce<Record<string, number>>((m, r) => ({ ...m, [r.size ?? '؟']: (m[r.size ?? '؟'] ?? 0) + 1 }), {})
+  if (q.isLoading) return <Spinner />
+  return (
+    <div className="space-y-3">
+      {pending.length > 0 && (
+        <Card className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="font-semibold">المقاسات المطلوبة:</span>
+          {Object.entries(sizes).map(([s, n]) => (
+            <Badge key={s} tone="brand">
+              {s}: {n}
+            </Badge>
+          ))}
+        </Card>
+      )}
+      {!q.data?.length ? (
+        <Empty title="مفيش طلبات تيشيرت" />
+      ) : (
+        <Card className="divide-y divide-line p-0">
+          {q.data.map((r) => (
+            <div key={r.id} className="flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
+              <VolunteerName id={r.volunteer_id} name={names.get(r.volunteer_id) ?? '…'} className="min-w-0 flex-1 truncate font-semibold" />
+              <span className="ltr font-semibold">{r.size ?? '—'}</span>
+              {r.notes && <span className="text-xs text-muted">{r.notes}</span>}
+              <span className="text-xs text-muted">{fmtShort(r.created_at)}</span>
+              {r.status === 'pending' ? (
+                <>
+                  <Button variant="success" size="sm" onClick={() => review.mutate({ id: r.id, status: 'accepted' })}>
+                    <Check className="size-4" /> اشترى
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-red-600" onClick={() => review.mutate({ id: r.id, status: 'rejected' })}>
+                    <X className="size-4" />
+                  </Button>
+                </>
+              ) : (
+                <Badge tone={r.status === 'accepted' ? 'green' : 'red'}>{r.status === 'accepted' ? 'اشترى' : 'اترفض'}</Badge>
+              )}
+            </div>
+          ))}
+        </Card>
+      )}
+    </div>
   )
 }

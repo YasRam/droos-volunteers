@@ -113,7 +113,22 @@ function Review({ request, onClose }: { request: CertificateRequest; onClose: ()
             <RequestBadge status={request.status} />
           </div>
         )}
-        {request.purpose && <p className="rounded-xl bg-surface px-3 py-2 text-sm">الغرض: {request.purpose}</p>}
+        <div className="grid grid-cols-1 gap-2 rounded-xl bg-surface px-3 py-2 text-sm sm:grid-cols-2">
+          <p>
+            <span className="text-muted">الاسم: </span>
+            <span className="font-semibold">{v?.full_name_ar ?? '…'}</span>
+          </p>
+          <p>
+            <span className="text-muted">الرقم القومي: </span>
+            <span className="ltr inline-block font-mono font-semibold tracking-wider">{nid.isLoading ? '…' : nid.data ?? 'مش متسجل'}</span>
+          </p>
+          {request.purpose && (
+            <p className="sm:col-span-2">
+              <span className="text-muted">الغرض: </span>
+              {request.purpose}
+            </p>
+          )}
+        </div>
 
         <div>
           <p className="mb-2 text-sm font-bold">صورة البطاقة</p>

@@ -402,4 +402,55 @@ insert into schedule_slots (day, grade, subject, starts_at, ends_at, place, kind
 values ('السبت', '4 ب', 'علوم', '10:00', '11:00', 'قاعة 1', 'تأسيس', 'بنات بس', false);
 select t.ok((select not takes_attendance from schedule_slots where place = 'قاعة 1'), 'class details saved');
 
+-- ---------- stages, camps, t-shirts, rules ----------
+insert into camps (kind, camp_date, capacity) values ('ميني كامب', app.today() + 10, 1);
+select id as v9001 from volunteers where code = 'V9001' \gset
+update volunteers set bought_tshirt = false where code in ('V9001', 'V9002');
+begin;
+set local role authenticated;
+select t.login('vol1@test.com');
+select t.ok(register_camp((select id from camps limit 1)) = 'confirmed', 'first volunteer gets a seat');
+select t.fails($$select accept_rules()$$, 'rules must exist before accepting');
+insert into tshirt_requests (volunteer_id, size) values (app.my_volunteer_id(), 'L');
+select t.fails($$insert into tshirt_requests (volunteer_id, size) values (app.my_volunteer_id(), 'XL')$$, 'one pending t-shirt request');
+update tshirt_requests set status = 'accepted';
+select t.ok((select status from tshirt_requests) = 'pending', 'volunteer cannot approve own t-shirt');
+select t.ok((select done from volunteer_stages() where key = 'registered'), 'registered stage done');
+select t.ok(not (select done from volunteer_stages() where key = 'tshirt'), 't-shirt stage not done yet');
+insert into stage_done (volunteer_id, stage_key) values (app.my_volunteer_id(), 'joined_group');
+select t.ok((select done from volunteer_stages() where key = 'joined_group'), 'volunteer marks joined group');
+select t.fails($$insert into stage_done (volunteer_id, stage_key) values (app.my_volunteer_id(), 'accepted')$$, 'volunteer cannot mark staff stages');
+select t.login('vol2@test.com');
+select t.ok(register_camp((select id from camps limit 1)) = 'waitlist', 'full camp → waiting list');
+select t.fails(format('select volunteer_stages(%L)', :'v9001'), 'volunteer cannot see others stages');
+commit;
+update app_settings set value = 'القواعد' where key = 'rules_text';
+begin;
+set local role authenticated;
+select t.login('vol1@test.com');
+select accept_rules();
+select t.ok((select done from volunteer_stages() where key = 'rules'), 'rules stage done after accepting');
+select cancel_camp((select id from camps limit 1));
+commit;
+select t.ok((select r.status from camp_registrations r join volunteers v on v.id = r.volunteer_id where v.code = 'V9002') = 'confirmed', 'waiting list moves up');
+select t.ok(exists (select 1 from notifications where recipient_email = 'vol2@test.com' and title like 'مكانك%'), 'promoted volunteer is notified');
+begin;
+set local role authenticated;
+select t.login('hr@test.com');
+update tshirt_requests set status = 'accepted';
+select set_camp_attendance((select id from camps limit 1), (select id from volunteers where code = 'V9002'), true);
+insert into stages (key, name, source) values ('custom_1', 'دورة إسعافات', 'manual');
+insert into stage_done (volunteer_id, stage_key) select id, 'custom_1' from volunteers where code = 'V9002';
+commit;
+select t.ok((select bought_tshirt from volunteers where code = 'V9001'), 'approved request marks the t-shirt');
+select t.ok((select attended_minicamp from volunteers where code = 'V9002'), 'camp attendance marks the volunteer');
+select t.ok(exists (select 1 from participations p join volunteers v on v.id = p.volunteer_id where v.code = 'V9002' and p.event = 'ميني كامب'), 'camp attendance is a participation');
+select t.ok(exists (select 1 from notifications where recipient_email = 'vol1@test.com' and title like 'ميني كامب يوم%'), 'new mini camp announced to those who never attended');
+begin;
+set local role authenticated;
+select t.login('hr@test.com');
+select t.ok(remind_camp((select id from camps limit 1)) >= 0, 'reminder can be resent');
+select t.ok((select attended from camp_stats() limit 1) = 1, 'camp stats count attendance');
+commit;
+
 \echo ALL ROLE TESTS PASSED

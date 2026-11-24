@@ -10,6 +10,7 @@ import {
   Inbox,
   LogOut,
   FileBarChart,
+  Tent,
   CalendarCheck,
   Menu,
   Settings,
@@ -110,7 +111,8 @@ export default function Layout() {
   const items = useMemo<NavItem[]>(() => {
     const list: NavItem[] = [{ to: '/', label: 'الرئيسية', icon: Home }]
     if (p.volunteerId || p.canRegisterActivity) list.push({ to: '/check-in', label: 'تسجيل حضور', icon: Hand })
-    if (p.canReview) list.push({ to: '/requests', label: 'الطلبات', icon: Inbox, badge: pending.data })
+    if (p.canReview || p.can('stages.manage')) list.push({ to: '/requests', label: 'الطلبات', icon: Inbox, badge: pending.data })
+    if (p.can('stages.manage') || p.can('stats.view')) list.push({ to: '/camps', label: 'الكامبات', icon: Tent })
     if (p.canSeeVolunteers) list.push({ to: '/volunteers', label: 'المتطوعين', icon: Users })
     if (p.viewAll || p.leader) list.push({ to: '/tree', label: 'الهيكل', icon: Network })
     if (p.can('attendance.view_all') || p.can('attendance.register')) list.push({ to: '/followups', label: 'المتابعة اليومية', icon: ClipboardList })

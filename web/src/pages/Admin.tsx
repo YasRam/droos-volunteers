@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Check, CircleAlert, CircleCheck, Download, Eye, Upload, EyeOff, HardDrive, Link2, Lock, MessageCircle, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, CircleAlert, CircleCheck, Download, Eye, Upload, EyeOff, HardDrive, Link2, Lock, MessageCircle, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Badge, Button, Card, Field, Input, Modal, PageHeader, Select, Spinner, Tabs } from '@/components/ui'
+import { Badge, Button, Card, Field, Input, Modal, PageHeader, Select, Spinner, Tabs, Textarea } from '@/components/ui'
 import { fmtDateTime } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { usePermissions } from '@/lib/auth'
@@ -13,13 +13,14 @@ import { locale } from '@/lib/i18n'
 import { supabase } from '@/lib/supabase'
 import type { Lookup } from '@/lib/types'
 
-type Tab = 'lists' | 'groups' | 'data'
+type Tab = 'lists' | 'groups' | 'stages' | 'data'
 
 export default function Admin() {
   const p = usePermissions()
   const [params, setParams] = useSearchParams()
   const tabs = [
     ...(p.can('settings.manage') ? [{ value: 'lists' as Tab, label: 'القوائم' }, { value: 'groups' as Tab, label: 'جروبات الواتساب' }] : []),
+    ...(p.can('stages.manage') ? [{ value: 'stages' as Tab, label: 'مراحل التطوع والقواعد' }] : []),
     ...(p.can('data.export') || p.can('backup.manage') || p.can('settings.manage') ? [{ value: 'data' as Tab, label: 'البيانات والنسخ الاحتياطية' }] : []),
   ]
   const tab = (tabs.find((t) => t.value === params.get('tab'))?.value ?? tabs[0]?.value) as Tab
@@ -29,6 +30,7 @@ export default function Admin() {
       <Tabs value={tab} onChange={(t) => setParams({ tab: t })} tabs={tabs} />
       {tab === 'lists' && <Lists />}
       {tab === 'groups' && <Groups />}
+      {tab === 'stages' && <StagesSettings />}
       {tab === 'data' && (
         <div className="space-y-6">
           {p.can('data.export') && (
@@ -636,6 +638,188 @@ function SiteBackup() {
           </div>
         </Modal>
       )}
+    </Card>
+  )
+}
+
+type StageDef = { key: string; name: string; description: string | null; source: string; self_complete: boolean; sort_order: number; is_active: boolean; is_builtin: boolean }
+
+const SOURCE_LABEL: Record<string, string> = {
+  registered: 'بيتعلّم لوحده مع التسجيل',
+  interview: 'بيتعلّم لما الـ HR يسجّل المقابلة',
+  rules: 'المتطوع بيوافق على القواعد',
+  joined_group: 'المتطوع أو ليدر اللجنة',
+  committee_test: 'ليدر اللجنة بيعلّمه',
+  tshirt: 'بيتعلّم لما طلب التيشيرت يتأكد',
+  minicamp: 'بيتعلّم لما يحضر ميني كامب',
+  first_activity: 'بيتعلّم مع أول مشاركة مقبولة',
+  accepted: 'بيتعلّم لما درجة القبول تبقى «مقبول»',
+  manual: 'يدوي',
+}
+
+/** The volunteer path: rename, reorder, hide, add stages; and the activity rules text. */
+function StagesSettings() {
+  const qc = useQueryClient()
+  const q = useQuery({
+    queryKey: ['admin', 'stages'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('stages').select('*').order('sort_order')
+      if (error) throw error
+      return data as StageDef[]
+    },
+  })
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['admin', 'stages'] })
+    qc.invalidateQueries({ queryKey: ['stages'] })
+  }
+  const patch = async (key: string, change: Partial<StageDef>) => {
+    const { error } = await supabase.from('stages').update(change).eq('key', key)
+    if (error) toastError(error)
+    else refresh()
+  }
+  const [draft, setDraft] = useState({ name: '', description: '', self_complete: false })
+  const add = useMutation({
+    mutationFn: async () => {
+      if (!draft.name.trim()) throw { message: 'اكتب اسم المرحلة' }
+      const sort = Math.max(0, ...(q.data ?? []).map((s) => s.sort_order)) + 10
+      const { error } = await supabase.from('stages').insert({
+        key: `custom_${Date.now()}`,
+        name: draft.name.trim(),
+        description: draft.description.trim() || null,
+        source: 'manual',
+        self_complete: draft.self_complete,
+        sort_order: sort,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setDraft({ name: '', description: '', self_complete: false })
+      toast.success('المرحلة اتضافت')
+      refresh()
+    },
+    onError: toastError,
+  })
+  const move = (i: number, dir: -1 | 1) => {
+    const list = q.data ?? []
+    const a = list[i]
+    const b = list[i + dir]
+    if (!a || !b) return
+    void Promise.all([patch(a.key, { sort_order: b.sort_order }), patch(b.key, { sort_order: a.sort_order })])
+  }
+  const remove = async (s: StageDef) => {
+    if (!confirm(`تمسح مرحلة «${s.name}»؟`)) return
+    const { error } = await supabase.from('stages').delete().eq('key', s.key)
+    if (error) toastError(error)
+    else refresh()
+  }
+  if (q.isLoading) return <Spinner />
+  return (
+    <div className="space-y-4">
+      <Card className="p-0">
+        <p className="border-b border-line px-4 py-3 text-sm text-muted">
+          المراحل دي بتظهر لكل متطوع في الصفحة الرئيسية بالترتيب ده، وبيشوف اللي خلصه واللي فاضل. المراحل اليدوية بيعلّمها اللي معاه صلاحية مراحل التطوع من ملف المتطوع، أو المتطوع نفسه لو اخترت كده.
+        </p>
+        <div className="divide-y divide-line">
+          {q.data?.map((s, i) => (
+            <div key={s.key} className={clsx('flex flex-wrap items-center gap-2 px-4 py-2.5', !s.is_active && 'bg-gray-50 opacity-70')}>
+              <div className="flex flex-col">
+                <button onClick={() => move(i, -1)} disabled={i === 0} className="text-muted disabled:opacity-30" aria-label="لفوق">
+                  <ArrowUp className="size-4" />
+                </button>
+                <button onClick={() => move(i, 1)} disabled={i === (q.data?.length ?? 0) - 1} className="text-muted disabled:opacity-30" aria-label="لتحت">
+                  <ArrowDown className="size-4" />
+                </button>
+              </div>
+              <div className="min-w-0 flex-1 basis-48">
+                <Input defaultValue={s.name} onBlur={(e) => e.target.value.trim() && e.target.value !== s.name && patch(s.key, { name: e.target.value.trim() })} className="h-9 font-semibold" />
+                <Input
+                  defaultValue={s.description ?? ''}
+                  onBlur={(e) => e.target.value !== (s.description ?? '') && patch(s.key, { description: e.target.value.trim() || null })}
+                  placeholder="وصف قصير"
+                  className="mt-1 h-8 text-xs"
+                />
+              </div>
+              <Badge>{SOURCE_LABEL[s.source] ?? s.source}</Badge>
+              {s.source === 'manual' && (
+                <label className="flex items-center gap-1 text-xs">
+                  <input type="checkbox" className="size-4 accent-brand-700" checked={s.self_complete} onChange={(e) => patch(s.key, { self_complete: e.target.checked })} />
+                  المتطوع يعلّمها بنفسه
+                </label>
+              )}
+              <Button variant="ghost" size="sm" onClick={() => patch(s.key, { is_active: !s.is_active })} title={s.is_active ? 'إخفاء' : 'إظهار'} aria-label="إخفاء أو إظهار">
+                {s.is_active ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+              </Button>
+              {!s.is_builtin && (
+                <Button variant="ghost" size="sm" className="text-red-600" onClick={() => remove(s)} aria-label="مسح">
+                  <Trash2 className="size-4" />
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      </Card>
+      <Card>
+        <p className="mb-3 font-bold">مرحلة جديدة</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="مثلاً: دورة إسعافات أولية" />
+          <Input value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="وصف قصير (اختياري)" />
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" className="size-4 accent-brand-700" checked={draft.self_complete} onChange={(e) => setDraft({ ...draft, self_complete: e.target.checked })} />
+            المتطوع يعلّمها بنفسه
+          </label>
+          <Button onClick={() => add.mutate()} loading={add.isPending}>
+            <Plus className="size-4" /> إضافة
+          </Button>
+        </div>
+      </Card>
+      <RulesEditor />
+    </div>
+  )
+}
+
+function RulesEditor() {
+  const qc = useQueryClient()
+  const q = useQuery({
+    queryKey: ['setting', 'rules'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('app_settings').select('key, value').in('key', ['rules_text', 'rules_version'])
+      if (error) throw error
+      const m = Object.fromEntries((data as { key: string; value: string | null }[]).map((r) => [r.key, r.value]))
+      return { text: m.rules_text ?? '', version: Number(m.rules_version ?? 1) }
+    },
+  })
+  const [text, setText] = useState<string | null>(null)
+  const [again, setAgain] = useState(false)
+  const save = useMutation({
+    mutationFn: async () => {
+      const rows = [{ key: 'rules_text', value: (text ?? '').trim() || null }]
+      if (again) rows.push({ key: 'rules_version', value: String((q.data?.version ?? 1) + 1) })
+      const { error } = await supabase.from('app_settings').upsert(rows)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success(again ? 'اتحفظت، وكل المتطوعين محتاجين يوافقوا تاني' : 'اتحفظت')
+      setText(null)
+      setAgain(false)
+      qc.invalidateQueries({ queryKey: ['setting'] })
+      qc.invalidateQueries({ queryKey: ['stages'] })
+    },
+    onError: toastError,
+  })
+  if (q.isLoading) return <Spinner />
+  const value = text ?? q.data?.text ?? ''
+  return (
+    <Card>
+      <p className="font-bold">قواعد النشاط</p>
+      <p className="mb-3 text-xs text-muted">كل متطوع بيقراها ويوافق عليها من الصفحة الرئيسية. النسخة رقم {q.data?.version}.</p>
+      <Textarea value={value} onChange={(e) => setText(e.target.value)} rows={12} placeholder="اكتب أو الصق القواعد هنا" />
+      <label className="mt-3 flex items-center gap-2 text-sm">
+        <input type="checkbox" className="size-4 accent-brand-700" checked={again} onChange={(e) => setAgain(e.target.checked)} />
+        تعديل مهم: اطلب من كل المتطوعين يوافقوا تاني
+      </label>
+      <Button className="mt-3" onClick={() => save.mutate()} loading={save.isPending} disabled={text === null && !again}>
+        حفظ القواعد
+      </Button>
     </Card>
   )
 }

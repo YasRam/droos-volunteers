@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { PushCard } from '@/components/PushToggle'
+import { StagesCard } from '@/components/StagesCard'
 import { Button, Card } from '@/components/ui'
 import { useAuth, usePermissions } from '@/lib/auth'
 import { addDays, cairoToday, fmtDate, fmtShort, useHrRows, useLookups, useSetting, useStatusOptions, useVolunteers, whatsappLink, type VolunteerWithStats } from '@/lib/data'
@@ -50,6 +51,7 @@ export default function Home() {
         </Card>
       )}
 
+      {p.volunteerId && <StagesCard volunteerId={p.volunteerId} self />}
       {p.volunteerId && <MyNumbers volunteerId={p.volunteerId} />}
       {(p.staff || p.viewAll) && <TodayNumbers today={today} full={p.viewAll} canReview={p.canReview} />}
       {seesVolunteers && <VolunteerNumbers vols={vols.data} full={p.viewAll} leader={!p.viewAll && p.leader} today={today} />}
