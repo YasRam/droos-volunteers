@@ -1,4 +1,15 @@
-import { lazy, Suspense, type ReactNode } from 'react'
+import { lazy as reactLazy, Suspense, type ComponentType, type ReactNode } from 'react'
+import { isChunkError, PageErrorBoundary, reloadOnce } from '@/components/PageErrorBoundary'
+
+/** lazy() that loads the new version when an old page file is gone. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const lazy = <T extends ComponentType<any>>(load: () => Promise<{ default: T }>) =>
+  reactLazy(() =>
+    load().catch((e) => {
+      if (isChunkError(e)) reloadOnce()
+      throw e
+    }),
+  )
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Layout from '@/components/Layout'
 import { Spinner } from '@/components/ui'
@@ -39,6 +50,7 @@ export default function App() {
   if (!known) return <NotRegistered />
 
   return (
+    <PageErrorBoundary>
     <Suspense fallback={<Spinner />}>
       <Routes>
         <Route element={<Layout />}>
@@ -66,5 +78,6 @@ export default function App() {
         </Route>
       </Routes>
     </Suspense>
+    </PageErrorBoundary>
   )
 }

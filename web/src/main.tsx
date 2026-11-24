@@ -7,12 +7,19 @@ import { AuthProvider } from '@/lib/auth'
 import App from './App'
 import './index.css'
 import { isEn, startEnglish } from '@/lib/i18n'
+import { reloadOnce } from '@/components/PageErrorBoundary'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 30_000 } },
 })
 
 if (isEn) void startEnglish()
+
+// After a new version is published, an open page may ask for page files that were replaced: reload once.
+window.addEventListener('vite:preloadError', (e) => {
+  e.preventDefault()
+  reloadOnce()
+})
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

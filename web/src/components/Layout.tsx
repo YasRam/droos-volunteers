@@ -23,13 +23,15 @@ import {
   ShieldCheck,
   Network,
 } from 'lucide-react'
-import { useEffect, useMemo, useState, type ComponentType } from 'react'
+import { Suspense, useEffect, useMemo, useState, type ComponentType } from 'react'
+import { Spinner } from '@/components/ui'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth, usePermissions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import type { Notification } from '@/lib/types'
 import { fmtDateTime } from '@/lib/data'
+import { PageErrorBoundary } from '@/components/PageErrorBoundary'
 import { LangSwitch } from '@/components/LangSwitch'
 import { PushSwitch } from './PushToggle'
 
@@ -220,7 +222,11 @@ export default function Layout() {
         </header>
 
         <main className="mx-auto max-w-5xl px-4 pb-28 pt-4 lg:pb-10">
-          <Outlet />
+          <PageErrorBoundary key={location.pathname}>
+              <Suspense fallback={<Spinner />}>
+                <Outlet />
+              </Suspense>
+            </PageErrorBoundary>
         </main>
       </div>
 
