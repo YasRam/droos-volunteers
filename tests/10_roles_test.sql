@@ -398,7 +398,6 @@ select t.ok((select count(*) from report_eval('2026-11-01') where classes > 0) =
 commit;
 
 -- ---------- class details ----------
-select t.fails($$insert into schedule_slots (day, grade, subject, starts_at, ends_at, audience) values ('السبت', '4 ب', 'علوم', '10:00', '11:00', 'حد')$$, 'audience must be one of the choices');
 insert into schedule_slots (day, grade, subject, starts_at, ends_at, place, kind, audience, takes_attendance)
 values ('السبت', '4 ب', 'علوم', '10:00', '11:00', 'قاعة 1', 'تأسيس', 'بنات بس', false);
 select t.ok((select not takes_attendance from schedule_slots where place = 'قاعة 1'), 'class details saved');
@@ -484,5 +483,19 @@ select t.ok((select calls from report_eval('2026-11-01') where day = '2026-11-21
 select set_config('request.jwt.claims', '{"role":"service_role"}', false);
 select t.ok((select count(*) from report_eval('2026-11-01')) = 30 and (select calls from report_eval('2026-11-01') where day = '2026-11-21') = 12, 'service role (sheet sync) can read reports');
 select set_config('request.jwt.claims', '', false);
+
+-- ---------- delete with replacement, class lists ----------
+insert into lookups (list, value) values ('المكان', 'قاعة قديمة'), ('المكان', 'قاعة جديدة') on conflict do nothing;
+insert into participations (volunteer_id, activity_date, event, place, status) select id, '2026-11-25', 'تدريس', 'قاعة قديمة', 'accepted' from volunteers where code = 'V9002';
+begin;
+set local role authenticated;
+select t.login('admin@test.com');
+select t.ok((select lookup_usage((select id from lookups where list = 'المكان' and value = 'قاعة قديمة'))) = 1, 'usage counted');
+select t.ok((delete_lookup((select id from lookups where list = 'المكان' and value = 'قاعة قديمة'), 'قاعة جديدة') ->> 'rows')::int = 1, 'delete moves records to the chosen value');
+commit;
+select t.ok((select place from participations where activity_date = '2026-11-25') = 'قاعة جديدة', 'record now uses the new value');
+select t.ok(not exists (select 1 from lookups where list = 'المكان' and value = 'قاعة قديمة'), 'old value removed');
+insert into schedule_slots (day, grade, subject, starts_at, ends_at, kind, audience) values ('الأحد', '5 ب', 'علوم', '10:00', '11:00', 'ورشة رسم', 'بنات بس');
+select t.ok(exists (select 1 from schedule_slots where kind = 'ورشة رسم'), 'class kind is free from the list');
 
 \echo ALL ROLE TESTS PASSED

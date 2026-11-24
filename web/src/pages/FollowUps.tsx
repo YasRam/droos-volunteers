@@ -9,9 +9,9 @@ import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import ActivityFields, { activitySchema, checkActivity, eventForm, toActivityPayload, type ActivityValues } from '@/components/ActivityFields'
 import { VolunteerName } from '@/components/VolunteerLink'
-import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, RequestBadge, Select, Spinner } from '@/components/ui'
+import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, RequestBadge, Select, Spinner, Tabs } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
-import { addDays, cairoToday, fmtShort, useDirectory, useLookups } from '@/lib/data'
+import { addDays, cairoToday, fmtDate, fmtShort, useDirectory, useLookups } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import type { Participation } from '@/lib/types'
@@ -33,6 +33,7 @@ export default function FollowUps() {
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<Participation | null>(null)
   const [groupForm, setGroupForm] = useState(false)
+  const [view, setView] = useState<'person' | 'day'>('person')
   const navigate = useNavigate()
 
   const q = useQuery({
@@ -129,7 +130,17 @@ export default function FollowUps() {
           </Field>
         </div>
       </Card>
-      {q.isLoading ? (
+      <Tabs
+        value={view}
+        onChange={(v) => setView(v as 'person' | 'day')}
+        tabs={[
+          { value: 'person', label: 'بالمتطوع' },
+          { value: 'day', label: 'باليوم' },
+        ]}
+      />
+      {view === 'day' && !q.isLoading ? (
+        <ByDay rows={(q.data ?? []).filter((r) => !search.trim() || (names.get(r.volunteer_id) ?? '').includes(search.trim()))} names={names} onEdit={setEditing} />
+      ) : q.isLoading ? (
         <Spinner />
       ) : !people.length ? (
         <Empty title="مفيش مشاركات في الفترة دي" />
@@ -143,6 +154,61 @@ export default function FollowUps() {
       {groupForm && <MeetingForm meeting={null} onClose={() => setGroupForm(false)} />}
       {editing && <EditParticipation row={editing} name={names.get(editing.volunteer_id)} rowsKind={lookups.data?.rows} onClose={() => setEditing(null)} />}
     </>
+  )
+}
+
+/** Same participations, one card per day (newest first); group activities stay one line. */
+function ByDay({ rows, names, onEdit }: { rows: Participation[]; names: Map<string, string>; onEdit: (r: Participation) => void }) {
+  const navigate = useNavigate()
+  const days = useMemo(() => {
+    const m = new Map<string, Participation[]>()
+    for (const r of rows) m.set(r.activity_date, [...(m.get(r.activity_date) ?? []), r])
+    return [...m.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+  }, [rows])
+  if (!days.length) return <Empty title="مفيش مشاركات في الفترة دي" />
+  return (
+    <div className="space-y-3">
+      {days.map(([day, list]) => {
+        const groups = new Map<string, Participation[]>()
+        const singles = list.filter((r) => {
+          if (!r.meeting_id) return true
+          groups.set(r.meeting_id, [...(groups.get(r.meeting_id) ?? []), r])
+          return false
+        })
+        return (
+          <Card key={day} className="p-0">
+            <div className="flex items-center justify-between border-b border-line px-4 py-2">
+              <p className="font-bold">{fmtDate(day)}</p>
+              <span className="text-xs text-muted">
+                {new Set(list.map((r) => r.volunteer_id)).size} متطوع · {list.length} مشاركة
+              </span>
+            </div>
+            <div className="divide-y divide-line">
+              {[...groups.entries()].map(([id, g]) => (
+                <button key={id} onClick={() => navigate(`/meetings?edit=${id}`)} className="flex w-full items-center gap-2 px-4 py-2 text-start text-sm hover:bg-surface">
+                  <Badge tone="brand">جماعي</Badge>
+                  <span className="min-w-0 flex-1 truncate font-semibold">
+                    {g[0].event} · {g[0].subject}
+                  </span>
+                  <span className="text-xs text-muted">{g.length} حاضر</span>
+                  <Pencil className="size-4 text-muted" />
+                </button>
+              ))}
+              {singles.map((r) => (
+                <div key={r.id} className="flex items-center gap-2 px-4 py-2 text-sm">
+                  <VolunteerName id={r.volunteer_id} name={names.get(r.volunteer_id) ?? '—'} className="w-40 shrink-0 truncate font-semibold" />
+                  <p className="min-w-0 flex-1 truncate text-muted">{describe(r)}</p>
+                  <RequestBadge status={r.status} />
+                  <Button variant="ghost" size="sm" onClick={() => onEdit(r)} aria-label="تعديل" title="تعديل">
+                    <Pencil className="size-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )
+      })}
+    </div>
   )
 }
 

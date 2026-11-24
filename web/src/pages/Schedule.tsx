@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { VolunteerName } from '@/components/VolunteerLink'
 import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Spinner, Tabs } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
-import { fmtTime, timeInput, useDirectory, useLookups } from '@/lib/data'
+import { fmtTime, timeInput, useDirectory, useLookups, withCurrent } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import { WEEKDAYS, type ScheduleSlot, type Weekday } from '@/lib/types'
@@ -83,7 +83,7 @@ export default function Schedule() {
         <Select value={day} onChange={(e) => setDay(e.target.value)} placeholder="كل الأيام" options={WEEKDAYS} />
         <Select value={grade} onChange={(e) => setGrade(e.target.value)} placeholder="كل السنين" options={lookups.data?.list('السنة الدراسية') ?? []} />
         <Input value={teacher} onChange={(e) => setTeacher(e.target.value)} placeholder="اسم المتطوع" />
-        <Select value={kind} onChange={(e) => setKind(e.target.value)} placeholder="كل الأنواع" options={KINDS} />
+        <Select value={kind} onChange={(e) => setKind(e.target.value)} placeholder="كل الأنواع" options={lookups.data?.list('نوع الحصة').length ? lookups.data.list('نوع الحصة') : KINDS} />
       </div>
       {q.isLoading ? (
         <Spinner />
@@ -215,10 +215,10 @@ function SlotForm({ slot, onClose }: { slot: ScheduleSlot | null; onClose: () =>
           <datalist id="places">{places.map((x) => <option key={x} value={x} />)}</datalist>
         </Field>
         <Field label="النوع">
-          <Select {...form.register('kind')} options={KINDS} />
+          <Select {...form.register('kind')} options={withCurrent(lookups.data?.list('نوع الحصة').length ? lookups.data.list('نوع الحصة') : KINDS, slot?.kind)} />
         </Field>
         <Field label="لمين">
-          <Select {...form.register('audience')} options={AUDIENCES} />
+          <Select {...form.register('audience')} options={withCurrent(lookups.data?.list('لمين').length ? lookups.data.list('لمين') : AUDIENCES, slot?.audience)} />
         </Field>
         <Field label="الغياب">
           <label className="flex h-10 items-center gap-2 text-sm">

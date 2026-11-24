@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { VolunteerName } from '@/components/VolunteerLink'
 import { Badge, Button, Card, Empty, PageHeader, Spinner, Tabs } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
+import Certificates from './Certificates'
 import { useSearchParams } from 'react-router-dom'
 import { fmtShort, useDirectory } from '@/lib/data'
 import { toastError } from '@/lib/errors'
@@ -20,14 +21,16 @@ export default function Requests() {
   const tabs = [
     ...(p.canReview ? [{ value: 'attendance', label: 'الحضور' }] : []),
     ...(p.can('stages.manage') ? [{ value: 'tshirts', label: 'التيشيرتات' }] : []),
+    ...(p.can('certificates.review') ? [{ value: 'certificates', label: 'شهادات التطوع' }] : []),
   ]
   const tab = tabs.find((t) => t.value === params.get('tab'))?.value ?? tabs[0]?.value
   return (
     <>
-      <PageHeader title="الطلبات" subtitle="طلبات الحضور وطلبات التيشيرت" />
+      <PageHeader title="الطلبات" subtitle="طلبات الحضور والتيشيرت وشهادات التطوع" />
       {tabs.length > 1 && <Tabs tabs={tabs} value={tab} onChange={(t) => setParams({ tab: t })} />}
       {tab === 'attendance' && <Attendance />}
       {tab === 'tshirts' && <Tshirts />}
+      {tab === 'certificates' && <Certificates embedded />}
     </>
   )
 }

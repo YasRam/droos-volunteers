@@ -19,7 +19,6 @@ import {
   Users,
   UsersRound,
   FileSpreadsheet,
-  Award,
   ShieldCheck,
   Network,
 } from 'lucide-react'
@@ -48,12 +47,14 @@ function usePendingCount(enabled: boolean) {
     enabled,
     refetchInterval: 60_000,
     queryFn: async () => {
-      const { count, error } = await supabase
-        .from('participations')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'pending')
-      if (error) throw error
-      return count ?? 0
+      // Everything waiting in «الطلبات»: attendance, t-shirts, certificates (each only if visible to this user)
+      const counts = await Promise.all(
+        ['participations', 'tshirt_requests', 'certificate_requests'].map(async (t) => {
+          const { count, error } = await supabase.from(t).select('id', { count: 'exact', head: true }).eq('status', 'pending')
+          return error ? 0 : (count ?? 0)
+        }),
+      )
+      return counts.reduce((a, b) => a + b, 0)
     },
   })
 }
@@ -92,7 +93,7 @@ export default function Layout() {
   const qc = useQueryClient()
   const [moreOpen, setMoreOpen] = useState(false)
   const [bellOpen, setBellOpen] = useState(false)
-  const pending = usePendingCount(p.canReview)
+  const pending = usePendingCount(p.canReview || p.can('stages.manage') || p.can('certificates.review'))
   const notifications = useNotifications(me?.email ?? null)
   const unread = notifications.data?.filter((n) => !n.read_at).length ?? 0
 
@@ -113,7 +114,7 @@ export default function Layout() {
   const items = useMemo<NavItem[]>(() => {
     const list: NavItem[] = [{ to: '/', label: 'الرئيسية', icon: Home }]
     if (p.volunteerId || p.canRegisterActivity) list.push({ to: '/check-in', label: 'تسجيل حضور', icon: Hand })
-    if (p.canReview || p.can('stages.manage')) list.push({ to: '/requests', label: 'الطلبات', icon: Inbox, badge: pending.data })
+    if (p.canReview || p.can('stages.manage') || p.can('certificates.review')) list.push({ to: '/requests', label: 'الطلبات', icon: Inbox, badge: pending.data })
     if (p.can('stages.manage') || p.can('stats.view')) list.push({ to: '/camps', label: 'الكامبات', icon: Tent })
     if (p.canSeeVolunteers) list.push({ to: '/volunteers', label: 'المتطوعين', icon: Users })
     if (p.viewAll || p.leader) list.push({ to: '/tree', label: 'الهيكل', icon: Network })
@@ -124,7 +125,6 @@ export default function Layout() {
     if (p.can('stats.view') || p.leader) list.push({ to: '/stats', label: 'الإحصائيات', icon: BarChart3 })
     if (p.can('stats.view')) list.push({ to: '/reports', label: 'التقارير', icon: FileBarChart })
     if (p.can('attendance.register') || p.leader) list.push({ to: '/meetings', label: 'الاجتماعات', icon: CalendarCheck })
-    if (p.can('certificates.review')) list.push({ to: '/certificates', label: 'شهادات التطوع', icon: Award })
     if (p.can('roles.manage')) list.push({ to: '/permissions', label: 'الصلاحيات', icon: ShieldCheck })
     if (p.can('settings.manage')) list.push({ to: '/admin', label: 'الإعدادات', icon: Settings })
     else if (p.can('data.export') || p.can('backup.manage')) list.push({ to: '/admin?tab=data', label: 'البيانات', icon: FileSpreadsheet })

@@ -144,8 +144,8 @@ export interface ScheduleSlot {
   starts_at: string
   ends_at: string
   place?: string | null
-  kind?: 'حصة' | 'تأسيس' | 'ورشة ثابتة'
-  audience?: 'الكل' | 'بنات بس' | 'ولاد بس'
+  kind?: string
+  audience?: string
   takes_attendance?: boolean
   notes?: string | null
 }

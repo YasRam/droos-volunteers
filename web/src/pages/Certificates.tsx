@@ -9,7 +9,7 @@ import { fmtDate, fmtDateTime, useVolunteers } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 
-export default function Certificates() {
+export default function Certificates({ embedded }: { embedded?: boolean } = {}) {
   const [tab, setTab] = useState<'pending' | 'done'>('pending')
   const vols = useVolunteers()
   const byId = useMemo(() => new Map((vols.data ?? []).map((v) => [v.id, v])), [vols.data])
@@ -25,7 +25,7 @@ export default function Certificates() {
   const rows = (q.data ?? []).filter((r) => (tab === 'pending' ? r.status === 'pending' : r.status !== 'pending'))
   return (
     <>
-      <PageHeader title="شهادات التطوع" subtitle="طلبات المتطوعين بصورة البطاقة وتفاصيل مشاركاتهم" />
+      {!embedded && <PageHeader title="شهادات التطوع" subtitle="طلبات المتطوعين بصورة البطاقة وتفاصيل مشاركاتهم" />}
       <Tabs
         value={tab}
         onChange={setTab}

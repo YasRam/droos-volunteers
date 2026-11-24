@@ -271,7 +271,7 @@
 "القوايم، وجروبات الواتساب، وتنزيل البيانات والنسخ الاحتياطية": "Lists, WhatsApp groups, data downloads and backups",
 "القيمة دي موجودة قبل كده": "This value already exists",
 "الكامب": "Camp",
-"الكل": "All",
+"الكل": "Everyone",
 "الكل (": "All (",
 "الكود": "Code",
 "الكود ده بصمة مش كلمة سر، والسر نفسه بيفضل في السكريبت بس.": "This code is a fingerprint, not a password; the secret itself stays in the script only.",
@@ -969,7 +969,7 @@
 "لحد يوم": "Until day",
 "لسه مفيش ربط بالشيتات. حط لينك السكريبت في تبويب «ربط الشيتات».": "No sheets linked yet. Add the script link in the «Sheet links» tab.",
 "للنص الأول من الشهر اختار يوم 15": "For the first half of the month pick the 15th",
-"لمين": "Audience",
+"لمين": "For whom",
 "لو اتحدد، المتطوع بيطلع «خارج المتابعة» في الشيت": "If set, the volunteer appears as «خارج المتابعة» in the sheet",
 "لينك السكريبت": "Script link",
 "لينك السكريبت لازم يبدأ بـ https://script.google.com/macros/s/ ويخلص بـ /exec": "The script link must start with https://script.google.com/macros/s/ and end with /exec",
@@ -1181,7 +1181,28 @@
 "يوم عائلي جديد": "New family day",
 "احضر الكامب": "Attend the camp",
 "احضر حفلة التخرج": "Attend the graduation party",
-"مقابلة جديدة": "New interview"
+"مقابلة جديدة": "New interview",
+"» يحصلهم إيه؟": "»?",
+"أسباب الخروج من المتابعة (عمود «الأعمدة» في شيت المتابعة).": "Reasons for leaving follow-up (the «الأعمدة» column in the follow-up sheet).",
+"أنواع الحصص في الجدول (حصة، تأسيس، ورشة ثابتة...).": "Class types in the schedule (class, foundation, fixed workshop...).",
+"اتشالت من القايمة": "Removed from the list",
+"اتشالت، و": "Removed, and",
+"الحصة لمين (الكل، بنات بس، ولاد بس...).": "Who the class is for (everyone, girls only, boys only...).",
+"السنة الدراسية للمتطوع": "Volunteer's school year",
+"الـ": "The",
+"بالمتطوع": "By volunteer",
+"باليوم": "By day",
+"تاريخ مش متسجل": "Date not recorded",
+"دوّر بالاسم": "Search by name",
+"سجل اتنقل لـ «": "records moved to «",
+"سجل اللي فيهم «": "records with «",
+"سنة المتطوع الدراسية (طالب، خريج...).": "The volunteer's school year (student, graduate...).",
+"طلبات الحضور والتيشيرت وشهادات التطوع": "Attendance, T-shirt and certificate requests",
+"لسه محدش": "Nobody yet",
+"مش مستخدمة في أي بيانات، فمفيش حاجة هتتأثر.": "Not used in any data, so nothing will be affected.",
+"نوع الحصة": "Class type",
+"يتنقلوا لـ": "Move them to",
+"يفضلوا زي ما هما بالاسم القديم": "Keep them as they are with the old name"
 },
 "patterns": [
 [
@@ -1643,6 +1664,14 @@
 [
 "حضروا {0} (من المتابعين)",
 "Attended {0} (in follow-up)"
+],
+[
+"اتشالت، و{0} سجل اتنقل لـ «{1}»",
+"Removed, and {0} records moved to «{1}»"
+],
+[
+"الـ {0} سجل اللي فيهم «{1}» يحصلهم إيه؟",
+"What happens to the {0} records with «{1}»?"
 ]
 ],
 "words": {

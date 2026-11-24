@@ -81,6 +81,10 @@ const LIST_HINT: Record<string, string> = {
   المكان: 'أماكن الأنشطة.',
   'القائم على المقابلة': 'اللي بيعملوا المقابلات.',
   'حالة المتطوع': 'حالات المتطوعين. تغيير الاسم بيغيّره في كل المتطوعين. القيم اللي عليها قفل السيستم بيعتمد عليها.',
+  'نوع الحصة': 'أنواع الحصص في الجدول (حصة، تأسيس، ورشة ثابتة...).',
+  'لمين': 'الحصة لمين (الكل، بنات بس، ولاد بس...).',
+  'سبب الخروج': 'أسباب الخروج من المتابعة (عمود «الأعمدة» في شيت المتابعة).',
+  'السنة الدراسية للمتطوع': 'سنة المتطوع الدراسية (طالب، خريج...).',
   'حالة القبول': 'درجات القبول في المقابلة. تغيير الاسم بيغيّره في كل الملفات. القيم اللي عليها قفل السيستم بيعتمد عليها.',
 }
 // Which column of the evaluation sheet («اقتراح») an event counts in
@@ -116,6 +120,18 @@ function Lists() {
   const [picked, setPicked] = useState('')
   const current = picked || listNames[0] || ''
   const rows = (q.data ?? []).filter((r) => r.list === current)
+  // Move a value up or down: renumber the whole list so the order is always clean
+  const swap = async (list: Lookup[], i: number, dir: -1 | 1) => {
+    const order = [...list]
+    const [x] = order.splice(i, 1)
+    order.splice(i + dir, 0, x)
+    const changed = order.map((r, k) => ({ id: r.id, sort_order: (k + 1) * 10 })).filter((r, k) => order[k].sort_order !== r.sort_order)
+    for (const c of changed) {
+      const { error } = await supabase.from('lookups').update({ sort_order: c.sort_order }).eq('id', c.id)
+      if (error) return toastError(error)
+    }
+    refresh()
+  }
   const events = (q.data ?? []).filter((r) => r.list === 'الحدث').map((r) => r.value)
   const [value, setValue] = useState('')
   const [parent, setParent] = useState('')
@@ -196,8 +212,16 @@ function Lists() {
         </Card>
 
         <Card className="divide-y divide-line p-0">
-          {rows.map((r) => (
+          {rows.map((r, i) => (
             <div key={r.id} className={clsx('flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5', !r.is_active && 'bg-gray-50')}>
+              <div className="flex flex-col">
+                <button onClick={() => swap(rows, i, -1)} disabled={i === 0} className="text-muted disabled:opacity-30" aria-label="لفوق" title="لفوق">
+                  <ArrowUp className="size-4" />
+                </button>
+                <button onClick={() => swap(rows, i, 1)} disabled={i === rows.length - 1} className="text-muted disabled:opacity-30" aria-label="لتحت" title="لتحت">
+                  <ArrowDown className="size-4" />
+                </button>
+              </div>
               <div className="min-w-0 flex-1 basis-40">
                 <p className={clsx('flex items-center gap-1.5 truncate font-semibold', !r.is_active && 'text-muted line-through')}>
                   {isLocked(r) && <Lock className="size-3.5 shrink-0 text-muted" aria-label="ثابتة" />}
@@ -281,13 +305,17 @@ function EditValue({ row, onClose, onDone }: { row: Lookup; onClose: () => void;
     },
     onError: toastError,
   })
+  const [deleting, setDeleting] = useState(false)
+  const [moveTo, setMoveTo] = useState('')
+  const siblings = useAllLookups().data?.filter((x) => x.list === row.list && x.id !== row.id && x.is_active).map((x) => x.value) ?? []
   const remove = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc('delete_lookup', { p_id: row.id })
+      const { data, error } = await supabase.rpc('delete_lookup', { p_id: row.id, p_replace_with: moveTo || null })
       if (error) throw error
+      return Number((data as { rows: number } | null)?.rows ?? 0)
     },
-    onSuccess: () => {
-      toast.success('اتمسحت من القايمة')
+    onSuccess: (moved) => {
+      toast.success(moved ? `اتشالت، و${moved} سجل اتنقل لـ «${moveTo}»` : 'اتشالت من القايمة')
       onDone()
       onClose()
     },
@@ -316,15 +344,33 @@ function EditValue({ row, onClose, onDone }: { row: Lookup; onClose: () => void;
           <Button className="flex-1" onClick={() => rename.mutate()} loading={rename.isPending} disabled={!value.trim() || value.trim() === row.value}>
             <Check className="size-4" /> حفظ الاسم
           </Button>
-          <Button
-            variant="secondary"
-            className="text-red-600"
-            loading={remove.isPending}
-            onClick={() => confirm(isEnum ? `تخفي «${row.value}» من الاختيارات؟` : n ? `تمسح «${row.value}» من القايمة؟ الـ ${n} سجل القديمة هيفضلوا زي ما هما.` : `تمسح «${row.value}»؟`) && remove.mutate()}
-          >
+          <Button variant="secondary" className="text-red-600" onClick={() => setDeleting((d) => !d)}>
             <Trash2 className="size-4" /> {isEnum ? 'إخفاء' : 'مسح من القايمة'}
           </Button>
         </div>
+        {deleting && (
+          <div className="space-y-3 rounded-xl border border-red-200 bg-red-50/50 p-3">
+            {n > 0 ? (
+              <>
+                <p className="text-sm font-semibold">الـ {n} سجل اللي فيهم «{row.value}» يحصلهم إيه؟</p>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="radio" name="del" className="size-4 accent-brand-700" checked={!moveTo} onChange={() => setMoveTo('')} />
+                  يفضلوا زي ما هما بالاسم القديم
+                </label>
+                <label className="flex flex-wrap items-center gap-2 text-sm">
+                  <input type="radio" name="del" className="size-4 accent-brand-700" checked={Boolean(moveTo)} onChange={() => setMoveTo(siblings[0] ?? '')} disabled={!siblings.length} />
+                  يتنقلوا لـ
+                  <Select className="w-48" value={moveTo} onChange={(e) => setMoveTo(e.target.value)} placeholder="اختار..." options={siblings} disabled={!siblings.length} />
+                </label>
+              </>
+            ) : (
+              <p className="text-sm">مش مستخدمة في أي بيانات، فمفيش حاجة هتتأثر.</p>
+            )}
+            <Button className="w-full bg-red-600 hover:bg-red-700" loading={remove.isPending} onClick={() => remove.mutate()}>
+              {isEnum ? 'إخفاء' : 'مسح'} «{row.value}»
+            </Button>
+          </div>
+        )}
       </div>
     </Modal>
   )

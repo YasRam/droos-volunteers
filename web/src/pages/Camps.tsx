@@ -46,6 +46,11 @@ export default function Camps() {
   const active = (vols.data ?? []).filter((v) => v.status !== 'خارج المتابعة')
   const attended = active.filter(did)
   const missing = active.filter((v) => !did(v))
+  const [who, setWho] = useState('')
+  const attendedAll = [...(vols.data ?? []).filter(did)].sort((a, b) => {
+    const d = (v: typeof a) => (kind === 'minicamp' ? v.minicamp_date : kind === 'camp' ? v.camp_date : v.graduation_date) ?? ''
+    return d(b).localeCompare(d(a)) || a.full_name_ar.localeCompare(b.full_name_ar, 'ar')
+  })
   const allThree = active.filter((v) => v.attended_minicamp && v.attended_camp && v.attended_graduation).length
   const byMonth = useMemo(() => {
     const m = new Map<string, number>()
@@ -134,6 +139,30 @@ export default function Camps() {
           })}
         </div>
       )}
+      <Card className="mt-4 p-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2">
+          <p className="text-sm font-bold">
+            حضروا {KIND_NAME[kind]} ({attendedAll.length})
+          </p>
+          <Input value={who} onChange={(e) => setWho(e.target.value)} placeholder="دوّر بالاسم" className="h-9 w-48" />
+        </div>
+        <div className="max-h-96 divide-y divide-line overflow-y-auto">
+          {attendedAll
+            .filter((v) => !who.trim() || v.full_name_ar.includes(who.trim()))
+            .map((v) => {
+              const date = kind === 'minicamp' ? v.minicamp_date : kind === 'camp' ? v.camp_date : v.graduation_date
+              return (
+                <div key={v.id} className="flex items-center gap-2 px-4 py-1.5 text-sm">
+                  <VolunteerName id={v.id} name={v.full_name_ar} className="min-w-0 flex-1 truncate font-semibold" />
+                  <span className="text-xs text-muted">{v.main_committee ?? ''}</span>
+                  <span className="w-24 text-xs text-muted">{date ? fmtDate(date) : 'تاريخ مش متسجل'}</span>
+                  {v.status === 'خارج المتابعة' && <Badge>خارج المتابعة</Badge>}
+                </div>
+              )
+            })}
+          {!attendedAll.length && <p className="px-4 py-3 text-sm text-muted">لسه محدش</p>}
+        </div>
+      </Card>
       {missing.length > 0 && (
         <Card className="mt-4">
           <p className="mb-2 text-sm font-bold">
