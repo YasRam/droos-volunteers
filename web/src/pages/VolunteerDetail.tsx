@@ -215,6 +215,7 @@ function Interview({ v }: { v: Volunteer }) {
       acceptance: hr.data?.acceptance ?? '',
       interview_date: hr.data?.interview_date ?? '',
       interviewer: hr.data?.interviewer ?? '',
+      interviewer_id: hr.data?.interviewer_id ?? null,
       hr_notes: hr.data?.hr_notes ?? '',
     },
   })
@@ -233,7 +234,8 @@ function Interview({ v }: { v: Volunteer }) {
           .update({
             acceptance: f.acceptance || null,
             interview_date: f.interview_date || null,
-            interviewer: f.interviewer || null,
+            interviewer_id: f.interviewer_id || null,
+            interviewer: f.interviewer_id ? null : f.interviewer || null,
             ...(seesNotes ? { hr_notes: f.hr_notes || null } : {}),
           })
           .eq('volunteer_id', v.id)
@@ -278,11 +280,13 @@ function Interview({ v }: { v: Volunteer }) {
             <Field label="تاريخ المقابلة">
               <Input type="date" {...form.register('interview_date')} />
             </Field>
-            <Field label="القائم على المقابلة">
-              <Input {...form.register('interviewer')} list="interviewers" />
-              <datalist id="interviewers">
-                {lookups.data?.list('القائم على المقابلة').map((n) => <option key={n} value={n} />)}
-              </datalist>
+            <Field label="القائم على المقابلة" hint="المقابلة بتتحسب مشاركة «انترفيو» ليه وللمتطوع في يومها، من غير تسجيل">
+              <VolunteerSelect
+                value={form.watch('interviewer_id')}
+                onChange={(id) => form.setValue('interviewer_id', id, { shouldDirty: true })}
+                disabled={!canEditHr}
+              />
+              {!form.watch('interviewer_id') && hr.data?.interviewer && <p className="mt-1 text-xs text-muted">مسجّل قبل كده: {hr.data.interviewer}</p>}
             </Field>
             {seesNotes && (
               <div className="sm:col-span-2">

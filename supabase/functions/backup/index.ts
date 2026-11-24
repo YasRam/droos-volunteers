@@ -75,7 +75,23 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({})) as {
     file_name?: string
     images?: boolean
+    sheets?: { month: string }
     report?: { ok: boolean; bytes?: number; rows?: number; tables?: number; images?: number; error?: string }
+  }
+
+  // Sheet sync: the month's evaluation and meetings rows, plus where to write them
+  if (body.sheets) {
+    const month = String(body.sheets.month ?? '')
+    if (!/^\d{4}-\d{2}$/.test(month)) return json({ error: 'month' }, 400)
+    const [ev, mt, links] = await Promise.all([
+      db.rpc('report_eval', { p_month: `${month}-01` }),
+      db.rpc('report_meetings', { p_month: `${month}-01` }),
+      db.from('app_settings').select('key, value').in('key', ['report_sheet_eval', 'report_sheet_meetings']),
+    ])
+    const err = ev.error ?? mt.error ?? links.error
+    if (err) return json({ error: err.message }, 500)
+    const link = Object.fromEntries((links.data ?? []).map((r: { key: string; value: string | null }) => [r.key, r.value]))
+    return json({ eval: ev.data, meetings: mt.data, eval_sheet: link.report_sheet_eval ?? null, meetings_sheet: link.report_sheet_meetings ?? null })
   }
 
   // ID card photos: list every file with a short-lived download link; the script copies new ones.

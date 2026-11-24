@@ -1129,7 +1129,59 @@
 "سجّل حضورك في أول نشاط": "Register your first activity",
 "اطلب تيشيرت النشاط": "Request the activity T-shirt",
 "احضر ميني كامب": "Attend a mini camp",
-"بتبقى «مقبول» بعد فترة الاختبار": "You become «Accepted» after the trial period"
+"بتبقى «مقبول» بعد فترة الاختبار": "You become «Accepted» after the trial period",
+"(من المتابعين)": "(in follow-up)",
+"أكبر من 8 ميجا": "is larger than 8 MB",
+"أي تفاصيل عن اللي حصل": "Any details about what happened",
+"ابعت تذكير للي لسه محضروش": "Remind those who haven't attended yet",
+"اجتماع": "Meeting",
+"اجتماع / يوم عائلي": "Meeting / family day",
+"اكتب عدد المكالمات": "Write the number of calls",
+"الأنشطة الجماعية في الفترة دي": "Group activities in this period",
+"الاجتماع الأونلاين محتاج صورة واحدة على الأقل": "An online meeting needs at least one photo",
+"الاجتماعات والأيام العائلية": "Meetings and family days",
+"الصفحة دي مفتحتش": "This page didn't open",
+"الصور (اختياري)": "Photos (optional)",
+"الصور (مطلوبة)": "Photos (required)",
+"الصورة": "The photo",
+"الكامبات وحفلة التخرج": "Camps and graduation party",
+"المدة (بالدقايق)": "Duration (minutes)",
+"المسئول عنه": "Person in charge",
+"المقابلة بتتحسب مشاركة «انترفيو» ليه وللمتطوع في يومها، من غير تسجيل": "The interview counts as an «interview» participation for them and for the volunteer on its day, with no extra registration",
+"المواعيد الجاية": "Upcoming dates",
+"الميعاد اتضاف، واتبعت إشعار للي لسه محضروش": "Date added, and a notification went to those who haven't attended yet",
+"الميني كامب والكامب وحفلة التخرج: المواعيد، والأماكن، وقايمة الانتظار، والحضور. بيتسجلوا عند المتطوع ومش في المتابعة اليومية، ولازم يحضرهم كلهم قبل ما يبقى «مسئول».": "Mini camp, camp and graduation party: dates, places, waiting list and attendance. They're recorded on the volunteer, not in the daily follow-up, and all three are required before becoming «مسئول».",
+"اليوم العائلي اتسجل": "Family day recorded",
+"اليوم العائلي محتاج صورة واحدة على الأقل": "A family day needs at least one photo",
+"بتتسجل مرة واحدة بالحاضرين، وبتظهر في المتابعة اليومية مجمّعة. الاجتماع الأونلاين واليوم العائلي بيترفع معاهم صور.": "Recorded once with the attendees, and shown grouped in the daily follow-up. Online meetings and family days carry photos.",
+"تحديث": "Refresh",
+"تعديل النشاط الجماعي": "Edit the group activity",
+"تعديل يوم عائلي": "Edit family day",
+"تفاصيل الحدث (اختياري)": "Event details (optional)",
+"تقدر تزوّد أو تشيل في أي وقت. كل واحد هنا بتتحسبله مشاركة في اليوم ده": "You can add or remove people at any time. Everyone here gets a participation on that day",
+"تمسح الصورة دي؟": "Delete this photo?",
+"حضر حفلة التخرج": "Attended the graduation party",
+"حضروا": "Attended",
+"حضروا التلاتة (يقدروا يبقوا مسئولين)": "Attended all three (can become responsible)",
+"حضّرت محتوى الحصة دي كمان": "I also prepared the content for this class",
+"حفلة التخرج": "Graduation party",
+"حفلة تخرج": "Graduation party",
+"دقيقة": "minutes",
+"صورة جديدة هتترفع مع الحفظ": "new photos will be uploaded on save",
+"صورة واحدة على الأقل للاجتماع الأونلاين واليوم العائلي": "At least one photo for online meetings and family days",
+"عدد المكالمات": "Number of calls",
+"عدد المكالمات ومدتها": "Number of calls and duration",
+"غالبًا الموقع اتحدّث. اعمل تحديث للصفحة.": "The site was probably updated. Refresh the page.",
+"مادة تانية؟ اكتبها ودوس Enter": "Another subject? Type it and press Enter",
+"مسجّل قبل كده:": "Previously recorded:",
+"مسح الصورة": "Delete the photo",
+"مفيش اجتماعات ولا أيام عائلية في الشهر ده": "No meetings or family days this month",
+"مكالمة ·": "calls ·",
+"وصف اليوم": "Description of the day",
+"يوم عائلي جديد": "New family day",
+"احضر الكامب": "Attend the camp",
+"احضر حفلة التخرج": "Attend the graduation party",
+"مقابلة جديدة": "New interview"
 },
 "patterns": [
 [
@@ -1571,6 +1623,26 @@
 [
 "لـ {0}",
 "to {0}"
+],
+[
+"{0} مكالمة · {1} دقيقة",
+"{0} calls · {1} minutes"
+],
+[
+"الصورة {0} أكبر من 8 ميجا",
+"The photo {0} is larger than 8 MB"
+],
+[
+"الميعاد اتضاف، واتبعت إشعار للي لسه محضروش {0}",
+"Date added, and a notification went to those who haven't attended {0} yet"
+],
+[
+"حضر{0}",
+"Attended{0}"
+],
+[
+"حضروا {0} (من المتابعين)",
+"Attended {0} (in follow-up)"
 ]
 ],
 "words": {

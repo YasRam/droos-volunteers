@@ -120,6 +120,7 @@ select t.ok((select count(*) from volunteers) = 4, 'HR sees everyone');
 select t.ok((select count(*) from volunteer_hr) = 4, 'HR reads interview data');
 update volunteer_private set national_id = '29511010202624' where volunteer_id = (select id from volunteers where code = 'V9001');
 select t.ok((select national_id from volunteer_private p join volunteers v on v.id = p.volunteer_id where v.code = 'V9001') = '29511010202624', 'HR changes a national id directly');
+update volunteers set attended_minicamp = true, attended_camp = true, attended_graduation = true where code = 'V9002';
 update volunteers set status = 'مسئول' where code = 'V9002';
 select t.ok((select status_changed_at > now() - interval '1 minute' from volunteer_hr h join volunteers v on v.id = h.volunteer_id where v.code = 'V9002'), 'status change is timestamped');
 update volunteers set status = 'تحت المتابعة' where code = 'V9002';
@@ -444,7 +445,7 @@ insert into stage_done (volunteer_id, stage_key) select id, 'custom_1' from volu
 commit;
 select t.ok((select bought_tshirt from volunteers where code = 'V9001'), 'approved request marks the t-shirt');
 select t.ok((select attended_minicamp from volunteers where code = 'V9002'), 'camp attendance marks the volunteer');
-select t.ok(exists (select 1 from participations p join volunteers v on v.id = p.volunteer_id where v.code = 'V9002' and p.event = 'ميني كامب'), 'camp attendance is a participation');
+select t.ok(not exists (select 1 from participations p join volunteers v on v.id = p.volunteer_id where v.code = 'V9002' and p.event = 'ميني كامب'), 'camp attendance stays out of the daily follow-up');
 select t.ok(exists (select 1 from notifications where recipient_email = 'vol1@test.com' and title like 'ميني كامب يوم%'), 'new mini camp announced to those who never attended');
 begin;
 set local role authenticated;
@@ -452,5 +453,36 @@ select t.login('hr@test.com');
 select t.ok(remind_camp((select id from camps limit 1)) >= 0, 'reminder can be resent');
 select t.ok((select attended from camp_stats() limit 1) = 1, 'camp stats count attendance');
 commit;
+
+-- ---------- interviews, family days, calls, responsible rule ----------
+select id as v9003 from volunteers where code = 'V9003' \gset
+insert into volunteer_hr (volunteer_id) select id from volunteers where code = 'V9004' on conflict do nothing;
+update volunteer_hr set interview_date = '2026-11-10', interviewer_id = :'v9003' where volunteer_id = (select id from volunteers where code = 'V9004');
+select t.ok((select count(*) from participations where auto_ref like 'interview:%') = 2, 'interview counts for the volunteer and the interviewer');
+select t.ok((select interviewer from volunteer_hr where volunteer_id = (select id from volunteers where code = 'V9004')) = (select full_name_ar from volunteers where code = 'V9003'), 'interviewer name filled from the volunteer');
+update volunteer_hr set interview_date = '2026-11-12' where volunteer_id = (select id from volunteers where code = 'V9004');
+select t.ok((select count(*) from participations where auto_ref like 'interview:%' and activity_date = '2026-11-12') = 2, 'moving the interview moves both');
+begin;
+set local role authenticated;
+select t.login('hr@test.com');
+select save_meeting(jsonb_build_object('event', 'يوم عائلي', 'meeting_date', '2026-11-20', 'committee', 'فريق العمل'), array(select id from volunteers where code in ('V9001', 'V9002')));
+select t.fails($$update volunteers set status = 'مسئول' where code = 'V9001'$$, 'cannot become مسئول before camps and graduation');
+commit;
+select t.ok((select count(*) from participations where event = 'يوم عائلي') = 2, 'family day attendees in the daily follow-up');
+select t.ok((select count(*) from report_meetings('2026-11-01') r where r.meeting_date = '2026-11-20') = 0, 'family day is not a meeting row');
+update volunteers set attended_minicamp = true, attended_camp = true, attended_graduation = true where code = 'V9001';
+begin;
+set local role authenticated;
+select t.login('hr@test.com');
+update volunteers set status = 'مسئول' where code = 'V9001';
+commit;
+select t.ok((select status::text from volunteers where code = 'V9001') = 'مسئول', 'all three attended → can become مسئول');
+insert into lookups (list, value, report_column, form) values ('الحدث', 'اتصالات', 'calls', 'calls') on conflict on constraint lookups_unique do update set report_column = 'calls', form = 'calls';
+insert into participations (volunteer_id, activity_date, event, beneficiaries, duration_minutes, status) select id, '2026-11-21', 'اتصالات', 12, 45, 'accepted' from volunteers where code = 'V9001';
+select set_config('request.jwt.claims', '{"email":"mgmt@test.com","role":"authenticated"}', false);
+select t.ok((select calls from report_eval('2026-11-01') where day = '2026-11-21') = 12, 'calls column = number of calls');
+select set_config('request.jwt.claims', '{"role":"service_role"}', false);
+select t.ok((select count(*) from report_eval('2026-11-01')) = 30 and (select calls from report_eval('2026-11-01') where day = '2026-11-21') = 12, 'service role (sheet sync) can read reports');
+select set_config('request.jwt.claims', '', false);
 
 \echo ALL ROLE TESTS PASSED

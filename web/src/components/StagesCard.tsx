@@ -22,7 +22,7 @@ export type Stage = {
 
 export type Camp = {
   id: string
-  kind: 'ميني كامب' | 'كامب'
+  kind: 'ميني كامب' | 'كامب' | 'حفلة تخرج'
   title: string | null
   camp_date: string
   end_date: string | null
@@ -94,7 +94,7 @@ export function StagesCard({ volunteerId, self }: { volunteerId: string; self: b
               {!s.done && s.description && <p className="text-xs text-muted">{s.description}</p>}
               {s.done && s.done_at && <p className="text-xs text-muted">{fmtShort(s.done_at)}</p>}
             </div>
-            {!s.done && self && <StageAction stage={s} onOpen={() => setOpen(s.key)} onMark={() => mark.mutate({ key: s.key, done: true })} />}
+            {!s.done && self && <StageAction stage={s} onOpen={() => setOpen(s.source === 'manual' ? s.key : s.source)} onMark={() => mark.mutate({ key: s.key, done: true })} />}
             {!self && p.can('stages.manage') && s.source === 'manual' && (
               <Button variant="ghost" size="sm" onClick={() => mark.mutate({ key: s.key, done: !s.done })}>
                 {s.done ? 'شيل' : 'خلصت'}
@@ -105,8 +105,8 @@ export function StagesCard({ volunteerId, self }: { volunteerId: string; self: b
       </ol>
       {open === 'rules' && <RulesModal onClose={() => setOpen(null)} onDone={refresh} />}
       {open === 'tshirt' && <TshirtModal volunteerId={volunteerId} onClose={() => setOpen(null)} onDone={refresh} />}
-      {open === 'minicamp' && (
-        <Modal open onClose={() => setOpen(null)} title="الميني كامب">
+      {(open === 'minicamp' || open === 'camp' || open === 'graduation') && (
+        <Modal open onClose={() => setOpen(null)} title="المواعيد الجاية">
           <CampSignup />
         </Modal>
       )}
@@ -130,7 +130,7 @@ function StageAction({ stage, onOpen, onMark }: { stage: Stage; onOpen: () => vo
         <Shirt className="size-4" /> اطلب
       </Button>
     )
-  if (stage.source === 'minicamp')
+  if (stage.source === 'minicamp' || stage.source === 'camp' || stage.source === 'graduation')
     return (
       <Button size="sm" onClick={onOpen}>
         <CalendarDays className="size-4" /> المواعيد

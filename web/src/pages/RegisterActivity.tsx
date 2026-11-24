@@ -53,20 +53,12 @@ export default function RegisterActivity() {
 
   const save = useMutation({
     mutationFn: async (v: ActivityValues): Promise<Outcome> => {
-      if (!canPickOthers) {
-        const { data, error } = await supabase
-          .from('participations')
-          .insert({ ...toActivityPayload(v, eventForm(lookups.data?.rows, v.event)), activity_date: today, volunteer_id: p.volunteerId })
-          .select('status')
-          .single()
-        if (error) throw error
-        return { inserted: 1, skipped: [], pending: data.status === 'pending' }
+      const out = await saveOne(v)
+      // «حضّرت محتوى الحصة دي كمان»: the same class counted once more as content preparation
+      if (v.with_content && eventForm(lookups.data?.rows, v.event) === 'teaching') {
+        await saveOne({ ...v, event: 'تحضير محتوى', beneficiaries: '', with_content: false }, true)
       }
-      if (!selected.length) throw { message: 'اختار متطوع واحد على الأقل' }
-      const { data, error } = await supabase.rpc('register_activity', { p_activity: toActivityPayload(v, eventForm(lookups.data?.rows, v.event)), p_volunteer_ids: selected })
-      if (error) throw error
-      const r = data as { inserted: number; skipped_ids: string[] }
-      return { inserted: r.inserted, skipped: r.skipped_ids, pending: false }
+      return out
     },
     onSuccess: (r) => {
       setOutcome(r)
@@ -79,6 +71,26 @@ export default function RegisterActivity() {
     },
     onError: toastError,
   })
+
+  async function saveOne(v: ActivityValues, extra = false): Promise<Outcome> {
+    const kind = extra ? 'teaching' : eventForm(lookups.data?.rows, v.event)
+    {
+      if (!canPickOthers) {
+        const { data, error } = await supabase
+          .from('participations')
+          .insert({ ...toActivityPayload(v, kind), activity_date: today, volunteer_id: p.volunteerId })
+          .select('status')
+          .single()
+        if (error) throw error
+        return { inserted: 1, skipped: [], pending: data.status === 'pending' }
+      }
+      if (!selected.length) throw { message: 'اختار متطوع واحد على الأقل' }
+      const { data, error } = await supabase.rpc('register_activity', { p_activity: toActivityPayload(v, kind), p_volunteer_ids: selected })
+      if (error) throw error
+      const r = data as { inserted: number; skipped_ids: string[] }
+      return { inserted: r.inserted, skipped: r.skipped_ids, pending: false }
+    }
+  }
 
   const again = () => {
     setOutcome(null)

@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import type { Camp } from '@/components/StagesCard'
 import { VolunteerName } from '@/components/VolunteerLink'
 import { VolunteerSearch } from '@/components/VolunteerPick'
-import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Spinner, Stat, Textarea } from '@/components/ui'
+import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Spinner, Stat, Tabs, Textarea } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
 import { cairoToday, fmtDate, useVolunteers } from '@/lib/data'
 import { toastError } from '@/lib/errors'
@@ -40,9 +40,13 @@ export default function Camps() {
       return new Map((data as CampStat[]).map((r) => [r.camp_id, r]))
     },
   })
+  const [kind, setKind] = useState<'minicamp' | 'camp' | 'graduation'>('minicamp')
+  const KIND_NAME = { minicamp: 'ميني كامب', camp: 'كامب', graduation: 'حفلة تخرج' } as const
+  const did = (v: (typeof active)[number]) => (kind === 'minicamp' ? v.attended_minicamp : kind === 'camp' ? v.attended_camp : v.attended_graduation)
   const active = (vols.data ?? []).filter((v) => v.status !== 'خارج المتابعة')
-  const attended = active.filter((v) => v.attended_minicamp)
-  const missing = active.filter((v) => !v.attended_minicamp)
+  const attended = active.filter(did)
+  const missing = active.filter((v) => !did(v))
+  const allThree = active.filter((v) => v.attended_minicamp && v.attended_camp && v.attended_graduation).length
   const byMonth = useMemo(() => {
     const m = new Map<string, number>()
     for (const v of vols.data ?? []) if (v.minicamp_date) m.set(v.minicamp_date.slice(0, 7), (m.get(v.minicamp_date.slice(0, 7)) ?? 0) + 1)
@@ -52,8 +56,8 @@ export default function Camps() {
   return (
     <>
       <PageHeader
-        title="الكامبات"
-        subtitle="الكامب والميني كامب: المواعيد، والأماكن، وقايمة الانتظار، والحضور"
+        title="الكامبات وحفلة التخرج"
+        subtitle="الميني كامب والكامب وحفلة التخرج: المواعيد، والأماكن، وقايمة الانتظار، والحضور. بيتسجلوا عند المتطوع ومش في المتابعة اليومية، ولازم يحضرهم كلهم قبل ما يبقى «مسئول»."
         actions={
           manage && (
             <Button onClick={() => setEditing('new')}>
@@ -62,11 +66,20 @@ export default function Camps() {
           )
         }
       />
+      <Tabs
+        value={kind}
+        onChange={(k) => setKind(k as typeof kind)}
+        tabs={[
+          { value: 'minicamp', label: 'ميني كامب' },
+          { value: 'camp', label: 'كامب' },
+          { value: 'graduation', label: 'حفلة تخرج' },
+        ]}
+      />
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="حضروا ميني كامب (من المتابعين)" value={`${attended.length} من ${active.length}`} tone="green" />
+        <Stat label={`حضروا ${KIND_NAME[kind]} (من المتابعين)`} value={`${attended.length} من ${active.length}`} tone="green" />
         <Stat label="النسبة" value={active.length ? `${Math.round((attended.length / active.length) * 100)}%` : '—'} />
         <Stat label="لسه محضروش" value={missing.length} tone="orange" />
-        <Stat label="مواعيد جاية" value={(camps.data ?? []).filter((c) => c.camp_date >= cairoToday()).length} />
+        <Stat label="حضروا التلاتة (يقدروا يبقوا مسئولين)" value={allThree} />
       </div>
       {byMonth.length > 0 && (
         <Card className="mb-4">
@@ -123,7 +136,9 @@ export default function Camps() {
       )}
       {missing.length > 0 && (
         <Card className="mt-4">
-          <p className="mb-2 text-sm font-bold">لسه محضروش ميني كامب ({missing.length})</p>
+          <p className="mb-2 text-sm font-bold">
+            لسه محضروش {KIND_NAME[kind]} ({missing.length})
+          </p>
           <div className="flex flex-wrap gap-1.5">
             {missing.slice(0, 60).map((v) => (
               <VolunteerName key={v.id} id={v.id} name={v.full_name_ar} className="rounded-full bg-surface px-2.5 py-1 text-xs" />
@@ -180,9 +195,9 @@ function Registrations({ camp, manage }: { camp: Camp; manage: boolean }) {
               onPick={(v) => run.mutate(() => supabase.rpc('register_camp', { p_camp: camp.id, p_volunteer: v.id }))}
             />
           </div>
-          {camp.kind === 'ميني كامب' && (
+          {(
             <Button variant="secondary" size="sm" loading={remind.isPending} onClick={() => remind.mutate()}>
-              <BellRing className="size-4" /> ابعت تذكير للي محضروش
+              <BellRing className="size-4" /> ابعت تذكير للي لسه محضروش
             </Button>
           )}
         </div>
@@ -251,7 +266,7 @@ function CampForm({ camp, onClose }: { camp: Camp | null; onClose: () => void })
       if (error) throw error
     },
     onSuccess: () => {
-      toast.success(camp ? 'اتعدّل' : f.kind === 'ميني كامب' ? 'الميعاد اتضاف، واتبعت إشعار للي لسه محضروش ميني كامب' : 'الميعاد اتضاف')
+      toast.success(camp ? 'اتعدّل' : `الميعاد اتضاف، واتبعت إشعار للي لسه محضروش ${f.kind}`)
       qc.invalidateQueries({ queryKey: ['camps'] })
       onClose()
     },
@@ -273,7 +288,7 @@ function CampForm({ camp, onClose }: { camp: Camp | null; onClose: () => void })
     <Modal open onClose={onClose} title={camp ? 'تعديل الميعاد' : 'ميعاد جديد'}>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="النوع">
-          <Select value={f.kind} onChange={set('kind')} options={['ميني كامب', 'كامب']} />
+          <Select value={f.kind} onChange={set('kind')} options={['ميني كامب', 'كامب', 'حفلة تخرج']} />
         </Field>
         <Field label="اسم (اختياري)">
           <Input value={f.title} onChange={set('title')} placeholder="مثلاً: ميني كامب ديسمبر" />

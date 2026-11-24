@@ -56,7 +56,9 @@ export function VolunteerFacts({ v }: { v: Volunteer }) {
         <Row label="تاريخ الميلاد">{v.birth_date ? `${fmtDate(v.birth_date)} (${age} سنة)` : 'مش معروف (مفيش رقم قومي)'}</Row>
         <Row label="النوع">{v.gender ?? '—'}</Row>
         <Row label="اتسجل">{`${fmtDate(v.registered_at)} · من ${since(v.registered_at)}`}</Row>
-        <Row label="الكامب">{v.attended_minicamp ? `حضر ${fmtDate(v.minicamp_date)}` : 'لسه'}</Row>
+        <Row label="الميني كامب">{v.attended_minicamp ? `حضر${v.minicamp_date ? ' ' + fmtDate(v.minicamp_date) : ''}` : 'لسه'}</Row>
+        <Row label="الكامب">{v.attended_camp ? `حضر${v.camp_date ? ' ' + fmtDate(v.camp_date) : ''}` : 'لسه'}</Row>
+        <Row label="حفلة التخرج">{v.attended_graduation ? `حضر${v.graduation_date ? ' ' + fmtDate(v.graduation_date) : ''}` : 'لسه'}</Row>
         <Row label="التيشيرت">{v.bought_tshirt ? 'اشترى' : 'لسه'}</Row>
       </dl>
 

@@ -1,4 +1,3 @@
-import { Plus, X } from 'lucide-react'
 import { useId, useState } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import { z } from 'zod'
@@ -11,8 +10,9 @@ import type { Lookup } from '@/lib/types'
  *  teaching → المادة والسنة (ممكن أكتر من واحدة) وعدد الطلاب، كلهم لازم
  *  none     → مفيش نوع حدث (زي التنظيم)
  *  optional → نوع الحدث اختياري
+ *  calls    → عدد المكالمات ومدتها
  */
-export type EventForm = 'teaching' | 'none' | 'optional'
+export type EventForm = 'teaching' | 'none' | 'optional' | 'calls'
 export const SEP = '، '
 export const splitMulti = (s?: string | null) => (s ? s.split('،').map((x) => x.trim()).filter(Boolean) : [])
 
@@ -28,7 +28,9 @@ export const activitySchema = z.object({
   place: z.string().optional(),
   grade: z.string().optional(),
   beneficiaries: z.string().optional(),
+  duration_minutes: z.string().optional(),
   notes: z.string().optional(),
+  with_content: z.boolean().optional(),
 })
 
 export type ActivityValues = z.infer<typeof activitySchema>
@@ -40,6 +42,9 @@ export function validateActivity(v: ActivityValues, form: EventForm): Partial<Re
     if (!splitMulti(v.subject).length) e.subject = 'اختار المادة'
     if (!splitMulti(v.grade).length) e.grade = 'اختار السنة'
     if (!(Number(v.beneficiaries) > 0)) e.beneficiaries = 'اكتب عدد الطلاب'
+  } else if (form === 'calls') {
+    if (!(Number(v.beneficiaries) > 0)) e.beneficiaries = 'اكتب عدد المكالمات'
+    if (v.duration_minutes && !(Number(v.duration_minutes) > 0)) e.duration_minutes = 'رقم أكبر من صفر'
   } else if (v.beneficiaries && !(Number(v.beneficiaries) > 0)) {
     e.beneficiaries = 'رقم أكبر من صفر'
   }
@@ -53,7 +58,8 @@ export function toActivityPayload(v: ActivityValues, form: EventForm = 'optional
     subject: form === 'none' ? null : splitMulti(v.subject).join(SEP) || null,
     place: v.place || null,
     grade: form === 'teaching' ? splitMulti(v.grade).join(SEP) || null : null,
-    beneficiaries: form === 'teaching' && v.beneficiaries ? Number(v.beneficiaries) : null,
+    beneficiaries: (form === 'teaching' || form === 'calls') && v.beneficiaries ? Number(v.beneficiaries) : null,
+    duration_minutes: form === 'calls' && v.duration_minutes ? Number(v.duration_minutes) : null,
     notes: v.notes || null,
   }
 }
@@ -66,58 +72,44 @@ export function checkActivity(form: UseFormReturn<ActivityValues>, rows: Lookup[
   return Object.keys(errors).length === 0
 }
 
-/** Pick one or more values: suggestions + free text, shown as chips. Stored as «a، b». */
-function MultiPick({ value, onChange, options, placeholder }: { value: string; onChange: (v: string) => void; options: string[]; placeholder?: string }) {
-  const listId = useId()
+/** Pick one or more values by tapping them. Stored as «a، b». `allowOther` adds a free-text box (Enter to add). */
+function MultiPick({ value, onChange, options, allowOther }: { value: string; onChange: (v: string) => void; options: string[]; allowOther?: boolean }) {
   const [draft, setDraft] = useState('')
   const items = splitMulti(value)
-  const add = (x: string) => {
-    const t = x.trim()
-    if (!t || items.includes(t)) return setDraft('')
-    onChange([...items, t].join(SEP))
-    setDraft('')
-  }
+  const toggle = (x: string) => onChange((items.includes(x) ? items.filter((i) => i !== x) : [...items, x]).join(SEP))
+  const all = [...options, ...items.filter((i) => !options.includes(i))]
   return (
     <div>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-1.5">
+        {all.map((o) => {
+          const on = items.includes(o)
+          return (
+            <button
+              type="button"
+              key={o}
+              onClick={() => toggle(o)}
+              aria-pressed={on}
+              className={`rounded-full border px-3 py-1 text-sm font-semibold transition ${on ? 'border-brand-600 bg-brand-600 text-white' : 'border-line bg-white text-ink hover:bg-brand-50'}`}
+            >
+              {o}
+            </button>
+          )
+        })}
+      </div>
+      {allowOther && (
         <Input
+          className="mt-2"
           value={draft}
-          list={listId}
-          autoComplete="off"
-          placeholder={placeholder}
-          onChange={(e) => {
-            const v = e.target.value
-            // picking a suggestion fills the whole value at once
-            if (options.includes(v)) add(v)
-            else setDraft(v)
-          }}
+          placeholder="مادة تانية؟ اكتبها ودوس Enter"
+          onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              add(draft)
-            }
+            if (e.key !== 'Enter') return
+            e.preventDefault()
+            const t = draft.trim()
+            if (t && !items.includes(t)) onChange([...items, t].join(SEP))
+            setDraft('')
           }}
         />
-        <button type="button" onClick={() => add(draft)} className="rounded-xl border border-line px-3 text-brand-700 hover:bg-brand-50" aria-label="إضافة">
-          <Plus className="size-4" />
-        </button>
-        <datalist id={listId}>
-          {options.filter((o) => !items.includes(o)).map((o) => (
-            <option key={o} value={o} />
-          ))}
-        </datalist>
-      </div>
-      {items.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {items.map((x) => (
-            <span key={x} className="inline-flex items-center gap-1 rounded-full bg-brand-50 py-0.5 ps-2.5 pe-1 text-sm font-semibold text-brand-800">
-              {x}
-              <button type="button" onClick={() => onChange(items.filter((i) => i !== x).join(SEP))} className="rounded-full p-0.5 hover:bg-brand-100" aria-label={`شيل ${x}`}>
-                <X className="size-3.5" />
-              </button>
-            </span>
-          ))}
-        </div>
       )}
     </div>
   )
@@ -163,7 +155,7 @@ export default function ActivityFields({
                 clearErrors('subject')
               }}
               options={subjects}
-              placeholder="مثلاً: رياضيات"
+              allowOther
             />
           </Field>
           <Field label="السنة الدراسية" hint="ممكن تختار أكتر من سنة" error={errors.grade?.message}>
@@ -174,11 +166,25 @@ export default function ActivityFields({
                 clearErrors('grade')
               }}
               options={grades}
-              placeholder="اختار السنة"
             />
           </Field>
           <Field label="عدد الطلاب" error={errors.beneficiaries?.message}>
             <Input type="number" inputMode="numeric" min={1} {...register('beneficiaries')} />
+          </Field>
+          {event !== 'تحضير محتوى' && (
+            <label className="flex items-center gap-2 self-end pb-2 text-sm">
+              <input type="checkbox" className="size-4 accent-brand-700" {...register('with_content')} />
+              حضّرت محتوى الحصة دي كمان
+            </label>
+          )}
+        </>
+      ) : kind === 'calls' ? (
+        <>
+          <Field label="عدد المكالمات" error={errors.beneficiaries?.message}>
+            <Input type="number" inputMode="numeric" min={1} {...register('beneficiaries')} />
+          </Field>
+          <Field label="المدة (بالدقايق)" error={errors.duration_minutes?.message}>
+            <Input type="number" inputMode="numeric" min={1} {...register('duration_minutes')} />
           </Field>
         </>
       ) : kind === 'optional' ? (
@@ -196,8 +202,8 @@ export default function ActivityFields({
         <Select {...register('place')} placeholder="—" options={lookups.data?.list('المكان') ?? []} />
       </Field>
       <div className="sm:col-span-2">
-        <Field label="ملاحظات (اختياري)">
-          <Textarea {...register('notes')} rows={2} />
+        <Field label="تفاصيل الحدث (اختياري)">
+          <Textarea {...register('notes')} rows={2} placeholder="أي تفاصيل عن اللي حصل" />
         </Field>
       </div>
     </div>

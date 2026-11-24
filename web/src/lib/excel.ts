@@ -42,6 +42,8 @@ export const VOLUNTEER_COLUMNS: Column[] = [
   { key: 'bought_tshirt', header: 'اشترى التيشيرت', kind: 'bool', width: 11 },
   { key: 'attended_minicamp', header: 'حضر الميني كامب', kind: 'bool', width: 11 },
   { key: 'minicamp_date', header: 'تاريخ الميني كامب', kind: 'date', width: 12 },
+  { key: 'attended_camp', header: 'حضر الكامب', kind: 'bool', width: 11, readOnly: true },
+  { key: 'attended_graduation', header: 'حضر حفلة التخرج', kind: 'bool', width: 11, readOnly: true },
   { key: 'acceptance', header: 'درجة القبول', width: 12 },
   { key: 'interview_date', header: 'تاريخ المقابلة', kind: 'date', width: 12 },
   { key: 'interviewer', header: 'القائم على المقابلة', width: 16 },

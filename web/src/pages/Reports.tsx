@@ -9,7 +9,7 @@ import { cairoToday, fmtShort, useVolunteers } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { exportFollowup, seasonStart } from '@/lib/followupExport'
 import { supabase } from '@/lib/supabase'
-import { useMeetings } from './Meetings'
+import { FAMILY_DAY, useMeetings } from './Meetings'
 
 type Tab = 'eval' | 'meetings' | 'followup' | 'sheets'
 
@@ -251,7 +251,7 @@ function MeetingsReport({ month }: { month: string }) {
     <div className="space-y-3">
       <Card className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted">
-          {q.data?.length ?? 0} اجتماع في الشهر ده.{' '}
+          {q.data?.filter((m) => m.event !== FAMILY_DAY).length ?? 0} اجتماع في الشهر ده.{' '}
           <Link to="/meetings" className="text-brand-700">
             سجّل أو عدّل الاجتماعات
           </Link>
@@ -273,7 +273,7 @@ function MeetingsReport({ month }: { month: string }) {
               </tr>
             </thead>
             <tbody>
-              {[...(q.data ?? [])].reverse().map((m, i) => (
+              {[...(q.data ?? [])].filter((m) => m.event !== FAMILY_DAY).reverse().map((m, i) => (
                 <tr key={m.id}>
                   <td className="border border-line px-2 py-1 text-center">{i + 1}</td>
                   <td className="whitespace-nowrap border border-line px-2 py-1">{fmtShort(m.meeting_date)}</td>

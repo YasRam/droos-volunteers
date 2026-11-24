@@ -31,6 +31,8 @@ function setup() {
   folder_();
   ScriptApp.getProjectTriggers().filter((t) => t.getHandlerFunction() === 'backup').forEach((t) => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('backup').timeBased().everyDays(1).atHour(HOUR).create();
+  ScriptApp.getProjectTriggers().filter((t) => t.getHandlerFunction() === 'syncSheets').forEach((t) => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('syncSheets').timeBased().everyHours(1).create();
   const code = sha256Hex_(token);
   console.log('كود الربط (حطه في الموقع: الإعدادات ← النسخ الاحتياطي):\n' + code);
   return code;
@@ -225,11 +227,37 @@ function sb_(path, token, payload) {
   return JSON.parse(res.getContentText() || 'null');
 }
 
-function sheetLink_(token, key) {
+function sheetUrl_(token, key) {
   const rows = sb_('app_settings?select=value&key=eq.' + key, token);
   const url = rows && rows[0] && rows[0].value;
   if (!url) throw new Error('لينك الشيت مش متحدد في الإعدادات');
-  return SpreadsheetApp.openByUrl(url);
+  return url;
+}
+
+/**
+ * Every hour: the current month (and last month during the first 3 days, to catch late entries)
+ * is rewritten in the linked evaluation and meetings sheets. Nothing to press on the site.
+ */
+function syncSheets() {
+  const token = props.getProperty('TOKEN');
+  if (!token) throw new Error('شغّل setup الأول');
+  const now = new Date();
+  const ym = (d) => Utilities.formatDate(d, 'Africa/Cairo', 'yyyy-MM');
+  const months = [ym(now)];
+  if (Number(Utilities.formatDate(now, 'Africa/Cairo', 'd')) <= 3) months.push(ym(new Date(now.getFullYear(), now.getMonth() - 1, 15)));
+  months.forEach((m) => {
+    const res = UrlFetchApp.fetch(FUNCTION_URL, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'x-backup-token': token, Authorization: 'Bearer ' + ANON_KEY, apikey: ANON_KEY },
+      payload: JSON.stringify({ sheets: { month: m } }),
+      muteHttpExceptions: true,
+    });
+    if (res.getResponseCode() !== 200) throw new Error('تقارير ' + m + ': ' + res.getResponseCode() + ' ' + res.getContentText().slice(0, 200));
+    const data = JSON.parse(res.getContentText());
+    if (data.eval_sheet) fillEval_(SpreadsheetApp.openByUrl(data.eval_sheet), m + '-01', data.eval || []);
+    if (data.meetings_sheet) fillMeetings_(SpreadsheetApp.openByUrl(data.meetings_sheet), m + '-01', data.meetings || []);
+  });
 }
 
 const monthTab_ = (month) => MONTH_TABS[Number(month.slice(5, 7)) - 1];
@@ -240,8 +268,10 @@ const asDate_ = (iso) => {
 
 /** «تقييم فني» in the «اقتراح» layout: one row per day, columns C..Z. */
 function writeEval_(token, month) {
-  const rows = sb_('rpc/report_eval', token, { p_month: month });
-  const ss = sheetLink_(token, 'report_sheet_eval');
+  return fillEval_(SpreadsheetApp.openByUrl(sheetUrl_(token, 'report_sheet_eval')), month, sb_('rpc/report_eval', token, { p_month: month }));
+}
+
+function fillEval_(ss, month, rows) {
   const name = monthTab_(month);
   let sh = ss.getSheetByName(name);
   if (!sh) {
@@ -270,8 +300,10 @@ function writeEval_(token, month) {
 
 /** «شيت الاجتماعات»: the month's tab gets every meeting of the month (rewritten each time). */
 function writeMeetings_(token, month) {
-  const rows = sb_('rpc/report_meetings', token, { p_month: month });
-  const ss = sheetLink_(token, 'report_sheet_meetings');
+  return fillMeetings_(SpreadsheetApp.openByUrl(sheetUrl_(token, 'report_sheet_meetings')), month, sb_('rpc/report_meetings', token, { p_month: month }));
+}
+
+function fillMeetings_(ss, month, rows) {
   const name = monthTab_(month);
   const headers = ['العدد', 'تاريخ الاجتماع', 'اسم الفرع / مركزي', 'اللجنة', 'هيد الاجتماع', 'دور هيد الاجتماع في الهيكل', 'عدد الحاضرين',
     'الهدف من الاجتماع', 'انجازات اللجنة', 'نوع الاجتماع', 'لينك المحضر'];

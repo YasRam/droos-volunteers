@@ -104,7 +104,7 @@ const REPORT_COLUMNS: Record<string, string> = {
   courses: 'كورسات',
   events: 'ايفينتات',
 }
-const FORM_LABEL = { teaching: 'مادة + سنة + عدد طلاب', optional: 'نوع حدث اختياري', none: 'من غير نوع حدث' } as const
+const FORM_LABEL = { teaching: 'مادة + سنة + عدد طلاب', optional: 'نوع حدث اختياري', none: 'من غير نوع حدث', calls: 'عدد المكالمات ومدتها' } as const
 
 function Lists() {
   const qc = useQueryClient()

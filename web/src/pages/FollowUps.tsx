@@ -1,7 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { ChevronDown, Pencil, Search, Trash2 } from 'lucide-react'
+import { ChevronDown, Pencil, Search, Trash2, Users } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { MeetingForm } from './Meetings'
 import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -14,7 +16,8 @@ import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import type { Participation } from '@/lib/types'
 
-const describe = (r: Participation) => [r.event, r.subject, r.grade, r.beneficiaries ? `${r.beneficiaries} طالب` : null].filter(Boolean).join(' · ')
+const describe = (r: Participation) =>
+  [r.event, r.subject, r.grade, r.duration_minutes ? `${r.beneficiaries ?? 1} مكالمة · ${r.duration_minutes} دقيقة` : r.beneficiaries ? `${r.beneficiaries} طالب` : null].filter(Boolean).join(' · ')
 
 /** Participations in a period, grouped by person, each row editable. */
 export default function FollowUps() {
@@ -29,6 +32,8 @@ export default function FollowUps() {
   const [status, setStatus] = useState('')
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<Participation | null>(null)
+  const [groupForm, setGroupForm] = useState(false)
+  const navigate = useNavigate()
 
   const q = useQuery({
     queryKey: ['followups', from, to, event, status],
@@ -54,9 +59,45 @@ export default function FollowUps() {
   }, [q.data, names, search])
 
   const total = q.data?.length ?? 0
+  // Meetings and family days: one line each, with how many attended
+  const groups = useMemo(() => {
+    const m = new Map<string, { id: string; date: string; event: string; subject: string; count: number }>()
+    for (const r of q.data ?? []) {
+      if (!r.meeting_id) continue
+      const g = m.get(r.meeting_id) ?? { id: r.meeting_id, date: r.activity_date, event: r.event, subject: r.subject ?? '', count: 0 }
+      g.count++
+      m.set(r.meeting_id, g)
+    }
+    return [...m.values()].sort((a, b) => b.date.localeCompare(a.date))
+  }, [q.data])
   return (
     <>
-      <PageHeader title="المتابعة اليومية" subtitle={`${people.length} متطوع · ${total} مشاركة${anyDate ? '' : ' · آخر 7 أيام'}`} />
+      <PageHeader
+        title="المتابعة اليومية"
+        subtitle={`${people.length} متطوع · ${total} مشاركة${anyDate ? '' : ' · آخر 7 أيام'}`}
+        actions={
+          <Button variant="secondary" onClick={() => setGroupForm(true)}>
+            <Users className="size-4" /> اجتماع / يوم عائلي
+          </Button>
+        }
+      />
+      {groups.length > 0 && (
+        <Card className="mb-4 p-0">
+          <p className="border-b border-line px-4 py-2 text-sm font-bold">الأنشطة الجماعية في الفترة دي</p>
+          <div className="divide-y divide-line">
+            {groups.map((g) => (
+              <button key={g.id} onClick={() => navigate(`/meetings?edit=${g.id}`)} className="flex w-full items-center gap-2 px-4 py-2 text-start text-sm hover:bg-surface">
+                <span className="w-14 shrink-0 text-xs font-semibold text-muted">{fmtShort(g.date)}</span>
+                <span className="min-w-0 flex-1 truncate font-semibold">
+                  {g.event} · {g.subject}
+                </span>
+                <Badge tone="brand">{g.count} حاضر</Badge>
+                <Pencil className="size-4 text-muted" />
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
       <Card className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Field label="من">
           <Input type="date" value={from} min={anyDate ? undefined : addDays(today, -7)} onChange={(e) => setFrom(e.target.value)} />
@@ -99,6 +140,7 @@ export default function FollowUps() {
           ))}
         </div>
       )}
+      {groupForm && <MeetingForm meeting={null} onClose={() => setGroupForm(false)} />}
       {editing && <EditParticipation row={editing} name={names.get(editing.volunteer_id)} rowsKind={lookups.data?.rows} onClose={() => setEditing(null)} />}
     </>
   )
@@ -120,6 +162,7 @@ function PersonRows({
   canDelete: boolean
 }) {
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const [open, setOpen] = useState(rows.length <= 2)
   const remove = useMutation({
     mutationFn: async (rid: string) => {
@@ -156,11 +199,17 @@ function PersonRows({
                 {describe(r)}
                 {r.method === 'group' && <span className="text-xs text-muted"> · جماعي</span>}
               </p>
-              <RequestBadge status={r.status} />
-              <Button variant="ghost" size="sm" onClick={() => onEdit(r)} aria-label="تعديل" title="تعديل">
+              {r.meeting_id ? <Badge tone="brand">جماعي</Badge> : <RequestBadge status={r.status} />}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => (r.meeting_id ? navigate(`/meetings?edit=${r.meeting_id}`) : onEdit(r))}
+                aria-label="تعديل"
+                title={r.meeting_id ? 'تعديل النشاط الجماعي' : 'تعديل'}
+              >
                 <Pencil className="size-4" />
               </Button>
-              {canDelete && (
+              {canDelete && !r.meeting_id && (
                 <Button variant="ghost" size="sm" className="text-red-600" onClick={() => confirm('مسح المشاركة دي؟') && remove.mutate(r.id)} aria-label="مسح" title="مسح">
                   <Trash2 className="size-4" />
                 </Button>
@@ -186,6 +235,7 @@ function EditParticipation({ row, name, rowsKind, onClose }: { row: Participatio
       grade: row.grade ?? '',
       place: row.place ?? '',
       beneficiaries: row.beneficiaries ? String(row.beneficiaries) : '',
+      duration_minutes: row.duration_minutes ? String(row.duration_minutes) : '',
       notes: row.notes ?? '',
     },
   })

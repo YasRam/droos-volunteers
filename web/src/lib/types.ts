@@ -72,6 +72,10 @@ export interface Volunteer {
   follow_notes_2?: string | null
   follow_notes_3?: string | null
   out_reason?: string | null
+  attended_camp?: boolean
+  camp_date?: string | null
+  attended_graduation?: boolean
+  graduation_date?: string | null
 }
 
 export interface VolunteerDirectoryRow {
@@ -95,6 +99,7 @@ export interface VolunteerHr {
   acceptance: AcceptanceGrade | null
   interview_date: string | null
   interviewer: string | null
+  interviewer_id?: string | null
   hr_notes: string | null
   status_changed_at: string | null
 }
@@ -125,6 +130,8 @@ export interface Participation {
   created_at: string
   reviewed_by: string | null
   reviewed_at: string | null
+  meeting_id?: string | null
+  duration_minutes?: number | null
 }
 
 export interface ScheduleSlot {

@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ExternalLink, Pencil, Plus, Trash2, Users } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { VolunteerChips, VolunteerSelect } from '@/components/VolunteerPick'
-import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Spinner, Textarea } from '@/components/ui'
+import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Spinner, Tabs, Textarea } from '@/components/ui'
 import { useAuth, usePermissions } from '@/lib/auth'
 import { cairoToday, fmtDate, useLookups, useVolunteers } from '@/lib/data'
 import { toastError } from '@/lib/errors'
@@ -11,6 +12,7 @@ import { supabase } from '@/lib/supabase'
 
 export type Meeting = {
   id: string
+  event: string
   meeting_date: string
   committee: string
   head_id: string | null
@@ -24,6 +26,35 @@ export type Meeting = {
 }
 
 const TYPES = ['الفرع', 'اونلاين', 'اوفلاين']
+export const FAMILY_DAY = 'يوم عائلي'
+const PHOTO_BUCKET = 'activity-photos'
+const needsPhotos = (event: string, type: string) => event === FAMILY_DAY || type === 'اونلاين'
+
+type Photo = { id: string; path: string; url: string | null }
+function usePhotos(meetingId: string | undefined) {
+  return useQuery({
+    queryKey: ['meeting-photos', meetingId],
+    enabled: Boolean(meetingId),
+    queryFn: async () => {
+      const { data, error } = await supabase.from('meeting_photos').select('id, path').eq('meeting_id', meetingId!).order('created_at')
+      if (error) throw error
+      const rows = data as { id: string; path: string }[]
+      if (!rows.length) return [] as Photo[]
+      const signed = await supabase.storage.from(PHOTO_BUCKET).createSignedUrls(rows.map((r) => r.path), 3600)
+      return rows.map((r, i) => ({ ...r, url: signed.data?.[i]?.signedUrl ?? null }))
+    },
+  })
+}
+
+/** Fetch one group activity with its attendees (to open it from the daily follow-up). */
+export async function loadMeeting(id: string) {
+  const [m, a] = await Promise.all([
+    supabase.from('meetings').select('*').eq('id', id).single(),
+    supabase.from('participations').select('volunteer_id').eq('meeting_id', id),
+  ])
+  if (m.error) throw m.error
+  return { ...(m.data as Meeting), attendees: (a.data ?? []).map((r: { volunteer_id: string }) => r.volunteer_id) }
+}
 
 export function useMeetings(month: string) {
   return useQuery({
@@ -48,17 +79,24 @@ export function useMeetings(month: string) {
 export default function Meetings() {
   const [month, setMonth] = useState(cairoToday().slice(0, 7))
   const [editing, setEditing] = useState<(Meeting & { attendees: string[] }) | 'new' | null>(null)
+  const [params, setParams] = useSearchParams()
+  useEffect(() => {
+    const id = params.get('edit')
+    if (!id) return
+    setParams({}, { replace: true })
+    loadMeeting(id).then(setEditing).catch(toastError)
+  }, [params, setParams])
   const q = useMeetings(month)
   const vols = useVolunteers()
   const name = (id: string | null) => (id ? vols.data?.find((v) => v.id === id)?.full_name_ar : null)
   return (
     <>
       <PageHeader
-        title="الاجتماعات"
-        subtitle="كل اجتماع بيتسجل مرة واحدة، والحاضرين بيتحسبلهم مشاركة. بيطلع في شيت الاجتماعات."
+        title="الاجتماعات والأيام العائلية"
+        subtitle="بتتسجل مرة واحدة بالحاضرين، وبتظهر في المتابعة اليومية مجمّعة. الاجتماع الأونلاين واليوم العائلي بيترفع معاهم صور."
         actions={
           <Button onClick={() => setEditing('new')}>
-            <Plus className="size-4" /> اجتماع جديد
+            <Plus className="size-4" /> جديد
           </Button>
         }
       />
@@ -70,14 +108,16 @@ export default function Meetings() {
       {q.isLoading ? (
         <Spinner />
       ) : !q.data?.length ? (
-        <Empty title="مفيش اجتماعات في الشهر ده" />
+        <Empty title="مفيش اجتماعات ولا أيام عائلية في الشهر ده" />
       ) : (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {q.data.map((m) => (
             <Card key={m.id}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="font-bold">{m.committee}</p>
+                  <p className="font-bold">
+                    {m.event === FAMILY_DAY ? 'يوم عائلي' : 'اجتماع'} · {m.committee}
+                  </p>
                   <p className="text-xs text-muted">
                     {fmtDate(m.meeting_date)} · {m.meeting_type}
                   </p>
@@ -127,7 +167,7 @@ export default function Meetings() {
   )
 }
 
-function MeetingForm({ meeting, onClose }: { meeting: (Meeting & { attendees: string[] }) | null; onClose: () => void }) {
+export function MeetingForm({ meeting, onClose }: { meeting: (Meeting & { attendees: string[] }) | null; onClose: () => void }) {
   const qc = useQueryClient()
   const { me } = useAuth()
   const p = usePermissions()
@@ -135,6 +175,7 @@ function MeetingForm({ meeting, onClose }: { meeting: (Meeting & { attendees: st
   const vols = useVolunteers()
   const committees = p.can('attendance.register') ? [...new Set(['فريق العمل', ...(lookups.data?.list('اللجنة') ?? [])])] : (me?.committees ?? [])
   const [f, setF] = useState({
+    event: meeting?.event ?? 'أجتماع',
     meeting_date: meeting?.meeting_date ?? cairoToday(),
     committee: meeting?.committee ?? (p.can('attendance.register') ? '' : (me?.committees?.[0] ?? '')),
     head_id: meeting?.head_id ?? me?.volunteer_id ?? null,
@@ -147,6 +188,9 @@ function MeetingForm({ meeting, onClose }: { meeting: (Meeting & { attendees: st
     attendees_extra: String(meeting?.attendees_extra ?? 0),
   })
   const [attendees, setAttendees] = useState<string[]>(meeting?.attendees ?? [])
+  const photos = usePhotos(meeting?.id)
+  const [files, setFiles] = useState<File[]>([])
+  const isFamily = f.event === FAMILY_DAY
   const headRole = f.head_role || (f.head_id ? vols.data?.find((v) => v.id === f.head_id)?.position : '') || ''
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['meetings'] })
@@ -155,14 +199,28 @@ function MeetingForm({ meeting, onClose }: { meeting: (Meeting & { attendees: st
   const save = useMutation({
     mutationFn: async () => {
       if (!f.committee) throw { message: 'اختار اللجنة' }
-      const { error } = await supabase.rpc('save_meeting', {
+      if (needsPhotos(f.event, f.meeting_type) && !files.length && !photos.data?.length)
+        throw { message: isFamily ? 'اليوم العائلي محتاج صورة واحدة على الأقل' : 'الاجتماع الأونلاين محتاج صورة واحدة على الأقل' }
+      const big = files.find((x) => x.size > 8 * 1024 * 1024)
+      if (big) throw { message: `الصورة ${big.name} أكبر من 8 ميجا` }
+      const { data, error } = await supabase.rpc('save_meeting', {
         p: { ...f, id: meeting?.id ?? '', head_role: headRole, attendees_extra: Number(f.attendees_extra) || 0 },
         p_attendees: attendees,
       })
       if (error) throw error
+      const id = data as string
+      for (const [i, file] of files.entries()) {
+        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+        const path = `${id}/${Date.now()}-${i}.${ext}`
+        const up = await supabase.storage.from(PHOTO_BUCKET).upload(path, file, { contentType: file.type || 'image/jpeg' })
+        if (up.error) throw up.error
+        const ins = await supabase.from('meeting_photos').insert({ meeting_id: id, path })
+        if (ins.error) throw ins.error
+      }
     },
     onSuccess: () => {
-      toast.success('الاجتماع اتسجل')
+      toast.success(isFamily ? 'اليوم العائلي اتسجل' : 'الاجتماع اتسجل')
+      qc.invalidateQueries({ queryKey: ['meeting-photos'] })
       refresh()
       onClose()
     },
@@ -182,8 +240,16 @@ function MeetingForm({ meeting, onClose }: { meeting: (Meeting & { attendees: st
   })
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
   return (
-    <Modal open onClose={onClose} title={meeting ? 'تعديل اجتماع' : 'اجتماع جديد'}>
+    <Modal open onClose={onClose} title={meeting ? (isFamily ? 'تعديل يوم عائلي' : 'تعديل اجتماع') : isFamily ? 'يوم عائلي جديد' : 'اجتماع جديد'}>
       <div className="space-y-4">
+        <Tabs
+          value={f.event === FAMILY_DAY ? 'family' : 'meeting'}
+          onChange={(t) => setF({ ...f, event: t === 'family' ? FAMILY_DAY : 'أجتماع' })}
+          tabs={[
+            { value: 'meeting', label: 'اجتماع' },
+            { value: 'family', label: 'يوم عائلي' },
+          ]}
+        />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label="التاريخ">
             <Input type="date" value={f.meeting_date} onChange={set('meeting_date')} />
@@ -191,25 +257,27 @@ function MeetingForm({ meeting, onClose }: { meeting: (Meeting & { attendees: st
           <Field label="اللجنة">
             <Select value={f.committee} onChange={set('committee')} placeholder="اختار..." options={committees} />
           </Field>
-          <Field label="نوع الاجتماع">
+          <Field label={isFamily ? 'المكان' : 'نوع الاجتماع'}>
             <Select value={f.meeting_type} onChange={set('meeting_type')} options={TYPES} />
           </Field>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="هيد الاجتماع">
+          <Field label={isFamily ? 'المسئول عنه' : 'هيد الاجتماع'}>
             <VolunteerSelect value={f.head_id} onChange={(id) => setF({ ...f, head_id: id, head_role: '' })} />
           </Field>
           <Field label="دوره في الهيكل" hint="بيتحط من وظيفته لوحده، وتقدر تغيّره">
             <Input value={headRole} onChange={set('head_role')} placeholder="مثلاً: ليدر لجنة" />
           </Field>
         </div>
-        <Field label="الهدف من الاجتماع">
+        <Field label={isFamily ? 'وصف اليوم' : 'الهدف من الاجتماع'}>
           <Textarea value={f.goal} onChange={set('goal')} rows={2} />
         </Field>
-        <Field label="إنجازات اللجنة">
-          <Textarea value={f.achievements} onChange={set('achievements')} rows={2} />
-        </Field>
-        <Field label="الحاضرين" hint="كل واحد هنا بتتحسبله مشاركة «اجتماع» في اليوم ده">
+        {!isFamily && (
+          <Field label="إنجازات اللجنة">
+            <Textarea value={f.achievements} onChange={set('achievements')} rows={2} />
+          </Field>
+        )}
+        <Field label="الحاضرين" hint="تقدر تزوّد أو تشيل في أي وقت. كل واحد هنا بتتحسبله مشاركة في اليوم ده">
           <VolunteerChips value={attendees} onChange={setAttendees} />
         </Field>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -220,6 +288,20 @@ function MeetingForm({ meeting, onClose }: { meeting: (Meeting & { attendees: st
             <Input value={f.minutes_link} onChange={set('minutes_link')} dir="ltr" placeholder="https://drive.google.com/..." />
           </Field>
         </div>
+        <Field
+          label={needsPhotos(f.event, f.meeting_type) ? 'الصور (مطلوبة)' : 'الصور (اختياري)'}
+          hint={needsPhotos(f.event, f.meeting_type) ? 'صورة واحدة على الأقل للاجتماع الأونلاين واليوم العائلي' : undefined}
+        >
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={(e) => setFiles([...(e.target.files ?? [])])}
+            className="block w-full text-sm file:me-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:font-semibold file:text-brand-800"
+          />
+          {files.length > 0 && <p className="mt-1 text-xs text-muted">{files.length} صورة جديدة هتترفع مع الحفظ</p>}
+        </Field>
+        {photos.data && photos.data.length > 0 && <PhotoGrid photos={photos.data} />}
         <p className="text-sm text-muted">إجمالي الحاضرين: {attendees.length + (Number(f.attendees_extra) || 0)}</p>
         <div className="flex gap-2">
           <Button className="flex-1" onClick={() => save.mutate()} loading={save.isPending}>
@@ -233,5 +315,42 @@ function MeetingForm({ meeting, onClose }: { meeting: (Meeting & { attendees: st
         </div>
       </div>
     </Modal>
+  )
+}
+
+function PhotoGrid({ photos }: { photos: Photo[] }) {
+  const qc = useQueryClient()
+  const del = useMutation({
+    mutationFn: async (ph: Photo) => {
+      const a = await supabase.storage.from(PHOTO_BUCKET).remove([ph.path])
+      if (a.error) throw a.error
+      const b = await supabase.from('meeting_photos').delete().eq('id', ph.id)
+      if (b.error) throw b.error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['meeting-photos'] }),
+    onError: toastError,
+  })
+  return (
+    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+      {photos.map((ph) => (
+        <div key={ph.id} className="relative">
+          {ph.url ? (
+            <a href={ph.url} target="_blank" rel="noreferrer">
+              <img src={ph.url} alt="" className="aspect-square w-full rounded-lg border border-line object-cover" />
+            </a>
+          ) : (
+            <div className="aspect-square rounded-lg bg-surface" />
+          )}
+          <button
+            type="button"
+            onClick={() => confirm('تمسح الصورة دي؟') && del.mutate(ph)}
+            className="absolute end-1 top-1 rounded-full bg-white/90 p-1 text-red-600 shadow"
+            aria-label="مسح الصورة"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        </div>
+      ))}
+    </div>
   )
 }
