@@ -9,6 +9,8 @@ import {
   Home,
   Inbox,
   LogOut,
+  FileBarChart,
+  CalendarCheck,
   Menu,
   Settings,
   User,
@@ -116,6 +118,8 @@ export default function Layout() {
     if (p.volunteerId) list.push({ to: '/me/activities', label: 'أنشطتي', icon: UsersRound })
     if (p.volunteerId) list.push({ to: '/me', label: 'بياناتي', icon: UserRound })
     if (p.can('stats.view') || p.leader) list.push({ to: '/stats', label: 'الإحصائيات', icon: BarChart3 })
+    if (p.can('stats.view')) list.push({ to: '/reports', label: 'التقارير', icon: FileBarChart })
+    if (p.can('attendance.register') || p.leader) list.push({ to: '/meetings', label: 'الاجتماعات', icon: CalendarCheck })
     if (p.can('certificates.review')) list.push({ to: '/certificates', label: 'شهادات التطوع', icon: Award })
     if (p.can('roles.manage')) list.push({ to: '/permissions', label: 'الصلاحيات', icon: ShieldCheck })
     if (p.can('settings.manage')) list.push({ to: '/admin', label: 'الإعدادات', icon: Settings })

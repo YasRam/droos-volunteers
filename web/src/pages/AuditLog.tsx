@@ -24,6 +24,7 @@ const AREAS: Record<string, string> = {
   lookups: 'القوائم',
   certificate_requests: 'شهادات التطوع',
   backup: 'النسخ الاحتياطية',
+  meetings: 'الاجتماعات',
 }
 
 const FIELD: Record<string, string> = {
@@ -72,11 +73,27 @@ const FIELD: Record<string, string> = {
   role: 'الصلاحية',
   purpose: 'الغرض',
   review_note: 'ملاحظة الرد',
+  facebook: 'الفيسبوك',
+  study_year: 'السنة الدراسية',
+  follower_id: 'المتابع',
+  follower_trainee_id: 'متابع تحت التدريب',
+  follow_head_id: 'هيد المتابعة',
+  follow_notes_1: 'ملاحظات 1',
+  follow_notes_2: 'ملاحظات 2',
+  follow_notes_3: 'ملاحظات 3',
+  out_reason: 'سبب الخروج',
+  meeting_date: 'تاريخ الاجتماع',
+  head_role: 'دور الهيد',
+  meeting_type: 'نوع الاجتماع',
+  goal: 'الهدف',
+  achievements: 'الإنجازات',
+  minutes_link: 'لينك المحضر',
+  attendees_extra: 'حاضرين تانيين',
 }
 const SKIP = new Set([
   'id', 'updated_at', 'updated_by', 'created_at', 'created_by', 'reviewed_at', 'reviewed_by', 'status_changed_at', 'requested_at',
   'volunteer_id', 'group_activity_id', 'legacy_code', 'code', 'registered_at', 'method', 'sort_order', 'permissions', 'key',
-  'is_builtin', 'requested_national_id', 'id_card_path', 'link', 'form',
+  'is_builtin', 'requested_national_id', 'id_card_path', 'link', 'form', 'report_column', 'meeting_id', 'head_id',
 ])
 
 function show(v: unknown, key?: string): string {
@@ -131,6 +148,8 @@ function sentence(r: AuditRow): string {
         : `غيّر «${o?.value}» لـ «${n?.value}» في قايمة ${n?.list}${Number(n?.rows_updated) ? ` وحدّث ${n?.rows_updated} سجل` : ''}`
     case 'certificate_requests':
       return r.action === 'INSERT' ? `${who} طلب شهادة تطوع` : `رد على طلب شهادة ${who}: ${show(n?.status, 'status')}`
+    case 'meetings':
+      return r.action === 'INSERT' ? `سجّل اجتماع ${n?.committee} يوم ${show(n?.meeting_date)}` : r.action === 'DELETE' ? `مسح اجتماع ${o?.committee} يوم ${show(o?.meeting_date)}` : `عدّل اجتماع ${n?.committee}`
     case 'backup':
       return `استرجع نسخة احتياطية متاخدة ${n?.exported_at ? fmtDateTime(String(n.exported_at)) : ''} (كل البيانات اترجعت لحالتها وقتها)`
     default:

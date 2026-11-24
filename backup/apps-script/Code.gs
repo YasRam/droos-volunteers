@@ -168,3 +168,133 @@ function sha256Hex_(text) {
     .map((b) => ((b + 256) % 256).toString(16).padStart(2, '0'))
     .join('');
 }
+
+// =====================================================================
+// Reports into the branch's Google Sheets (button on the site)
+//
+// Deployed as a web app (execute as me, anyone can call). Every call carries the signed-in
+// user's Supabase session; the script checks it and their «stats.view» permission with
+// Supabase itself, then reads the report with that same session (so the database rules apply).
+// The sheets are the ones linked in the site's settings; the script writes the month's tab.
+// =====================================================================
+
+const SUPABASE_URL = 'https://vxeseshwjcnenddhiuby.supabase.co';
+const MONTH_TABS = ['يناير', 'فبراير', 'مارس', 'ابريل', 'مايو', 'يونيو', 'يوليو', 'اغسطس', 'سبتمبر', 'اكتوبر', 'نوفمبر', 'ديسمبر'];
+const BRANCH = 'اسكندرية';
+
+function doPost(e) {
+  try {
+    const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    const token = String(body.access_token || '');
+    if (!token) throw new Error('لازم تكون داخل الموقع');
+    const ctx = sb_('rpc/my_context', token, {});
+    const perms = (ctx && ctx.permissions) || [];
+    if (perms.indexOf('stats.view') < 0) throw new Error('محتاج صلاحية الإحصائيات');
+    if (!/^\d{4}-\d{2}$/.test(String(body.month || ''))) throw new Error('الشهر مش مفهوم');
+    const month = body.month + '-01';
+    let result;
+    if (body.report === 'eval') result = writeEval_(token, month);
+    else if (body.report === 'meetings') result = writeMeetings_(token, month);
+    else throw new Error('تقرير مش معروف');
+    return json_(Object.assign({ ok: true }, result));
+  } catch (err) {
+    return json_({ ok: false, error: String((err && err.message) || err) });
+  }
+}
+
+function doGet() {
+  return json_({ ok: true, app: 'droos-volunteers sheets' });
+}
+
+function json_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+/** Calls Supabase REST as the signed-in user. */
+function sb_(path, token, payload) {
+  const res = UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    method: payload === undefined ? 'get' : 'post',
+    contentType: 'application/json',
+    headers: { apikey: ANON_KEY, Authorization: 'Bearer ' + token },
+    payload: payload === undefined ? undefined : JSON.stringify(payload),
+    muteHttpExceptions: true,
+  });
+  const code = res.getResponseCode();
+  if (code === 401) throw new Error('الجلسة خلصت، ادخل الموقع تاني');
+  if (code >= 300) throw new Error('السيرفر رد بـ ' + code + ': ' + res.getContentText().slice(0, 200));
+  return JSON.parse(res.getContentText() || 'null');
+}
+
+function sheetLink_(token, key) {
+  const rows = sb_('app_settings?select=value&key=eq.' + key, token);
+  const url = rows && rows[0] && rows[0].value;
+  if (!url) throw new Error('لينك الشيت مش متحدد في الإعدادات');
+  return SpreadsheetApp.openByUrl(url);
+}
+
+const monthTab_ = (month) => MONTH_TABS[Number(month.slice(5, 7)) - 1];
+const asDate_ = (iso) => {
+  const p = iso.split('-').map(Number);
+  return new Date(p[0], p[1] - 1, p[2]);
+};
+
+/** «تقييم فني» in the «اقتراح» layout: one row per day, columns C..Z. */
+function writeEval_(token, month) {
+  const rows = sb_('rpc/report_eval', token, { p_month: month });
+  const ss = sheetLink_(token, 'report_sheet_eval');
+  const name = monthTab_(month);
+  let sh = ss.getSheetByName(name);
+  if (!sh) {
+    const tpl = ss.getSheetByName('اقتراح');
+    if (!tpl) throw new Error('مفيش تابة «' + name + '» ولا تابة «اقتراح» أنسخ منها');
+    sh = tpl.copyTo(ss).setName(name);
+  }
+  // Data starts two rows under the row whose first cell is «اليوم»
+  const head = sh.getRange(1, 1, 8, 1).getValues().map((r) => String(r[0]).trim());
+  const dayRow = head.indexOf('اليوم');
+  if (dayRow < 0) throw new Error('مش لاقي عمود «اليوم» في تابة ' + name);
+  const first = dayRow + 3;
+  sh.getRange(1, 1).setValue('شيت تقييم شهر ' + name + ' ' + month.slice(0, 4));
+
+  const keys = ['classes', 'foundation', 'content', 'exam_primary', 'exam_prep', 'organizers', 'admin', 'meetings_desc', 'meetings', 'camps',
+    'workshop_type', 'workshops', 'sports', 'trips', 'behavior', 'religious', 'quran', 'calls', 'media', 'courses_type', 'courses',
+    'events', 'other_type', 'other'];
+  const values = [];
+  for (let i = 0; i < 31; i++) {
+    const r = rows[i];
+    values.push(r ? [asDate_(r.day)].concat(keys.map((k) => (r[k] === null || r[k] === undefined ? '' : r[k]))) : new Array(keys.length + 1).fill(''));
+  }
+  sh.getRange(first, 2, 31, keys.length + 1).setValues(values);
+  return { url: ss.getUrl() + '#gid=' + sh.getSheetId(), rows: rows.length, tab: name };
+}
+
+/** «شيت الاجتماعات»: the month's tab gets every meeting of the month (rewritten each time). */
+function writeMeetings_(token, month) {
+  const rows = sb_('rpc/report_meetings', token, { p_month: month });
+  const ss = sheetLink_(token, 'report_sheet_meetings');
+  const name = monthTab_(month);
+  const headers = ['العدد', 'تاريخ الاجتماع', 'اسم الفرع / مركزي', 'اللجنة', 'هيد الاجتماع', 'دور هيد الاجتماع في الهيكل', 'عدد الحاضرين',
+    'الهدف من الاجتماع', 'انجازات اللجنة', 'نوع الاجتماع', 'لينك المحضر'];
+  let sh = ss.getSheetByName(name);
+  if (!sh) {
+    sh = ss.insertSheet(name);
+    sh.setRightToLeft(true);
+    sh.getRange(1, 1, 1, headers.length).merge().setValue('نشاط دروس التقوية شهر ' + name + ' ' + month.slice(0, 4))
+      .setHorizontalAlignment('center').setFontWeight('bold').setBackground('#d9ead3');
+    sh.getRange(2, 1, 1, headers.length).setValues([headers]).setFontWeight('bold').setBackground('#f3f3f3');
+    sh.setFrozenRows(2);
+  }
+  const top = sh.getRange(1, 1, 6, 1).getValues().map((r) => String(r[0]).trim());
+  const hdr = top.indexOf('العدد');
+  if (hdr < 0) throw new Error('مش لاقي عمود «العدد» في تابة ' + name);
+  const first = hdr + 2;
+  const last = sh.getLastRow();
+  if (last >= first) sh.getRange(first, 1, last - first + 1, headers.length).clearContent();
+  if (rows.length) {
+    sh.getRange(first, 1, rows.length, headers.length).setValues(rows.map((r) => [
+      r.n, asDate_(r.meeting_date), BRANCH, r.committee, r.head || '', r.head_role || '', r.attendees,
+      r.goal || '', r.achievements || '', r.meeting_type || '', r.minutes_link || '',
+    ]));
+  }
+  return { url: ss.getUrl() + '#gid=' + sh.getSheetId(), rows: rows.length, tab: name };
+}

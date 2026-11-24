@@ -7,6 +7,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Badge, Button, Card, Empty, Field, Input, PageHeader, RequestBadge, Select, Spinner, StatusBadge, Tabs, Textarea, Toggle } from '@/components/ui'
 import { VolunteerFacts } from '@/components/VolunteerFacts'
+import { VolunteerSelect } from '@/components/VolunteerPick'
 import { ContactLinks } from '@/components/VolunteerLink'
 import { useAuth, usePermissions } from '@/lib/auth'
 import { ageFrom, fmtShort, useLookups, useStatusOptions, whatsappLink, withCurrent } from '@/lib/data'
@@ -119,7 +120,12 @@ export default function VolunteerDetail() {
           </div>
         </div>
       )}
-      {tab === 'interview' && <Interview v={v} />}
+      {tab === 'interview' && (
+        <div className="space-y-4">
+          <Interview v={v} />
+          <FollowupCard v={v} canEdit={p.can('volunteers.edit')} canNote={p.can('volunteers.edit') || p.leader} />
+        </div>
+      )}
       {tab === 'committee' && <Committee v={v} editable={canEditCommittee} />}
       {tab === 'activities' && <Activities volunteerId={v.id} />}
     </>
@@ -370,6 +376,74 @@ function Activities({ volunteerId }: { volunteerId: string }) {
           <RequestBadge status={p.status} />
         </div>
       ))}
+    </Card>
+  )
+}
+
+/** المتابعة: who follows this volunteer up, their notes, and why they left (for «شيت المتابعة»). */
+function FollowupCard({ v, canEdit, canNote }: { v: Volunteer; canEdit: boolean; canNote: boolean }) {
+  const qc = useQueryClient()
+  const lookups = useLookups()
+  const [f, setF] = useState({
+    follower_id: v.follower_id ?? null,
+    follower_trainee_id: v.follower_trainee_id ?? null,
+    follow_head_id: v.follow_head_id ?? null,
+    out_reason: v.out_reason ?? '',
+    follow_notes_1: v.follow_notes_1 ?? '',
+    follow_notes_2: v.follow_notes_2 ?? '',
+    follow_notes_3: v.follow_notes_3 ?? '',
+  })
+  const save = useMutation({
+    mutationFn: async () => {
+      const notes = { follow_notes_1: f.follow_notes_1 || null, follow_notes_2: f.follow_notes_2 || null, follow_notes_3: f.follow_notes_3 || null }
+      const payload = canEdit
+        ? { ...notes, follower_id: f.follower_id, follower_trainee_id: f.follower_trainee_id, follow_head_id: f.follow_head_id, out_reason: f.out_reason || null }
+        : notes
+      const { error } = await supabase.from('volunteers').update(payload).eq('id', v.id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('اتحفظ')
+      qc.invalidateQueries({ queryKey: ['volunteer', v.id] })
+      qc.invalidateQueries({ queryKey: ['volunteers'] })
+    },
+    onError: toastError,
+  })
+  if (!canEdit && !canNote) return null
+  return (
+    <Card>
+      <p className="mb-1 font-bold text-brand-800">المتابعة</p>
+      <p className="mb-4 text-xs text-muted">بتطلع في شيت المتابعة اللي بيتبعت كل نص شهر.</p>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Field label="المتابع">
+          <VolunteerSelect value={f.follower_id} onChange={(id) => setF({ ...f, follower_id: id })} disabled={!canEdit} />
+        </Field>
+        <Field label="متابع تحت التدريب">
+          <VolunteerSelect value={f.follower_trainee_id} onChange={(id) => setF({ ...f, follower_trainee_id: id })} disabled={!canEdit} />
+        </Field>
+        <Field label="هيد المتابعة">
+          <VolunteerSelect value={f.follow_head_id} onChange={(id) => setF({ ...f, follow_head_id: id })} disabled={!canEdit} />
+        </Field>
+        <div className="sm:col-span-3">
+          <Field label="سبب الخروج من المتابعة (الأعمدة)" hint="لو اتحدد، المتطوع بيطلع «خارج المتابعة» في الشيت">
+            <Select
+              value={f.out_reason}
+              onChange={(e) => setF({ ...f, out_reason: e.target.value })}
+              placeholder="—"
+              options={withCurrent(lookups.data?.list('سبب الخروج') ?? [], v.out_reason)}
+              disabled={!canEdit}
+            />
+          </Field>
+        </div>
+        {(['follow_notes_1', 'follow_notes_2', 'follow_notes_3'] as const).map((k, i) => (
+          <Field key={k} label={`ملاحظات ${i + 1}`}>
+            <Textarea value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} rows={2} />
+          </Field>
+        ))}
+      </div>
+      <Button className="mt-4" onClick={() => save.mutate()} loading={save.isPending}>
+        حفظ
+      </Button>
     </Card>
   )
 }

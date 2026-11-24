@@ -81,6 +81,27 @@ const LIST_HINT: Record<string, string> = {
   'حالة المتطوع': 'حالات المتطوعين. تغيير الاسم بيغيّره في كل المتطوعين. القيم اللي عليها قفل السيستم بيعتمد عليها.',
   'حالة القبول': 'درجات القبول في المقابلة. تغيير الاسم بيغيّره في كل الملفات. القيم اللي عليها قفل السيستم بيعتمد عليها.',
 }
+// Which column of the evaluation sheet («اقتراح») an event counts in
+const REPORT_COLUMNS: Record<string, string> = {
+  classes: 'عدد الحصص',
+  foundation: 'حصص التأسيس',
+  content: 'تحضير محتوى',
+  exam: 'امتحانات شهرية',
+  organizers: 'متطوعين التنظيم',
+  admin: 'اداريات وانترفيوهات',
+  meetings: 'الاجتماعات',
+  camps: 'الكامبات',
+  workshop: 'ورشة فنية',
+  sports: 'يوم رياضي',
+  trips: 'رحلات',
+  behavior: 'حصص السلوكية',
+  religious: 'ندوات دينية',
+  quran: 'تحفيظ القرآن',
+  calls: 'اتصالات',
+  media: 'كرنفالات ودعاية',
+  courses: 'كورسات',
+  events: 'ايفينتات',
+}
 const FORM_LABEL = { teaching: 'مادة + سنة + عدد طلاب', optional: 'نوع حدث اختياري', none: 'من غير نوع حدث' } as const
 
 function Lists() {
@@ -198,6 +219,16 @@ function Lists() {
                   onChange={(e) => patch(r, { form: e.target.value as Lookup['form'] })}
                   options={Object.entries(FORM_LABEL).map(([v, label]) => ({ value: v, label }))}
                   aria-label="الخانات المطلوبة"
+                />
+              )}
+              {current === 'الحدث' && (
+                <Select
+                  className="w-44"
+                  value={r.report_column ?? ''}
+                  onChange={(e) => patch(r, { report_column: e.target.value || null })}
+                  placeholder="شيت التقييم: أخرى"
+                  options={Object.entries(REPORT_COLUMNS).map(([v, label]) => ({ value: v, label: `شيت التقييم: ${label}` }))}
+                  aria-label="عمود شيت التقييم"
                 />
               )}
               {!isLocked(r) && (

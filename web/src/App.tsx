@@ -16,6 +16,8 @@ const FollowUps = lazy(() => import('@/pages/FollowUps'))
 const Requests = lazy(() => import('@/pages/Requests'))
 const Schedule = lazy(() => import('@/pages/Schedule'))
 const Stats = lazy(() => import('@/pages/Stats'))
+const Reports = lazy(() => import('@/pages/Reports'))
+const Meetings = lazy(() => import('@/pages/Meetings'))
 const Admin = lazy(() => import('@/pages/Admin'))
 const Permissions = lazy(() => import('@/pages/Permissions'))
 const Certificates = lazy(() => import('@/pages/Certificates'))
@@ -50,6 +52,8 @@ export default function App() {
           <Route path="requests/*" element={<Guard allow={p.canReview}><Requests /></Guard>} />
           <Route path="schedule" element={<Schedule />} />
           <Route path="stats" element={<Guard allow={p.can('stats.view') || p.leader}><Stats /></Guard>} />
+          <Route path="reports" element={<Guard allow={p.can('stats.view')}><Reports /></Guard>} />
+          <Route path="meetings" element={<Guard allow={p.can('attendance.register') || p.leader}><Meetings /></Guard>} />
           <Route path="tree" element={<Guard allow={p.viewAll || p.leader}><Tree /></Guard>} />
           <Route path="data" element={<Navigate to="/admin?tab=data" replace />} />
           <Route path="certificates" element={<Guard allow={p.can('certificates.review')}><Certificates /></Guard>} />

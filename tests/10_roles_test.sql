@@ -353,4 +353,53 @@ select t.ok(exists (select 1 from audit_log where table_name = 'backup'), 'resto
 insert into volunteers (full_name_ar, phone) values ('بعد الاسترجاع', '01000000099');
 select t.ok((select code from volunteers where full_name_ar = 'بعد الاسترجاع') is not null, 'new rows still get codes');
 
+-- ---------- meetings, follow-up, reports ----------
+begin;
+set local role authenticated;
+select t.login('vol1@test.com');
+select t.fails($$select save_meeting('{"meeting_date":"2026-11-05","committee":"تدريس"}'::jsonb, '{}')$$, 'volunteer cannot record a meeting');
+select t.fails($$update volunteers set follower_id = id where code = 'V9001'$$, 'volunteer cannot set their own follower');
+update volunteers set facebook = 'fb.com/me' where code = 'V9001';
+select t.ok((select facebook from volunteers where code = 'V9001') = 'fb.com/me', 'volunteer sets own facebook');
+select t.login('leader@test.com');
+select save_meeting(jsonb_build_object('meeting_date', '2026-11-05', 'committee', (select committee from committee_leaders limit 1), 'goal', 'خطة الشهر', 'meeting_type', 'اونلاين'),
+                    array(select id from volunteers where code in ('V9001', 'V9003')));
+select t.fails($$select save_meeting('{"meeting_date":"2026-11-05","committee":"ميديا"}'::jsonb, '{}')$$, 'leader only records own committee meetings');
+commit;
+select t.ok((select count(*) from participations where meeting_id is not null) = 2, 'meeting attendees get participations');
+select t.ok((select place from participations where meeting_id is not null limit 1) = 'اونلاين', 'online meeting counts from home');
+begin;
+set local role authenticated;
+select t.login('leader@test.com');
+select save_meeting(jsonb_build_object('id', (select id from meetings limit 1), 'meeting_date', '2026-11-06', 'committee', (select committee from committee_leaders limit 1)),
+                    array(select id from volunteers where code = 'V9001'));
+commit;
+select t.ok((select count(*) from participations where meeting_id is not null) = 1, 'removed attendee loses the participation');
+select t.ok((select activity_date from participations where meeting_id is not null) = '2026-11-06', 'meeting date change moves participations');
+insert into lookups (list, value, report_column) values ('الحدث', 'تدريس', 'classes'), ('الحدث', 'امتحان شهري', 'exam'), ('الحدث', 'أجتماع', 'meetings')
+on conflict on constraint lookups_unique do update set report_column = excluded.report_column;
+insert into participations (volunteer_id, activity_date, event, subject, grade, place, status)
+select id, '2026-11-06', 'تدريس', 'رياضيات', '4 ب', 'الفرع', 'accepted' from volunteers where code in ('V9001', 'V9002');
+insert into participations (volunteer_id, activity_date, event, subject, grade, status)
+select id, '2026-11-06', 'امتحان شهري', 'علوم', '2 ع', 'accepted' from volunteers where code = 'V9001';
+begin;
+set local role authenticated;
+select t.login('mgmt@test.com');
+select t.ok((select classes from report_eval('2026-11-01') where day = '2026-11-06') = 1, 'two volunteers in one class count as one class');
+select t.ok((select exam_prep from report_eval('2026-11-01') where day = '2026-11-06') = 1, 'prep exam counted in its column');
+select t.ok((select meetings from report_eval('2026-11-01') where day = '2026-11-06') = 1, 'meeting counted on its day');
+select t.ok((select count(*) from report_eval('2026-11-01')) = 30, 'one row per day of the month');
+select t.ok((select other from report_eval('2026-11-01') where day = '2026-11-06') = 0, 'mapped events stay out of «أخرى»');
+select t.ok((select attendees from report_meetings('2026-11-01')) = 1, 'meeting attendees counted');
+select t.ok((select r.code from report_followup_days('2026-11-01', '2026-11-30') r join volunteers v on v.id = r.volunteer_id where v.code = 'V9001' and r.day = '2026-11-06') = 1, 'branch day coded 1');
+select t.login('vol1@test.com');
+select t.ok((select count(*) from report_eval('2026-11-01') where classes > 0) = 0, 'volunteer gets no report numbers');
+commit;
+
+-- ---------- class details ----------
+select t.fails($$insert into schedule_slots (day, grade, subject, starts_at, ends_at, audience) values ('السبت', '4 ب', 'علوم', '10:00', '11:00', 'حد')$$, 'audience must be one of the choices');
+insert into schedule_slots (day, grade, subject, starts_at, ends_at, place, kind, audience, takes_attendance)
+values ('السبت', '4 ب', 'علوم', '10:00', '11:00', 'قاعة 1', 'تأسيس', 'بنات بس', false);
+select t.ok((select not takes_attendance from schedule_slots where place = 'قاعة 1'), 'class details saved');
+
 \echo ALL ROLE TESTS PASSED

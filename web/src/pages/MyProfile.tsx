@@ -24,6 +24,8 @@ export const personalSchema = z.object({
   area: z.string().optional(),
   availability_notes: z.string().optional(),
   referral_source: z.string().optional(),
+  study_year: z.string().optional(),
+  facebook: z.string().optional(),
 })
 export type PersonalValues = z.infer<typeof personalSchema>
 
@@ -56,6 +58,17 @@ export function PersonalFields({ form }: { form: ReturnType<typeof useForm<Perso
       <Field label="المنطقة السكنية">
         <Input {...register('area')} />
       </Field>
+      <Field label="السنة الدراسية (لو طالب)">
+        <Input {...register('study_year')} list="study-years" placeholder="مثلاً: سنة تالتة جامعة، خريج" />
+        <datalist id="study-years">
+          {['طالب ثانوي', 'سنة أولى جامعة', 'سنة تانية جامعة', 'سنة تالتة جامعة', 'سنة رابعة جامعة', 'سنة خامسة جامعة', 'خريج'].map((y) => (
+            <option key={y} value={y} />
+          ))}
+        </datalist>
+      </Field>
+      <Field label="لينك الفيسبوك">
+        <Input {...register('facebook')} dir="ltr" placeholder="https://facebook.com/..." />
+      </Field>
       <div className="sm:col-span-2">
         <Field label="المواعيد المتاحة والملاحظات">
           <Textarea {...register('availability_notes')} />
@@ -81,6 +94,8 @@ export const toPersonalPayload = (v: PersonalValues) => ({
   area: v.area || null,
   availability_notes: v.availability_notes || null,
   referral_source: v.referral_source || null,
+  study_year: v.study_year?.trim() || null,
+  facebook: v.facebook?.trim() || null,
 })
 
 export const personalDefaults = (v: Volunteer): PersonalValues => ({
@@ -94,6 +109,8 @@ export const personalDefaults = (v: Volunteer): PersonalValues => ({
   area: v.area ?? '',
   availability_notes: v.availability_notes ?? '',
   referral_source: v.referral_source ?? '',
+  study_year: v.study_year ?? '',
+  facebook: v.facebook ?? '',
 })
 
 /** National ID: read-only unless the person has national_id.edit. No change requests. */

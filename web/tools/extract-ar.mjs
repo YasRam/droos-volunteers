@@ -1,6 +1,6 @@
 // Lists every Arabic text in the source: exact strings and template patterns ({0}, {1}...).
 // Output: JSON {"exact": [...], "patterns": [...]} to stdout. Used to build src/i18n/en.json.
-import * as ts0 from 'typescript5'
+import * as ts0 from './node_modules/typescript/lib/typescript.js'
 import { readFileSync } from 'node:fs'
 const ts = ts0.default ?? ts0
 const AR = /[؀-ۿ]/

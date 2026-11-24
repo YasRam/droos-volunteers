@@ -63,6 +63,15 @@ export interface Volunteer {
   minicamp_date: string | null
   updated_at: string
   updated_by: string | null
+  facebook?: string | null
+  study_year?: string | null
+  follower_id?: string | null
+  follower_trainee_id?: string | null
+  follow_head_id?: string | null
+  follow_notes_1?: string | null
+  follow_notes_2?: string | null
+  follow_notes_3?: string | null
+  out_reason?: string | null
 }
 
 export interface VolunteerDirectoryRow {
@@ -127,6 +136,11 @@ export interface ScheduleSlot {
   volunteer_id: string | null
   starts_at: string
   ends_at: string
+  place?: string | null
+  kind?: 'حصة' | 'تأسيس' | 'ورشة ثابتة'
+  audience?: 'الكل' | 'بنات بس' | 'ولاد بس'
+  takes_attendance?: boolean
+  notes?: string | null
 }
 
 export interface Lookup {
@@ -138,6 +152,7 @@ export interface Lookup {
   is_active: boolean
   link: string | null
   form: 'teaching' | 'none' | 'optional' | null
+  report_column?: string | null
 }
 
 export interface StaffRole {

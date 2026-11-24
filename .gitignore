@@ -7,3 +7,4 @@ data/parts/
 dist/
 !.env.example
 site.zip
+web/tools/node_modules
