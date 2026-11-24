@@ -311,6 +311,12 @@ function Interview({ v }: { v: Volunteer }) {
   )
 }
 
+const CAMP_FLAGS = [
+  ['attended_minicamp', 'minicamp_date', 'الميني كامب'],
+  ['attended_camp', 'camp_date', 'الكامب'],
+  ['attended_graduation', 'graduation_date', 'حفلة التخرج'],
+] as const
+
 function Committee({ v, editable }: { v: Volunteer; editable: boolean }) {
   const qc = useQueryClient()
   const save = useMutation({
@@ -337,18 +343,26 @@ function Committee({ v, editable }: { v: Volunteer; editable: boolean }) {
         {flags.map(([key, label]) => (
           <Toggle key={key} label={label} checked={Boolean(v[key])} disabled={!editable || save.isPending} onChange={(val) => save.mutate({ [key]: val })} />
         ))}
-        <Toggle
-          label="حضر الميني كامب"
-          checked={v.attended_minicamp}
-          disabled={!editable || save.isPending}
-          onChange={(val) => save.mutate({ attended_minicamp: val, minicamp_date: val ? (v.minicamp_date ?? new Date().toISOString().slice(0, 10)) : null })}
-        />
       </div>
-      {v.attended_minicamp && (
-        <Field label="موعد الميني كامب">
-          <Input type="date" defaultValue={v.minicamp_date ?? ''} disabled={!editable} onBlur={(e) => e.target.value !== v.minicamp_date && save.mutate({ minicamp_date: e.target.value || null })} />
-        </Field>
-      )}
+      {CAMP_FLAGS.map(([flag, dateKey, label]) => (
+        <div key={flag} className="grid grid-cols-1 items-end gap-2 sm:grid-cols-2">
+          <Toggle
+            label={`حضر ${label}`}
+            checked={Boolean(v[flag])}
+            disabled={!editable || save.isPending}
+            onChange={(val) => save.mutate({ [flag]: val, [dateKey]: val ? (v[dateKey] ?? new Date().toISOString().slice(0, 10)) : null })}
+          />
+          {v[flag] && (
+            <Input
+              type="date"
+              aria-label={`تاريخ ${label}`}
+              defaultValue={(v[dateKey] as string | null) ?? ''}
+              disabled={!editable}
+              onBlur={(e) => e.target.value !== v[dateKey] && save.mutate({ [dateKey]: e.target.value || null })}
+            />
+          )}
+        </div>
+      ))}
       {!editable && <p className="text-xs text-muted">بيانات اللجنة يعدّلها ليدر اللجنة أو الـ HR.</p>}
     </Card>
   )

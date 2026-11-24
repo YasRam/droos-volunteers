@@ -36,6 +36,15 @@ export default defineConfig({
         navigateFallback: `${base}index.html`,
         // Phone notifications: push + notificationclick handlers (public/push-sw.js)
         importScripts: ['push-sw.js'],
+        // Big files that only some people open load on demand (then stay cached), so the first visit stays light
+        globIgnores: ['**/exceljs*.js', '**/Stats-*.js', '**/en-*.js', '**/templates/**'],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.includes('/assets/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'assets', expiration: { maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 60 } },
+          },
+        ],
       },
     }),
   ],

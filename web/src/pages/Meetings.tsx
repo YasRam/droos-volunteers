@@ -76,6 +76,17 @@ export function useMeetings(month: string) {
 }
 
 /** Meetings of a month: who held it, why, what came out of it, who attended. */
+function perCommittee(rows: Meeting[]): [string, number, number][] {
+  const m = new Map<string, [number, number]>()
+  for (const r of rows) {
+    const x = m.get(r.committee) ?? [0, 0]
+    if (r.event === FAMILY_DAY) x[1]++
+    else x[0]++
+    m.set(r.committee, x)
+  }
+  return [...m.entries()].map(([c, [n, f]]) => [c, n, f] as [string, number, number]).sort((a, b) => b[1] - a[1])
+}
+
 export default function Meetings() {
   const [month, setMonth] = useState(cairoToday().slice(0, 7))
   const [editing, setEditing] = useState<(Meeting & { attendees: string[] }) | 'new' | null>(null)
@@ -100,11 +111,25 @@ export default function Meetings() {
           </Button>
         }
       />
-      <Card className="mb-4 max-w-xs">
-        <Field label="الشهر">
-          <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-        </Field>
-      </Card>
+      <div className="mb-4 flex flex-wrap items-start gap-3">
+        <Card className="w-full max-w-xs">
+          <Field label="الشهر">
+            <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+          </Field>
+        </Card>
+        {Boolean(q.data?.length) && (
+          <Card className="min-w-0 flex-1">
+            <p className="mb-2 text-sm font-bold">عدد الاجتماعات لكل لجنة</p>
+            <div className="flex flex-wrap gap-2">
+              {perCommittee(q.data!).map(([c, n, f]) => (
+                <Badge key={c} tone="brand">
+                  {c}: {n} اجتماع{f ? ` · ${f} يوم عائلي` : ''}
+                </Badge>
+              ))}
+            </div>
+          </Card>
+        )}
+      </div>
       {q.isLoading ? (
         <Spinner />
       ) : !q.data?.length ? (

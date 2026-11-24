@@ -1,4 +1,7 @@
 import type { ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { usePermissions } from '@/lib/auth'
+import { supabase } from '@/lib/supabase'
 import { Badge, Card, StatusBadge } from './ui'
 import { useParticipationSummary } from '@/lib/certificates'
 import { ageFrom, fmtDate } from '@/lib/data'
@@ -34,6 +37,18 @@ export function VolunteerFacts({ v }: { v: Volunteer }) {
   const summary = useParticipationSummary(v.id)
   const age = ageFrom(v.birth_date)
   const s = summary.data
+  const p = usePermissions()
+  const hr = useQuery({
+    queryKey: ['volunteer-hr-facts', v.id],
+    enabled: p.can('hr.view'),
+    queryFn: async () => {
+      const { data, error } = await supabase.from('volunteer_hr_read').select('interview_date, interviewer, interviewer_id, acceptance').eq('volunteer_id', v.id).maybeSingle()
+      if (error) throw error
+      if (!data?.interviewer_id) return data
+      const { data: who } = await supabase.from('volunteer_directory').select('full_name_ar').eq('id', data.interviewer_id).maybeSingle()
+      return { ...data, interviewer: who?.full_name_ar ?? data.interviewer }
+    },
+  })
   const lastAgo = s?.last_date ? Math.floor((Date.now() - Date.parse(s.last_date)) / 864e5) : null
 
   return (
@@ -56,6 +71,11 @@ export function VolunteerFacts({ v }: { v: Volunteer }) {
         <Row label="تاريخ الميلاد">{v.birth_date ? `${fmtDate(v.birth_date)} (${age} سنة)` : 'مش معروف (مفيش رقم قومي)'}</Row>
         <Row label="النوع">{v.gender ?? '—'}</Row>
         <Row label="اتسجل">{`${fmtDate(v.registered_at)} · من ${since(v.registered_at)}`}</Row>
+        {p.can('hr.view') && (
+          <Row label="الانترفيو">
+            {hr.data?.interview_date ? `${fmtDate(hr.data.interview_date)}${hr.data.interviewer ? ' · ' + hr.data.interviewer : ''}${hr.data.acceptance ? ' · ' + hr.data.acceptance : ''}` : 'لسه'}
+          </Row>
+        )}
         <Row label="الميني كامب">{v.attended_minicamp ? `حضر${v.minicamp_date ? ' ' + fmtDate(v.minicamp_date) : ''}` : 'لسه'}</Row>
         <Row label="الكامب">{v.attended_camp ? `حضر${v.camp_date ? ' ' + fmtDate(v.camp_date) : ''}` : 'لسه'}</Row>
         <Row label="حفلة التخرج">{v.attended_graduation ? `حضر${v.graduation_date ? ' ' + fmtDate(v.graduation_date) : ''}` : 'لسه'}</Row>

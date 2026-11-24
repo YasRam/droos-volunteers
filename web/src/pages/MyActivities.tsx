@@ -9,7 +9,7 @@ import type { Participation } from '@/lib/types'
 
 const monthFmt = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' })
 
-export default function MyActivities() {
+export default function MyActivities({ embedded }: { embedded?: boolean } = {}) {
   const { volunteerId } = usePermissions()
   const q = useQuery({
     queryKey: ['my-activities'],
@@ -37,7 +37,13 @@ export default function MyActivities() {
 
   return (
     <>
-      <PageHeader title="أنشطتي" subtitle={q.data ? `${accepted} مشاركة مقبولة من ${q.data.length}` : undefined} />
+      {embedded ? (
+        <h2 className="font-bold">
+          أنشطتي {q.data && <span className="text-sm font-normal text-muted">· {accepted} مشاركة مقبولة من {q.data.length}</span>}
+        </h2>
+      ) : (
+        <PageHeader title="أنشطتي" subtitle={q.data ? `${accepted} مشاركة مقبولة من ${q.data.length}` : undefined} />
+      )}
       {q.isLoading ? (
         <Spinner />
       ) : !months.length ? (

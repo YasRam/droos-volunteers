@@ -52,6 +52,7 @@ export function StagesCard({ volunteerId, self }: { volunteerId: string; self: b
   const p = usePermissions()
   const q = useStages(volunteerId)
   const [open, setOpen] = useState<string | null>(null)
+  const [showDone, setShowDone] = useState(false)
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['stages'] })
     qc.invalidateQueries({ queryKey: ['tshirt-mine'] })
@@ -85,8 +86,9 @@ export function StagesCard({ volunteerId, self }: { volunteerId: string; self: b
         <div className="h-2 rounded-full bg-brand-500 transition-all" style={{ width: `${pct}%` }} />
       </div>
       {self && next && <p className="mt-2 text-xs text-muted">الخطوة الجاية: {next.name}</p>}
+      {done === stages.length && <p className="mt-2 text-sm font-semibold text-emerald-700">خلصت كل المراحل 🎉</p>}
       <ol className="mt-3 space-y-1.5">
-        {stages.map((s) => (
+        {stages.filter((s) => showDone || !s.done).map((s) => (
           <li key={s.key} className={clsx('flex items-start gap-2 rounded-xl px-2 py-1.5', !s.done && s.key === next?.key && 'bg-brand-50')}>
             {s.done ? <Check className="mt-0.5 size-5 shrink-0 text-emerald-600" /> : <CircleDashed className="mt-0.5 size-5 shrink-0 text-gray-300" />}
             <div className="min-w-0 flex-1">
@@ -103,6 +105,11 @@ export function StagesCard({ volunteerId, self }: { volunteerId: string; self: b
           </li>
         ))}
       </ol>
+      {done > 0 && (
+        <button className="mt-2 text-xs font-semibold text-brand-700" onClick={() => setShowDone((x) => !x)}>
+          {showDone ? 'اخفي اللي خلص' : `اعرض اللي خلص (${done})`}
+        </button>
+      )}
       {open === 'rules' && <RulesModal onClose={() => setOpen(null)} onDone={refresh} />}
       {open === 'tshirt' && <TshirtModal volunteerId={volunteerId} onClose={() => setOpen(null)} onDone={refresh} />}
       {(open === 'minicamp' || open === 'camp' || open === 'graduation') && (
@@ -238,24 +245,15 @@ export function CampSignup() {
   const qc = useQueryClient()
   const today = cairoToday()
   const q = useQuery({
-    queryKey: ['camps', 'upcoming'],
+    queryKey: ['camps', 'upcoming', today],
     queryFn: async () => {
-      const [camps, mine] = await Promise.all([
-        supabase.from('camps').select('*').gte('camp_date', today).order('camp_date'),
-        supabase.from('camp_registrations').select('camp_id, status'),
-      ])
-      if (camps.error) throw camps.error
-      if (mine.error) throw mine.error
-      const seats = await Promise.all(
-        (camps.data as Camp[]).map(async (c) => {
-          const { data } = await supabase.rpc('camp_seats', { p_camp: c.id })
-          return [c.id, (data as { confirmed: number; waitlist: number }[] | null)?.[0] ?? { confirmed: 0, waitlist: 0 }] as const
-        }),
-      )
+      const { data, error } = await supabase.rpc('my_camps')
+      if (error) throw error
+      const rows = data as (Camp & { confirmed: number; waitlist: number; my_status: string | null })[]
       return {
-        camps: camps.data as Camp[],
-        mine: new Map((mine.data as { camp_id: string; status: string }[]).map((r) => [r.camp_id, r.status])),
-        seats: new Map(seats),
+        camps: rows as Camp[],
+        mine: new Map(rows.filter((r) => r.my_status).map((r) => [r.id, r.my_status!])),
+        seats: new Map(rows.map((r) => [r.id, { confirmed: r.confirmed, waitlist: r.waitlist }])),
       }
     },
   })
@@ -272,7 +270,7 @@ export function CampSignup() {
     onError: toastError,
   })
   if (q.isLoading) return <Spinner />
-  if (!q.data?.camps.length) return <p className="text-sm text-muted">مفيش كامب جاي دلوقتي. هيوصلك إشعار أول ما يتحدد ميعاد.</p>
+  if (!q.data?.camps.length) return <p className="text-sm text-muted">مفيش ميعاد جاي ليك دلوقتي. هيوصلك إشعار أول ما يتحدد. (الكامب لـ «مشروع مسئول»، وحفلة التخرج للي حضر الكامب)</p>
   return (
     <div className="space-y-3">
       {q.data.camps.map((c) => {

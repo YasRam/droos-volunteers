@@ -49,8 +49,8 @@ const EVAL_GROUPS: { group: string; cols: { key: keyof EvalRow; label: string; t
       { key: 'classes', label: 'عدد الحصص' },
       { key: 'foundation', label: 'التأسيس' },
       { key: 'content', label: 'تحضير محتوى' },
-      { key: 'exam_primary', label: 'امتحان 4–6 ب' },
-      { key: 'exam_prep', label: 'امتحان 1–3 ع' },
+      { key: 'exam_primary', label: 'امتحان ابتدائي' },
+      { key: 'exam_prep', label: 'امتحان (أي سنة تانية)' },
     ],
   },
   { group: 'تنظيم', cols: [{ key: 'organizers', label: 'متطوعين التنظيم' }] },
@@ -103,7 +103,7 @@ const EVAL_GROUPS: { group: string; cols: { key: keyof EvalRow; label: string; t
 async function sendToSheet(report: 'eval' | 'meetings', month: string) {
   const { data: urlRow } = await supabase.from('app_settings').select('value').eq('key', 'sheets_webapp_url').maybeSingle()
   const url = urlRow?.value as string | undefined
-  if (!url) throw { message: 'لسه مفيش ربط بالشيتات. حط لينك السكريبت في تبويب «ربط الشيتات».' }
+  if (!url) throw { message: 'الكتابة الفورية في الشيت محتاجة «لينك السكريبت» في «ربط الشيتات». من غيره الشيت بيتحدّث لوحده كل ساعة.' }
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
   if (!token) throw { message: 'ادخل الموقع تاني' }

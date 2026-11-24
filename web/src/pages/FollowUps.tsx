@@ -33,7 +33,7 @@ export default function FollowUps() {
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<Participation | null>(null)
   const [groupForm, setGroupForm] = useState(false)
-  const [view, setView] = useState<'person' | 'day'>('person')
+  const [view, setView] = useState<'person' | 'day'>('day')
   const navigate = useNavigate()
 
   const q = useQuery({
@@ -134,8 +134,8 @@ export default function FollowUps() {
         value={view}
         onChange={(v) => setView(v as 'person' | 'day')}
         tabs={[
-          { value: 'person', label: 'بالمتطوع' },
           { value: 'day', label: 'باليوم' },
+          { value: 'person', label: 'بالمتطوع' },
         ]}
       />
       {view === 'day' && !q.isLoading ? (

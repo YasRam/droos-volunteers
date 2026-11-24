@@ -33,6 +33,7 @@ import type { Notification } from '@/lib/types'
 import { fmtDateTime } from '@/lib/data'
 import { PageErrorBoundary } from '@/components/PageErrorBoundary'
 import { LangSwitch } from '@/components/LangSwitch'
+import { PasswordButton } from '@/components/PasswordModal'
 import { PushSwitch } from './PushToggle'
 
 interface NavItem {
@@ -162,6 +163,7 @@ export default function Layout() {
             <button onClick={signOut} className="flex items-center gap-1 text-sm text-red-600">
               <LogOut className="size-4" /> خروج
             </button>
+            <PasswordButton email={me?.email} />
             <LangSwitch />
           </div>
         </div>
@@ -261,6 +263,7 @@ export default function Layout() {
                 </NavLink>
               ))}
               <LangSwitch stacked />
+              <PasswordButton stacked email={me?.email} />
               <button onClick={signOut} className="flex flex-col items-center gap-1 rounded-xl p-3 text-xs font-semibold text-red-600 hover:bg-red-50">
                 <LogOut className="size-5" />
                 خروج

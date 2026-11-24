@@ -18,6 +18,8 @@ create or replace function auth.uid() returns uuid language sql stable as $$
 $$;
 create or replace function cron.schedule(job text, sched text, cmd text) returns bigint
 language sql as $$ select 1::bigint $$;
+create table if not exists cron.job (jobid bigint, jobname text);
+create or replace function cron.unschedule(id bigint) returns boolean language sql as $$ select true $$;
 
 grant usage on schema public, extensions, auth to anon, authenticated, service_role;
 grant execute on all functions in schema auth to anon, authenticated, service_role;

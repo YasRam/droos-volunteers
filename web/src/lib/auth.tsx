@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Session } from '@supabase/supabase-js'
 import { isDevAuth, supabase } from './supabase'
@@ -11,8 +11,12 @@ interface AuthState {
   me: MyContext | null
   /** signed in and the email belongs to a volunteer, staff member or committee leader */
   known: boolean
+  /** my_context failed (network, waking up) — not the same as an unknown email */
+  failed: boolean
+  retry: () => void
   isLeader: boolean
   signIn: () => Promise<void>
+  signInWithPassword: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -22,16 +26,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient()
   const [session, setSession] = useState<Session | null>(null)
   const [ready, setReady] = useState(isDevAuth)
+  const userId = useRef<string | null>(null)
 
   useEffect(() => {
     if (isDevAuth) return
     supabase.auth.getSession().then(({ data }) => {
+      userId.current = data.session?.user.id ?? null
       setSession(data.session)
       setReady(true)
     })
+    // Supabase fires events on every token refresh and when the tab comes back;
+    // only a different person (or signing out) should drop the cached data.
     const { data } = supabase.auth.onAuthStateChange((_event, s) => {
+      const id = s?.user.id ?? null
+      if (id !== userId.current) {
+        userId.current = id
+        qc.clear()
+      }
       setSession(s)
-      qc.clear()
     })
     return () => data.subscription.unsubscribe()
   }, [qc])
@@ -42,6 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: ['me', session?.user.id ?? 'dev'],
     enabled: ready && signedIn,
     staleTime: 5 * 60_000,
+    retry: 4,
+    retryDelay: (n) => Math.min(1000 * 2 ** n, 8000),
     queryFn: async () => {
       const { data, error } = await supabase.rpc('my_context')
       if (error) throw error
@@ -58,12 +72,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ready: ready && (!signedIn || !meQuery.isLoading),
     me,
     known,
+    failed: meQuery.isError && !meQuery.data,
+    retry: () => void meQuery.refetch(),
     isLeader,
     signIn: async () => {
       await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: window.location.origin + import.meta.env.BASE_URL, queryParams: { prompt: 'select_account' } },
       })
+    },
+    signInWithPassword: async (email, password) => {
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password })
+      if (error) throw new Error(/invalid/i.test(error.message) ? 'الإيميل أو كلمة السر غلط' : error.message)
     },
     signOut: async () => {
       await supabase.auth.signOut()

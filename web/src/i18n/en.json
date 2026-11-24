@@ -1254,7 +1254,39 @@
 "ميعاد انترفيو (": "Interview booked (",
 "نتيجة الانترفيو": "Interview result",
 "نتيجة الانترفيو ·": "Interview result ·",
-"هيفضل في القايمة": "Stays in the list"
+"هيفضل في القايمة": "Stays in the list",
+"8 حروف أو أرقام على الأقل": "At least 8 letters or numbers",
+"اتأكد إن النت شغال وجرب تاني.": "Check your internet connection and try again.",
+"اتأكد من التاريخ، غالباً قبل الحصة": "Check the date — usually before the class",
+"اتحضّر المحتوى يوم": "Content prepared on",
+"اتحفظت. تقدر تدخل بالإيميل وكلمة السر من أي جهاز": "Saved. You can sign in with your email and password from any device",
+"اتسجل حضورك": "Your attendance was recorded",
+"اخفي اللي خلص": "Hide completed",
+"اكتبها تاني": "Type it again",
+"الإيميل أو كلمة السر غلط": "Wrong email or password",
+"الانترفيو": "Interview",
+"الدخول بالإيميل وكلمة السر": "Sign in with email and password",
+"الكتابة الفورية في الشيت محتاجة «لينك السكريبت» في «ربط الشيتات». من غيره الشيت بيتحدّث لوحده كل ساعة.": "Writing to the sheet right away needs the «Script link» in «Link sheets». Without it the sheet updates by itself every hour.",
+"امتحان (أي سنة تانية)": "Exam (any other grade)",
+"امتحان ابتدائي": "Primary exam",
+"بتسجّل لنفسك (آخر 6 أيام)، والطلب بيستنى موافقة الإدارة": "You're registering yourself (last 6 days); the request waits for approval",
+"بعد ما تحطها تقدر تدخل من أي جهاز بالإيميل": "After setting it you can sign in from any device with the email",
+"بيتسجل معاها «تحضير محتوى»": "Also records «Content preparation»",
+"جرب تاني": "Try again",
+"خلصت كل المراحل 🎉": "All stages done 🎉",
+"دخول": "Sign in",
+"طلبك وصل، والإدارة هتوافق عليه": "Request received; the admins will approve it",
+"عدد الاجتماعات لكل لجنة": "Meetings per committee",
+"كلمة السر": "Password",
+"كلمة السر الجديدة": "New password",
+"كلمة سر للدخول": "Sign-in password",
+"محتاجين قرار: مقبول ولا لأ. افتح المتطوع وغيّر النتيجة من «الحالة والمقابلة».": "They need a decision: accepted or not. Open the volunteer and change the result in «Status & interview».",
+"مش زي الأولى": "Doesn't match",
+"مش قادرين نوصل للسيرفر": "Can't reach the server",
+"مفيش جديد، كلهم متسجلين نفس النشاط قبل كده": "Nothing new — all were already registered for this activity",
+"مفيش كلمة سر؟ ادخل بجوجل مرة واحدة وحطها من «كلمة السر» في القايمة.": "No password? Sign in with Google once and set one from «Password» in the menu.",
+"مفيش ميعاد جاي ليك دلوقتي. هيوصلك إشعار أول ما يتحدد. (الكامب لـ «مشروع مسئول»، وحفلة التخرج للي حضر الكامب)": "No upcoming date for you now. You'll be notified once one is set. (The camp is for «Responsible-in-training», the graduation party for camp attendees)",
+"وكلمة السر من غير حساب جوجل.": "and password without a Google account."
 },
 "patterns": [
 [
@@ -1764,6 +1796,34 @@
 [
 "نتيجة الانترفيو · {0}",
 "Interview result · {0}"
+],
+[
+"اتخطّينا (متسجلين قبل كده): {0}",
+"Skipped (already registered): {0}"
+],
+[
+"اعرض اللي خلص ({0})",
+"Show completed ({0})"
+],
+[
+"عدّى عليهم 3 شهور في «اختبار» ({0})",
+"3+ months in «Trial» ({0})"
+],
+[
+"· {0} يوم عائلي",
+"· {0} family days"
+],
+[
+"{0}: {1} اجتماع",
+"{0}: {1} meetings"
+],
+[
+"تاريخ {0}",
+"{0} date"
+],
+[
+"حضر {0}",
+"Attended {0}"
 ]
 ],
 "words": {

@@ -54,6 +54,7 @@ export default function Home() {
       {p.volunteerId && <StagesCard volunteerId={p.volunteerId} self />}
       {p.volunteerId && <MyNumbers volunteerId={p.volunteerId} />}
       {(p.staff || p.viewAll) && <TodayNumbers today={today} full={p.viewAll} canReview={p.canReview} />}
+      {(p.leader || p.can('hr.view')) && <TestOverdue />}
       {seesVolunteers && <VolunteerNumbers vols={vols.data} full={p.viewAll} leader={!p.viewAll && p.leader} today={today} />}
       {seesVolunteers && <Birthdays vols={vols.data} today={today} />}
       {p.viewAll && <LongTest vols={vols.data} today={today} canEdit={p.can('hr.edit')} />}
@@ -364,5 +365,37 @@ function LongTest({ vols, today, canEdit }: { vols?: VolunteerWithStats[]; today
         </Card>
       )}
     </Section>
+  )
+}
+
+/** Volunteers 3 months or more in «اختبار»: the leader decides. */
+function TestOverdue() {
+  const q = useQuery({
+    queryKey: ['test-overdue'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('test_overdue')
+      if (error) throw error
+      return data as { id: string; code: string; full_name_ar: string; committee: string | null; since: string }[]
+    },
+  })
+  const rows = q.data ?? []
+  if (!rows.length) return null
+  return (
+    <Card className="border-orange-200 bg-orange-50">
+      <p className="font-bold">عدّى عليهم 3 شهور في «اختبار» ({rows.length})</p>
+      <p className="text-xs text-muted">محتاجين قرار: مقبول ولا لأ. افتح المتطوع وغيّر النتيجة من «الحالة والمقابلة».</p>
+      <ul className="mt-2 max-h-64 divide-y divide-orange-100 overflow-y-auto text-sm">
+        {rows.map((r) => (
+          <li key={r.id}>
+            <Link to={`/volunteers/${r.id}`} className="flex items-center justify-between gap-2 py-1.5 hover:text-brand-700">
+              <span className="truncate font-semibold">{r.full_name_ar}</span>
+              <span className="shrink-0 text-xs text-muted">
+                {r.committee ?? '—'} · من {fmtShort(r.since)}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Card>
   )
 }

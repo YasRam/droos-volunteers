@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { CertificateCard } from '@/components/CertificateCard'
 import { VolunteerFacts } from '@/components/VolunteerFacts'
+import MyActivities from '@/pages/MyActivities'
 import { Button, Card, Field, Input, PageHeader, Spinner, Textarea } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
 import { useSetting } from '@/lib/data'
@@ -207,6 +208,7 @@ export default function MyProfile() {
               </Button>
             </form>
           </Card>
+          <MyActivities embedded />
         </div>
         <div className="space-y-4">
           <VolunteerFacts v={v} />

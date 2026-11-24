@@ -1,12 +1,16 @@
 import { useState } from 'react'
-import { Button } from '@/components/ui'
+import { Button, Input } from '@/components/ui'
 import { LangSwitch } from '@/components/LangSwitch'
 import { useAuth } from '@/lib/auth'
 import { toastError } from '@/lib/errors'
 
 export default function Login() {
-  const { signIn } = useAuth()
+  const { signIn, signInWithPassword } = useAuth()
   const [loading, setLoading] = useState(false)
+  const [withPw, setWithPw] = useState(false)
+  const [email, setEmail] = useState('')
+  const [pw, setPw] = useState('')
+  const [busy, setBusy] = useState(false)
   return (
     <div className="grid min-h-dvh place-items-center bg-gradient-to-b from-brand-50 to-surface px-6">
       <div className="w-full max-w-sm text-center">
@@ -30,6 +34,35 @@ export default function Login() {
           <GoogleIcon /> الدخول بحساب جوجل
         </Button>
         <p className="mt-4 text-xs text-muted">ادخل بنفس الإيميل اللي مسجّل بيه في النشاط</p>
+        {withPw ? (
+          <form
+            className="mt-6 space-y-2 text-start"
+            onSubmit={async (e) => {
+              e.preventDefault()
+              setBusy(true)
+              try {
+                await signInWithPassword(email, pw)
+              } catch (err) {
+                toastError(err)
+              } finally {
+                setBusy(false)
+              }
+            }}
+          >
+            <Input type="email" autoComplete="username" placeholder="الإيميل" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" required />
+            <Input type="password" autoComplete="current-password" placeholder="كلمة السر" value={pw} onChange={(e) => setPw(e.target.value)} dir="ltr" required />
+            <Button type="submit" variant="secondary" className="w-full" loading={busy}>
+              دخول
+            </Button>
+            <p className="text-xs text-muted">
+              مفيش كلمة سر؟ ادخل بجوجل مرة واحدة وحطها من «كلمة السر» في القايمة.
+            </p>
+          </form>
+        ) : (
+          <button className="mt-6 text-sm font-semibold text-brand-700" onClick={() => setWithPw(true)}>
+            الدخول بالإيميل وكلمة السر
+          </button>
+        )}
         <LangSwitch className="mx-auto mt-6" />
       </div>
     </div>

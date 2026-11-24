@@ -1,16 +1,17 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, Search, UserPlus, X } from 'lucide-react'
+import { Search, UserPlus, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import ActivityFields, { activitySchema, checkActivity, eventForm, toActivityPayload, type ActivityValues } from '@/components/ActivityFields'
 import { Button, Card, Input, PageHeader } from '@/components/ui'
 import { useAuth, usePermissions } from '@/lib/auth'
-import { addDays, cairoToday, fmtDate, useDirectory, useLookups } from '@/lib/data'
+import { addDays, cairoToday, useDirectory, useLookups } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
+
+const fmtNames = (ids: string[], names: Map<string, string>) => ids.map((id) => names.get(id) ?? id).join('، ')
 
 interface Outcome {
   inserted: number
@@ -33,8 +34,7 @@ export default function RegisterActivity() {
   const lookups = useLookups()
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<string[]>(() => (p.volunteerId ? [p.volunteerId] : []))
-  const [outcome, setOutcome] = useState<Outcome | null>(null)
-  const defaults = { activity_date: today, event: '', place: 'الفرع' }
+  const defaults = { activity_date: today, event: '', place: 'الفرع', with_content: true, content_date: today }
   const form = useForm<ActivityValues>({ resolver: zodResolver(activitySchema), defaultValues: defaults })
 
   const names = useMemo(() => {
@@ -56,18 +56,21 @@ export default function RegisterActivity() {
       const out = await saveOne(v)
       // «حضّرت محتوى الحصة دي كمان»: the same class counted once more as content preparation
       if (v.with_content && eventForm(lookups.data?.rows, v.event) === 'teaching') {
-        await saveOne({ ...v, event: 'تحضير محتوى', beneficiaries: '', with_content: false }, true)
+        await saveOne({ ...v, event: 'تحضير محتوى', activity_date: v.content_date || v.activity_date, beneficiaries: '', with_content: false }, true)
       }
       return out
     },
     onSuccess: (r) => {
-      setOutcome(r)
       qc.invalidateQueries({ queryKey: ['followups'] })
       qc.invalidateQueries({ queryKey: ['my-activities'] })
       qc.invalidateQueries({ queryKey: ['my-stats'] })
       qc.invalidateQueries({ queryKey: ['volunteers'] })
       qc.invalidateQueries({ queryKey: ['lookups'] })
-      if (r.inserted) toast.success(r.pending ? 'اتبعت الطلب، مستني موافقة' : `اتسجل ${r.inserted}`)
+      const skipped = r.skipped.length ? `اتخطّينا (متسجلين قبل كده): ${fmtNames(r.skipped, names)}` : undefined
+      if (r.pending) toast.success('طلبك وصل، والإدارة هتوافق عليه', { description: skipped })
+      else if (r.inserted) toast.success(r.inserted === 1 && !canPickOthers ? 'اتسجل حضورك' : `اتسجل ${r.inserted}`, { description: skipped })
+      else toast.info('مفيش جديد، كلهم متسجلين نفس النشاط قبل كده')
+      again()
     },
     onError: toastError,
   })
@@ -78,7 +81,7 @@ export default function RegisterActivity() {
       if (!canPickOthers) {
         const { data, error } = await supabase
           .from('participations')
-          .insert({ ...toActivityPayload(v, kind), activity_date: today, volunteer_id: p.volunteerId })
+          .insert({ ...toActivityPayload(v, kind), volunteer_id: p.volunteerId })
           .select('status')
           .single()
         if (error) throw error
@@ -92,44 +95,9 @@ export default function RegisterActivity() {
     }
   }
 
-  const again = () => {
-    setOutcome(null)
+  function again() {
     setSelected(p.volunteerId && !canPickOthers ? [p.volunteerId] : [])
     form.reset(defaults)
-  }
-
-  if (outcome) {
-    return (
-      <Card className="mx-auto mt-6 max-w-md text-center">
-        <CheckCircle2 className="mx-auto size-14 text-emerald-500" />
-        <h1 className="mt-3 text-xl font-bold">
-          {outcome.pending ? 'طلبك وصل' : outcome.inserted ? `اتسجل ${outcome.inserted === 1 && !canPickOthers ? 'حضورك' : outcome.inserted}` : 'مفيش جديد'}
-        </h1>
-        <p className="mt-1 text-sm text-muted">
-          {outcome.pending ? 'الإدارة هتوافق عليه، وهيوصلك إشعار.' : outcome.inserted ? 'المشاركة اتحسبت على طول.' : 'كلهم متسجلين نفس النشاط قبل كده.'}
-        </p>
-        {outcome.skipped.length > 0 && (
-          <div className="mt-3 rounded-xl bg-surface p-3 text-start text-sm">
-            <p className="text-muted">اتخطّينا دول لأنهم متسجلين نفس النشاط قبل كده:</p>
-            <ul className="mt-1 list-disc ps-5">
-              {outcome.skipped.map((id) => (
-                <li key={id}>{names.get(id) ?? id}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <div className="mt-5 flex justify-center gap-2">
-          <Button variant="secondary" onClick={again}>
-            تسجيل تاني
-          </Button>
-          {p.volunteerId && (
-            <Link to="/me/activities">
-              <Button>أنشطتي</Button>
-            </Link>
-          )}
-        </div>
-      </Card>
-    )
   }
 
   return (
@@ -139,7 +107,7 @@ export default function RegisterActivity() {
         subtitle={
           canPickOthers
             ? 'سجّل لنفسك أو لأي عدد من المتطوعين. المشاركة بتتقبل على طول، واللي متسجل نفس النشاط قبل كده بيتخطّى.'
-            : `${fmtDate(today)} · بتسجّل لنفسك، والطلب بيستنى موافقة الإدارة`
+            : 'بتسجّل لنفسك (آخر 6 أيام)، والطلب بيستنى موافقة الإدارة'
         }
       />
       <form onSubmit={form.handleSubmit((v) => checkActivity(form, lookups.data?.rows) && save.mutate(v))} className="space-y-4">
@@ -194,8 +162,7 @@ export default function RegisterActivity() {
         <Card>
           <ActivityFields
             form={form}
-            dateLocked={!canPickOthers}
-            dateMin={canPickOthers && p.organizer && !p.full ? addDays(today, -7) : undefined}
+            dateMin={canPickOthers && !p.organizer ? undefined : addDays(today, -6)}
             dateMax={today}
           />
         </Card>

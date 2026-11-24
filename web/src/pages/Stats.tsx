@@ -78,9 +78,9 @@ function Overview() {
           <ResponsiveContainer>
             <BarChart data={byMonth} onClick={(e) => e?.activeLabel && setMonth(byMonth.find((b) => b.month === e.activeLabel)?.key ?? month)}>
               <CartesianGrid vertical={false} stroke="#e3e8ec" />
-              <XAxis dataKey="month" tick={{ fontSize: 11, fontFamily: 'Cairo' }} />
+              <XAxis dataKey="month" tick={{ fontSize: 11, fontFamily: 'IBM Plex Sans Arabic' }} />
               <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={32} />
-              <Tooltip formatter={(v) => [v, 'مشاركة']} labelStyle={{ fontFamily: 'Cairo' }} />
+              <Tooltip formatter={(v) => [v, 'مشاركة']} labelStyle={{ fontFamily: 'IBM Plex Sans Arabic' }} />
               <Bar dataKey="value" fill="#00838f" radius={[6, 6, 0, 0]} cursor="pointer" />
             </BarChart>
           </ResponsiveContainer>
@@ -120,9 +120,9 @@ function NewVolunteers() {
         <ResponsiveContainer>
           <BarChart data={data}>
             <CartesianGrid vertical={false} stroke="#e3e8ec" />
-            <XAxis dataKey="month" tick={{ fontSize: 11, fontFamily: 'Cairo' }} />
+            <XAxis dataKey="month" tick={{ fontSize: 11, fontFamily: 'IBM Plex Sans Arabic' }} />
             <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={32} />
-            <Tooltip formatter={(v) => [v, 'متطوع جديد']} labelStyle={{ fontFamily: 'Cairo' }} />
+            <Tooltip formatter={(v) => [v, 'متطوع جديد']} labelStyle={{ fontFamily: 'IBM Plex Sans Arabic' }} />
             <Bar dataKey="value" fill="#1e88e5" radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>

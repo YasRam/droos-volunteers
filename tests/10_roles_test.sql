@@ -71,7 +71,13 @@ insert into participations (volunteer_id, activity_date, event, subject, grade)
   values (app.my_volunteer_id(), app.today(), 'تدريس', 'لغة عربية', '3 ع');
 select t.ok((select count(*) from participations) = 2, 'same subject, different grade is allowed');
 select t.fails($$insert into participations (volunteer_id, activity_date, event)
-  values (app.my_volunteer_id(), app.today() - 1, 'تنظيم')$$, 'volunteer cannot back-date');
+  values (app.my_volunteer_id(), app.today() - 7, 'تنظيم')$$, 'volunteer cannot go back more than 6 days');
+savepoint six;
+insert into participations (volunteer_id, activity_date, event) values (app.my_volunteer_id(), app.today() - 6, 'تنظيم');
+select t.ok((select status from participations where activity_date = app.today() - 6) = 'pending', 'volunteer can check in up to 6 days back');
+rollback to savepoint six;
+select t.fails($$insert into participations (volunteer_id, activity_date, event)
+  values (app.my_volunteer_id(), app.today() + 1, 'تنظيم')$$, 'no future dates');
 select t.fails($$insert into participations (volunteer_id, activity_date, event)
   values ((select id from volunteer_directory limit 1), app.today(), 'تنظيم')$$, 'volunteer cannot check in someone else');
 select t.ok((select count(*) from audit_log) = 0, 'volunteer cannot read the log');
@@ -102,7 +108,7 @@ insert into participations (volunteer_id, activity_date, event)
 select t.ok((select p.status from participations p join volunteer_directory d on d.id = p.volunteer_id where d.code = 'V9003') = 'accepted', 'organizer entry is accepted');
 select t.ok((select status from volunteer_directory where code = 'V9003') = 'تحت المتابعة', 'participation brings volunteer back to follow-up');
 select t.fails($$insert into participations (volunteer_id, activity_date, event)
-  values ((select id from volunteer_directory where code = 'V9002'), app.today() - 10, 'تنظيم')$$, 'organizer limited to 7 days');
+  values ((select id from volunteer_directory where code = 'V9002'), app.today() - 10, 'تنظيم')$$, 'organizer limited to 6 days');
 select t.ok(
   (select (public.register_activity(
       jsonb_build_object('event', 'تنظيم', 'activity_date', app.today()),
@@ -148,7 +154,10 @@ update volunteer_hr set status_changed_at = now() - interval '100 days'
 select app.run_daily_jobs();
 select t.ok((select status from volunteers where code = 'V9004') = 'خارج المتابعة', 'no participation for 90 days → خارج المتابعة');
 select t.ok((select status from volunteers where code = 'V9001') = 'تحت المتابعة', 'active volunteer stays under follow-up');
-select t.ok((select acceptance from volunteer_hr h join volunteers v on v.id = h.volunteer_id where v.code = 'V9002') = 'مقبول', 'اختبار for 90 days → مقبول');
+select t.ok((select acceptance from volunteer_hr h join volunteers v on v.id = h.volunteer_id where v.code = 'V9002') = 'اختبار', 'اختبار is not accepted automatically');
+select app.alert_committee_tests();
+select t.ok((select test_alerted_at is not null from volunteer_hr h join volunteers v on v.id = h.volunteer_id where v.code = 'V9002'), '3 months in اختبار → leaders alerted');
+select t.ok(app.alert_committee_tests() = 0, 'alerted only once');
 select t.ok(app.run_monthly_summary() >= 1, 'monthly summary sent');
 
 
@@ -405,7 +414,7 @@ select t.ok((select not takes_attendance from schedule_slots where place = 'قا
 -- ---------- stages, camps, t-shirts, rules ----------
 insert into camps (kind, camp_date, capacity) values ('ميني كامب', app.today() + 10, 1);
 select id as v9001 from volunteers where code = 'V9001' \gset
-update volunteers set bought_tshirt = false where code in ('V9001', 'V9002');
+update volunteers set bought_tshirt = false, attended_minicamp = false where code in ('V9001', 'V9002');
 begin;
 set local role authenticated;
 select t.login('vol1@test.com');
@@ -539,5 +548,32 @@ select recruit_interview(:'newv', 'اختبار', '2026-12-02', :'v9003', null);
 select t.ok((select prev_acceptance from recruit_log where volunteer_id = :'newv' and outcome = 'اختبار') = 'معتذر', 'second interview shows the old result');
 select t.ok((select count(*) from recruit_log where volunteer_id = :'newv') = 9, 'full history kept');
 commit;
+
+-- ---------- feedback round (20) ----------
+begin;
+set local role authenticated;
+select t.login('org@test.com');
+select public.register_activity(jsonb_build_object('event', 'أجتماع', 'subject', 'الميديا', 'activity_date', app.today()), array[:'v9001'::uuid, :'v9003'::uuid]);
+commit;
+select t.ok((select count(*) from participations p join meetings m on m.id = p.meeting_id where m.committee = 'الميديا' and p.activity_date = app.today()) = 2, 'meeting from check-in grouped into one meeting');
+update camps set capacity = null;
+insert into camps (kind, camp_date) values ('كامب', app.today() + 5), ('حفلة تخرج', app.today() + 6);
+update volunteers set status = 'تحت المتابعة', attended_camp = false, attended_graduation = false where code = 'V9002';
+begin;
+set local role authenticated;
+select t.login('vol2@test.com');
+select t.ok(not exists (select 1 from my_camps() where kind in ('كامب', 'حفلة تخرج')), 'camp and graduation hidden from those not eligible');
+select t.fails($$select register_camp((select id from camps where kind = 'كامب'))$$, 'camp only for مشروع مسئول');
+commit;
+update volunteers set status = 'مشروع مسئول' where code = 'V9002';
+begin;
+set local role authenticated;
+select t.login('vol2@test.com');
+select t.ok(exists (select 1 from my_camps() where kind = 'كامب'), 'مشروع مسئول sees the camp');
+select t.ok(register_camp((select id from camps where kind = 'كامب')) = 'confirmed', 'مشروع مسئول registers');
+commit;
+update volunteers set attended_minicamp = true, attended_camp = true where code = 'V9002';
+update volunteers set attended_graduation = true where code = 'V9002';
+select t.ok((select status::text from volunteers where code = 'V9002') = 'مسئول', 'graduation → مسئول');
 
 \echo ALL ROLE TESTS PASSED

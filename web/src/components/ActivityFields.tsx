@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import { z } from 'zod'
 import { Field, Input, Select, Textarea } from './ui'
@@ -31,6 +31,7 @@ export const activitySchema = z.object({
   duration_minutes: z.string().optional(),
   notes: z.string().optional(),
   with_content: z.boolean().optional(),
+  content_date: z.string().optional(),
 })
 
 export type ActivityValues = z.infer<typeof activitySchema>
@@ -135,6 +136,11 @@ export default function ActivityFields({
   // Types already used with this event first, then the rest
   const subjects = [...new Set([...(lookups.data?.list('نوع الحدث', event) ?? []), ...(lookups.data?.list('نوع الحدث') ?? [])])]
   const grades = lookups.data?.list('السنة الدراسية') ?? []
+  // Content preparation follows the class date until it is changed by hand
+  const day = watch('activity_date')
+  useEffect(() => {
+    if (!formState.dirtyFields.content_date) setValue('content_date', day)
+  }, [day, formState.dirtyFields.content_date, setValue])
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -172,10 +178,17 @@ export default function ActivityFields({
             <Input type="number" inputMode="numeric" min={1} {...register('beneficiaries')} />
           </Field>
           {event !== 'تحضير محتوى' && (
-            <label className="flex items-center gap-2 self-end pb-2 text-sm">
-              <input type="checkbox" className="size-4 accent-brand-700" {...register('with_content')} />
-              حضّرت محتوى الحصة دي كمان
-            </label>
+            <div className="space-y-2 rounded-xl bg-surface p-3 sm:col-span-2">
+              <label className="flex items-center gap-2 text-sm font-semibold">
+                <input type="checkbox" className="size-4 accent-brand-700" {...register('with_content')} />
+                بيتسجل معاها «تحضير محتوى»
+              </label>
+              {watch('with_content') && (
+                <Field label="اتحضّر المحتوى يوم" hint="اتأكد من التاريخ، غالباً قبل الحصة">
+                  <Input type="date" {...register('content_date')} min={dateMin} max={watch('activity_date') || dateMax} />
+                </Field>
+              )}
+            </div>
           )}
         </>
       ) : kind === 'calls' ? (
