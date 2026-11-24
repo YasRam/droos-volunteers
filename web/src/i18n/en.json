@@ -462,7 +462,7 @@
 "ربط": "Link",
 "رد على طلب شهادة": "answered the certificate request of",
 "رفض": "Reject",
-"رفض الانترفيو": "Rejected at interview",
+"رفض الانترفيو": "Refused the interview",
 "رقم أكبر من صفر": "A number above zero",
 "رقم الهاتف": "Phone number",
 "رقم الواتساب": "WhatsApp number",
@@ -1202,7 +1202,59 @@
 "مش مستخدمة في أي بيانات، فمفيش حاجة هتتأثر.": "Not used in any data, so nothing will be affected.",
 "نوع الحصة": "Class type",
 "يتنقلوا لـ": "Move them to",
-"يفضلوا زي ما هما بالاسم القديم": "Keep them as they are with the old name"
+"يفضلوا زي ما هما بالاسم القديم": "Keep them as they are with the old name",
+"· اتسجل": "· registered",
+"· فات، سجّل النتيجة": "· passed, record the result",
+"اتعمل انترفيو": "Interviewed",
+"اتعمل انترفيو (": "Interviewed (",
+"اختار النتيجة": "Pick the result",
+"اختار نتيجة المكالمة": "Pick the call result",
+"التاريخ (": "History (",
+"التواصل مع المتطوعين الجداد، ومواعيد الانترفيو ونتايجها. كل خطوة بتتسجل في تاريخ المتطوع.": "Contacting new volunteers, interview dates and results. Every step is saved in the volunteer's history.",
+"الجداد": "New volunteers",
+"اللي رفض الانترفيو أو اترفض أو اتفصل أو اعتذر نهائي. بيرجع لوحده لو حالته اتغيرت من ملفه، أو بزرار «رجّعه للتواصل».": "Those who refused the interview, were rejected, dismissed or withdrew for good. They come back automatically if their status changes in their profile, or with «Back to calls».",
+"المكالمة اتسجلت": "Call recorded",
+"الميعاد اتسجل": "Date recorded",
+"الميعاد:": "Date:",
+"النتيجة اتسجلت": "Result recorded",
+"بتتحسبله مشاركة «انترفيو»": "Gets an «interview» participation",
+"بيبدأ فترة الاختبار": "Starts the trial period",
+"بيتقفل ويختفي": "Closed and hidden",
+"بيرجع لقايمة التواصل بملاحظاته": "Goes back to the call list with its notes",
+"بيروح لقايمة «ميعاد انترفيو»": "Goes to the «Interview booked» list",
+"بيظهر أول 200. استخدم البحث.": "Showing the first 200. Use search.",
+"تاريخ الانترفيو": "Interview date",
+"تاريخ التواصل والانترفيو": "Calls & interview history",
+"ترجّع": "Return",
+"حدد ميعاد": "Date set",
+"حفظ النتيجة": "Save the result",
+"رجع لقايمة التواصل": "Back to the call list",
+"رجوع": "Back",
+"رجّعه للتواصل": "Back to calls",
+"رد، ولسه هيتحدد ميعاد": "Answered; date still to be set",
+"رقم غلط": "Wrong number",
+"سجّل مكالمة": "Record a call",
+"غيّر الميعاد": "Change the date",
+"كان:": "Was:",
+"لقايمة التواصل؟": "to the call list?",
+"للتواصل": "To call",
+"للتواصل (": "To call (",
+"مثلاً: هيرد بعد الامتحانات": "e.g. will answer after exams",
+"محضرش": "No-show",
+"مردش": "No answer",
+"مع": "with",
+"مفيش حد مستني تواصل": "Nobody waiting for a call",
+"مفيش مواعيد انترفيو": "No interview dates",
+"مقفول": "Closed",
+"مقفول (": "Closed (",
+"مكالمة": "Call",
+"من غير نتيجة قبلها": "No earlier result",
+"ميعاد الانترفيو": "Interview date",
+"ميعاد انترفيو": "Interview booked",
+"ميعاد انترفيو (": "Interview booked (",
+"نتيجة الانترفيو": "Interview result",
+"نتيجة الانترفيو ·": "Interview result ·",
+"هيفضل في القايمة": "Stays in the list"
 },
 "patterns": [
 [
@@ -1672,6 +1724,46 @@
 [
 "الـ {0} سجل اللي فيهم «{1}» يحصلهم إيه؟",
 "What happens to the {0} records with «{1}»?"
+],
+[
+"اتعمل انترفيو ({0})",
+"Interviewed ({0})"
+],
+[
+"الميعاد: {0} ·",
+"Date: {0} ·"
+],
+[
+"ترجّع {0} لقايمة التواصل؟",
+"Return {0} to the call list?"
+],
+[
+"كان: {0}",
+"Was: {0}"
+],
+[
+"للتواصل ({0})",
+"To call ({0})"
+],
+[
+"مع {0} ·",
+"with {0} ·"
+],
+[
+"مقفول ({0})",
+"Closed ({0})"
+],
+[
+"مكالمة · {0}",
+"Call · {0}"
+],
+[
+"ميعاد انترفيو ({0})",
+"Interview booked ({0})"
+],
+[
+"نتيجة الانترفيو · {0}",
+"Interview result · {0}"
 ]
 ],
 "words": {

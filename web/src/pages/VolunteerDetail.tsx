@@ -9,6 +9,7 @@ import { Badge, Button, Card, Empty, Field, Input, PageHeader, RequestBadge, Sel
 import { VolunteerFacts } from '@/components/VolunteerFacts'
 import { VolunteerSelect } from '@/components/VolunteerPick'
 import { StagesCard } from '@/components/StagesCard'
+import { RecruitHistory, useRecruitLog } from '@/pages/Recruit'
 import { ContactLinks } from '@/components/VolunteerLink'
 import { useAuth, usePermissions } from '@/lib/auth'
 import { ageFrom, fmtShort, useLookups, useStatusOptions, whatsappLink, withCurrent } from '@/lib/data'
@@ -125,6 +126,7 @@ export default function VolunteerDetail() {
       {tab === 'interview' && (
         <div className="space-y-4">
           <Interview v={v} />
+          {p.can('hr.view') && <RecruitCard volunteerId={v.id} />}
           <FollowupCard v={v} canEdit={p.can('volunteers.edit')} canNote={p.can('volunteers.edit') || p.leader} />
         </div>
       )}
@@ -450,6 +452,19 @@ function FollowupCard({ v, canEdit, canNote }: { v: Volunteer; canEdit: boolean;
       <Button className="mt-4" onClick={() => save.mutate()} loading={save.isPending}>
         حفظ
       </Button>
+    </Card>
+  )
+}
+
+/** Calls and interviews over time, so a second interview shows the earlier result. */
+function RecruitCard({ volunteerId }: { volunteerId: string }) {
+  const log = useRecruitLog()
+  const rows = log.data?.get(volunteerId) ?? []
+  if (!rows.length) return null
+  return (
+    <Card>
+      <p className="font-bold text-brand-800">تاريخ التواصل والانترفيو</p>
+      <RecruitHistory logs={rows} />
     </Card>
   )
 }

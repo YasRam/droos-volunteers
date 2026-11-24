@@ -11,6 +11,7 @@ import {
   LogOut,
   FileBarChart,
   Tent,
+  UserPlus,
   CalendarCheck,
   Menu,
   Settings,
@@ -115,6 +116,7 @@ export default function Layout() {
     const list: NavItem[] = [{ to: '/', label: 'الرئيسية', icon: Home }]
     if (p.volunteerId || p.canRegisterActivity) list.push({ to: '/check-in', label: 'تسجيل حضور', icon: Hand })
     if (p.canReview || p.can('stages.manage') || p.can('certificates.review')) list.push({ to: '/requests', label: 'الطلبات', icon: Inbox, badge: pending.data })
+    if (p.can('hr.view')) list.push({ to: '/recruit', label: 'الجداد', icon: UserPlus })
     if (p.can('stages.manage') || p.can('stats.view')) list.push({ to: '/camps', label: 'الكامبات', icon: Tent })
     if (p.canSeeVolunteers) list.push({ to: '/volunteers', label: 'المتطوعين', icon: Users })
     if (p.viewAll || p.leader) list.push({ to: '/tree', label: 'الهيكل', icon: Network })

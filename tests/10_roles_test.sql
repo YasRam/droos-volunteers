@@ -498,4 +498,46 @@ select t.ok(not exists (select 1 from lookups where list = 'المكان' and va
 insert into schedule_slots (day, grade, subject, starts_at, ends_at, kind, audience) values ('الأحد', '5 ب', 'علوم', '10:00', '11:00', 'ورشة رسم', 'بنات بس');
 select t.ok(exists (select 1 from schedule_slots where kind = 'ورشة رسم'), 'class kind is free from the list');
 
+-- ---------- recruitment pipeline ----------
+insert into volunteers (full_name_ar, phone) values ('متطوع جديد للتجربة', '01000000123');
+select id as newv from volunteers where phone = '01000000123' \gset
+select t.ok((select recruit_status from volunteers where id = :'newv') = 'للتواصل', 'new volunteer enters the call list');
+select t.ok((select acceptance from volunteer_hr where volunteer_id = :'newv') is null, 'no interview result yet');
+begin;
+set local role authenticated;
+select t.login('vol1@test.com');
+select t.fails(format('select recruit_call(%L, %L)', :'newv', 'مردش'), 'volunteers cannot log calls');
+select t.login('hr@test.com');
+select recruit_call(:'newv', 'مردش', null, 'هيرد بالليل');
+select t.fails(format('select recruit_call(%L, %L)', :'newv', 'حدد ميعاد'), 'a date is required to book');
+select recruit_call(:'newv', 'حدد ميعاد', '2026-11-28 17:00+02', null);
+commit;
+select t.ok((select recruit_status from volunteers where id = :'newv') = 'ميعاد انترفيو', 'booked → interview list');
+begin;
+set local role authenticated;
+select t.login('hr@test.com');
+select recruit_interview(:'newv', 'محضرش', '2026-11-28', null, 'اعتذر في آخر لحظة');
+commit;
+select t.ok((select recruit_status from volunteers where id = :'newv') = 'للتواصل', 'no-show goes back to the call list');
+begin;
+set local role authenticated;
+select t.login('hr@test.com');
+select recruit_call(:'newv', 'حدد ميعاد', '2026-11-30 17:00+02', null);
+select recruit_interview(:'newv', 'مرفوض', '2026-11-30', :'v9003', null);
+commit;
+select t.ok((select recruit_status from volunteers where id = :'newv') = 'مقفول', 'rejected → closed');
+select t.ok((select acceptance::text from volunteer_hr where volunteer_id = :'newv') = 'مرفوض', 'result saved');
+select t.ok((select count(*) from participations where auto_ref = 'interview:' || :'newv') = 2, 'interview counts for both');
+update volunteer_hr set acceptance = 'معتذر' where volunteer_id = :'newv';
+select t.ok((select recruit_status from volunteers where id = :'newv') = 'اتعمل انترفيو', 'status changed by hand → visible again');
+begin;
+set local role authenticated;
+select t.login('hr@test.com');
+select recruit_reopen(:'newv', 'قدّم تاني');
+select recruit_call(:'newv', 'حدد ميعاد', '2026-12-02 17:00+02', null);
+select recruit_interview(:'newv', 'اختبار', '2026-12-02', :'v9003', null);
+select t.ok((select prev_acceptance from recruit_log where volunteer_id = :'newv' and outcome = 'اختبار') = 'معتذر', 'second interview shows the old result');
+select t.ok((select count(*) from recruit_log where volunteer_id = :'newv') = 9, 'full history kept');
+commit;
+
 \echo ALL ROLE TESTS PASSED

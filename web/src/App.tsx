@@ -26,6 +26,7 @@ const RegisterActivity = lazy(() => import('@/pages/RegisterActivity'))
 const FollowUps = lazy(() => import('@/pages/FollowUps'))
 const Requests = lazy(() => import('@/pages/Requests'))
 const Camps = lazy(() => import('@/pages/Camps'))
+const Recruit = lazy(() => import('@/pages/Recruit'))
 const Schedule = lazy(() => import('@/pages/Schedule'))
 const Stats = lazy(() => import('@/pages/Stats'))
 const Reports = lazy(() => import('@/pages/Reports'))
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="register" element={<Navigate to="/check-in" replace />} />
           <Route path="followups" element={<Guard allow={p.can('attendance.view_all') || p.can('attendance.register')}><FollowUps /></Guard>} />
           <Route path="requests/*" element={<Guard allow={p.canReview || p.can('stages.manage') || p.can('certificates.review')}><Requests /></Guard>} />
+          <Route path="recruit" element={<Guard allow={p.can('hr.view')}><Recruit /></Guard>} />
           <Route path="camps" element={<Guard allow={p.can('stages.manage') || p.can('stats.view')}><Camps /></Guard>} />
           <Route path="schedule" element={<Schedule />} />
           <Route path="stats" element={<Guard allow={p.can('stats.view') || p.leader}><Stats /></Guard>} />
