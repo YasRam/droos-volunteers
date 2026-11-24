@@ -9,6 +9,7 @@ import { toastError } from '@/lib/errors'
 import { usePermissions } from '@/lib/auth'
 import { DataSection } from '@/pages/DataTools'
 import { useSearchParams } from 'react-router-dom'
+import { locale } from '@/lib/i18n'
 import { supabase } from '@/lib/supabase'
 import type { Lookup } from '@/lib/types'
 
@@ -422,7 +423,7 @@ function Backups() {
           <div className="min-w-0 flex-1">
             <p className="font-bold">نسخة كاملة كل يوم في جوجل درايف</p>
             <p className="mt-1 text-sm text-muted">
-              كل البيانات (المتطوعين، المشاركات، المقابلات، الصلاحيات، السجل...) بتتحفظ في ملف في الدرايف بتاعك الساعة 3 الفجر. بيتحفظ آخر 30 يوم + أول نسخة في كل شهر. صور البطايق مش ضمن النسخة.
+              كل البيانات (المتطوعين، المشاركات، المقابلات، الصلاحيات، السجل...) بتتحفظ في ملف في الدرايف بتاعك الساعة 3 الفجر. بيتحفظ آخر 30 يوم + أول نسخة في كل شهر، وصور البطايق بتتنسخ في فولدر لوحدها.
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
               {linked.isLoading ? null : linked.data ? <Badge tone="green">مربوط</Badge> : <Badge tone="orange">لسه مش مربوط</Badge>}
@@ -472,7 +473,7 @@ function Backups() {
                 <span className="font-semibold">{fmtDateTime(r.at)}</span>
                 {r.ok ? (
                   <span className="text-muted">
-                    {r.rows?.toLocaleString('ar-EG')} صف · {r.bytes ? `${Math.round(r.bytes / 1024).toLocaleString('ar-EG')} ك.ب` : ''}
+                    {r.rows?.toLocaleString(locale)} صف · {r.bytes ? `${Math.round(r.bytes / 1024).toLocaleString(locale)} ك.ب` : ''}
                   </span>
                 ) : (
                   <span className="text-red-600">{r.error}</span>
@@ -532,7 +533,7 @@ function SiteBackup() {
     setBusy(true)
     try {
       const n = await downloadBackup()
-      toast.success(`اتنزّلت نسخة فيها ${n.toLocaleString('ar-EG')} صف`)
+      toast.success(`اتنزّلت نسخة فيها ${n.toLocaleString(locale)} صف`)
     } catch (e) {
       toastError(e)
     } finally {
@@ -588,7 +589,7 @@ function SiteBackup() {
               <p className="mt-1 text-muted">
                 {Object.entries(TABLE_LABEL)
                   .filter(([k]) => pending.tables[k])
-                  .map(([k, label]) => `${(pending.tables[k]?.length ?? 0).toLocaleString('ar-EG')} ${label}`)
+                  .map(([k, label]) => `${(pending.tables[k]?.length ?? 0).toLocaleString(locale)} ${label}`)
                   .join(' · ')}
               </p>
             </div>

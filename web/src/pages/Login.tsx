@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui'
+import { LangSwitch } from '@/components/LangSwitch'
 import { useAuth } from '@/lib/auth'
 import { toastError } from '@/lib/errors'
 
@@ -29,6 +30,7 @@ export default function Login() {
           <GoogleIcon /> الدخول بحساب جوجل
         </Button>
         <p className="mt-4 text-xs text-muted">ادخل بنفس الإيميل اللي مسجّل بيه في النشاط</p>
+        <LangSwitch className="mx-auto mt-6" />
       </div>
     </div>
   )

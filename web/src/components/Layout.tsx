@@ -27,6 +27,7 @@ import { useAuth, usePermissions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import type { Notification } from '@/lib/types'
 import { fmtDateTime } from '@/lib/data'
+import { LangSwitch } from '@/components/LangSwitch'
 import { PushSwitch } from './PushToggle'
 
 interface NavItem {
@@ -147,9 +148,12 @@ export default function Layout() {
         <div className="border-t border-line p-4">
           <p className="truncate text-sm font-semibold">{displayName}</p>
           <p className="text-xs text-muted">{roleLabel}</p>
-          <button onClick={signOut} className="mt-2 flex items-center gap-1 text-sm text-red-600">
-            <LogOut className="size-4" /> خروج
-          </button>
+          <div className="mt-2 flex items-center justify-between">
+            <button onClick={signOut} className="flex items-center gap-1 text-sm text-red-600">
+              <LogOut className="size-4" /> خروج
+            </button>
+            <LangSwitch />
+          </div>
         </div>
       </aside>
 
@@ -242,6 +246,7 @@ export default function Layout() {
                   {it.label}
                 </NavLink>
               ))}
+              <LangSwitch stacked />
               <button onClick={signOut} className="flex flex-col items-center gap-1 rounded-xl p-3 text-xs font-semibold text-red-600 hover:bg-red-50">
                 <LogOut className="size-5" />
                 خروج

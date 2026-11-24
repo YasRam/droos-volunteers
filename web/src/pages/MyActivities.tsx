@@ -3,10 +3,11 @@ import { useMemo } from 'react'
 import { Card, Empty, PageHeader, RequestBadge, Spinner } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
 import { fmtShort } from '@/lib/data'
+import { locale } from '@/lib/i18n'
 import { supabase } from '@/lib/supabase'
 import type { Participation } from '@/lib/types'
 
-const monthFmt = new Intl.DateTimeFormat('ar-EG', { month: 'long', year: 'numeric' })
+const monthFmt = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' })
 
 export default function MyActivities() {
   const { volunteerId } = usePermissions()
