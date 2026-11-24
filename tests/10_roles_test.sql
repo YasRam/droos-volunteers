@@ -297,4 +297,60 @@ select t.fails($$insert into backup_runs (ok) values (true)$$, 'users cannot wri
 commit;
 select t.ok((select token_hash from backup_config) = repeat('ab', 32), 'hash stored lowercase');
 
+-- ---------- editable status lists ----------
+insert into lookups (list, value) select 'حالة المتطوع', 'مدرب' where not exists (select 1 from lookups where list = 'حالة المتطوع' and value = 'مدرب');
+insert into lookups (list, value) select 'حالة المتطوع', 'خارج المتابعة' where not exists (select 1 from lookups where list = 'حالة المتطوع' and value = 'خارج المتابعة');
+update volunteers set status = 'مدرب' where code = 'V9004';
+begin;
+set local role authenticated;
+select t.login('admin@test.com');
+select rename_lookup((select id from lookups where list = 'حالة المتطوع' and value = 'مدرب'), 'مدرب معتمد');
+select t.ok((select status::text from volunteers where code = 'V9004') = 'مدرب معتمد', 'renaming a status renames it in the data');
+select t.fails($$select rename_lookup((select id from lookups where list = 'حالة المتطوع' and value = 'خارج المتابعة'), 'بره')$$, 'core status is locked');
+select t.fails($$update lookups set value = 'x' where list = 'حالة المتطوع' and value = 'مدرب معتمد'$$, 'enum list value only changes via rename');
+select delete_lookup((select id from lookups where list = 'حالة المتطوع' and value = 'مدرب معتمد'));
+select t.ok((select not is_active from lookups where list = 'حالة المتطوع' and value = 'مدرب معتمد'), 'deleting a status hides it');
+insert into lookups (list, value) values ('حالة المتطوع', 'متطوع موسمي');
+commit;
+update volunteers set status = 'متطوع موسمي' where code = 'V9004';
+select t.ok((select status::text from volunteers where code = 'V9004') = 'متطوع موسمي', 'new status usable after adding it to the list');
+select t.ok((select count(*) from lookups where list = 'اليوم') = 0, 'day list removed');
+
+-- ---------- team group ----------
+insert into app_settings (key, value) values ('team_group_link', 'https://chat.whatsapp.com/team') on conflict (key) do update set value = excluded.value;
+update volunteers set status = 'مسئول' where code = 'V9002';
+begin;
+set local role authenticated;
+select t.login('vol1@test.com');
+select t.ok(team_group_link() is null, 'regular volunteer does not get the team group');
+select t.ok((select count(*) from app_settings where key = 'team_group_link') = 0, 'team link hidden from settings table');
+select t.login('vol2@test.com');
+select t.ok(team_group_link() is not null, 'مسئول gets the team group');
+select t.login('leader@test.com');
+select t.ok(team_group_link() is not null, 'committee leader gets the team group');
+commit;
+
+-- ---------- download / restore ----------
+create temp table _snap as select export_backup() as b from (select set_config('request.jwt.claims', '{"email":"admin@test.com"}', false)) x;
+begin;
+set local role authenticated;
+select t.login('hr@test.com');
+select t.fails($$select export_backup()$$, 'only backup.manage can download');
+commit;
+grant select on _snap to authenticated;
+delete from participations;
+update volunteers set full_name_ar = 'اتغير' where code = 'V9001';
+begin;
+set local role authenticated;
+select t.login('admin@test.com');
+select t.fails($$select restore_backup('{"app":"other"}'::jsonb)$$, 'foreign file refused');
+select restore_backup((select b from _snap));
+commit;
+select t.ok((select full_name_ar from volunteers where code = 'V9001') = 'متطوع أول', 'restore brings old data back');
+select t.ok((select count(*) from participations) = jsonb_array_length((select b from _snap) -> 'tables' -> 'participations'), 'restore brings deleted rows back');
+select t.ok((select count(*) from pg_trigger where tgrelid = 'public.volunteers'::regclass and tgenabled = 'D') = 0, 'triggers back on after restore');
+select t.ok(exists (select 1 from audit_log where table_name = 'backup'), 'restore is logged');
+insert into volunteers (full_name_ar, phone) values ('بعد الاسترجاع', '01000000099');
+select t.ok((select code from volunteers where full_name_ar = 'بعد الاسترجاع') is not null, 'new rows still get codes');
+
 \echo ALL ROLE TESTS PASSED

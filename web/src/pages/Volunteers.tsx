@@ -8,10 +8,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { AcceptanceBadge, Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Spinner, StatusBadge } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
-import { ageFrom, fmtShort, useDirectory, useHrRows, useLookups, useVolunteers, type VolunteerWithStats } from '@/lib/data'
+import { ageFrom, fmtShort, useDirectory, useHrRows, useLookups, useStatusOptions, useVolunteers, type VolunteerWithStats } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
-import { ACCEPTANCE, POSITIONS, STATUSES, type VolunteerHr, type VolunteerStatus } from '@/lib/types'
+import { POSITIONS, type VolunteerHr, type VolunteerStatus } from '@/lib/types'
 import { ContactLinks, VolunteerName } from '@/components/VolunteerLink'
 import { PersonalFields, personalSchema, toPersonalPayload, type PersonalValues } from './MyProfile'
 
@@ -55,6 +55,7 @@ const isStale = (v: VolunteerWithStats) =>
   v.status !== 'خارج المتابعة' && (!v.stats?.last_participation || Date.now() - Date.parse(v.stats.last_participation) > 30 * DAY)
 
 function FullList() {
+  const opts = useStatusOptions()
   const p = usePermissions()
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -154,11 +155,11 @@ function FullList() {
       {showFilters && (
         <Card className="mb-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <Field label="حالة المتطوع">
-            <Select value={filters.status} onChange={(e) => set('status', e.target.value)} placeholder="الكل" options={STATUSES} />
+            <Select value={filters.status} onChange={(e) => set('status', e.target.value)} placeholder="الكل" options={opts.statuses} />
           </Field>
           {p.viewAll && (
             <Field label="درجة القبول">
-              <Select value={filters.acceptance} onChange={(e) => set('acceptance', e.target.value)} placeholder="الكل" options={[...ACCEPTANCE, 'لسه']} />
+              <Select value={filters.acceptance} onChange={(e) => set('acceptance', e.target.value)} placeholder="الكل" options={[...opts.acceptance, 'لسه']} />
             </Field>
           )}
           <Field label="الوظيفة">
@@ -235,12 +236,13 @@ function FullList() {
 const SORT_LABEL: Record<SortKey, string> = { name: 'الاسم', this_month: 'الشهر ده', total: 'الإجمالي', last: 'آخر مشاركة' }
 
 function Legend({ full }: { full: boolean }) {
+  const opts = useStatusOptions()
   return (
     <Card className="mb-4 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
       <div>
         <p className="mb-2 font-bold">حالة المتطوع</p>
         <ul className="space-y-1.5">
-          {STATUSES.map((s) => (
+          {opts.statuses.map((s) => (
             <li key={s} className="flex items-center gap-2">
               <StatusBadge status={s} />
               <span className="text-xs text-muted">{STATUS_MEANING[s]}</span>
@@ -281,7 +283,7 @@ function Legend({ full }: { full: boolean }) {
         <div>
           <p className="mb-2 font-bold">درجة القبول (بيانات المقابلة)</p>
           <ul className="space-y-1.5">
-            {[...ACCEPTANCE, null].map((a) => (
+            {[...opts.acceptance, null].map((a) => (
               <li key={a ?? 'none'} className="flex items-center gap-2">
                 <AcceptanceBadge value={a} />
                 <span className="text-xs text-muted">{a ? ACCEPTANCE_MEANING[a] : 'لسه مفيش تقييم'}</span>

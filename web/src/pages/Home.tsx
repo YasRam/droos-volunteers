@@ -7,10 +7,10 @@ import { toast } from 'sonner'
 import { PushCard } from '@/components/PushToggle'
 import { Button, Card } from '@/components/ui'
 import { useAuth, usePermissions } from '@/lib/auth'
-import { addDays, cairoToday, fmtDate, fmtShort, useHrRows, useLookups, useSetting, useVolunteers, whatsappLink, type VolunteerWithStats } from '@/lib/data'
+import { addDays, cairoToday, fmtDate, fmtShort, useHrRows, useLookups, useSetting, useStatusOptions, useVolunteers, whatsappLink, type VolunteerWithStats } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
-import { STATUSES, type MonthlyParticipation, type VolunteerStats } from '@/lib/types'
+import { type MonthlyParticipation, type VolunteerStats } from '@/lib/types'
 
 const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
 
@@ -73,9 +73,18 @@ function WhatsAppGroups({ general, volunteerId, leaderOf }: { general: string | 
       return data as { main_committee: string | null; sub_committee: string | null } | null
     },
   })
+  const team = useQuery({
+    queryKey: ['team-group'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('team_group_link')
+      if (error) throw error
+      return (data as string | null) ?? null
+    },
+  })
   const names = [...new Set([mine.data?.main_committee, mine.data?.sub_committee, ...leaderOf].filter((c): c is string => Boolean(c)))]
   const groups = [
     ...(general ? [{ name: 'الجروب العام', link: general }] : []),
+    ...(team.data ? [{ name: 'فريق العمل', link: team.data }] : []),
     ...names.flatMap((n) => {
       const link = lookups.data?.rows.find((r) => r.list === 'اللجنة' && r.value === n)?.link
       return link ? [{ name: `جروب ${n}`, link }] : []
@@ -204,6 +213,7 @@ const STATUS_HINT: Record<string, string> = {
 }
 
 function VolunteerNumbers({ vols, full, leader, today }: { vols?: VolunteerWithStats[]; full: boolean; leader: boolean; today: string }) {
+  const opts = useStatusOptions()
   const month = useQuery({
     queryKey: ['monthly'],
     enabled: full,
@@ -226,7 +236,7 @@ function VolunteerNumbers({ vols, full, leader, today }: { vols?: VolunteerWithS
   return (
     <Section title={leader ? 'متطوعين لجنتك' : 'المتطوعين'} hint={vols ? `${vols.length} متطوع · اضغط على أي رقم عشان تشوف الأسماء` : undefined}>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {STATUSES.map((s) => (
+        {opts.statuses.map((s) => (
           <Metric key={s} label={s} value={count(s)} hint={STATUS_HINT[s]} tone={STATUS_TONE[s]} to={`/volunteers?status=${encodeURIComponent(s)}`} />
         ))}
       </div>

@@ -116,9 +116,9 @@ export default function Layout() {
     if (p.volunteerId) list.push({ to: '/me', label: 'بياناتي', icon: UserRound })
     if (p.can('stats.view') || p.leader) list.push({ to: '/stats', label: 'الإحصائيات', icon: BarChart3 })
     if (p.can('certificates.review')) list.push({ to: '/certificates', label: 'شهادات التطوع', icon: Award })
-    if (p.can('data.export')) list.push({ to: '/data', label: p.can('data.import') ? 'البيانات وExcel' : 'تنزيل Excel', icon: FileSpreadsheet })
     if (p.can('roles.manage')) list.push({ to: '/permissions', label: 'الصلاحيات', icon: ShieldCheck })
     if (p.can('settings.manage')) list.push({ to: '/admin', label: 'الإعدادات', icon: Settings })
+    else if (p.can('data.export') || p.can('backup.manage')) list.push({ to: '/admin?tab=data', label: 'البيانات', icon: FileSpreadsheet })
     if (p.can('log.view')) list.push({ to: '/log', label: 'السجل', icon: History })
     return list
   }, [p, pending.data])

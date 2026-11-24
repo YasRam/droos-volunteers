@@ -72,7 +72,29 @@ Deno.serve(async (req) => {
     return json({ error: 'unauthorized' }, 401)
   }
 
-  const body = await req.json().catch(() => ({})) as { file_name?: string; report?: { ok: boolean; bytes?: number; rows?: number; tables?: number; error?: string } }
+  const body = await req.json().catch(() => ({})) as {
+    file_name?: string
+    images?: boolean
+    report?: { ok: boolean; bytes?: number; rows?: number; tables?: number; images?: number; error?: string }
+  }
+
+  // ID card photos: list every file with a short-lived download link; the script copies new ones.
+  if (body.images) {
+    const bucket = db.storage.from('id-cards')
+    const top = await bucket.list('', { limit: 1000 })
+    if (top.error) return json({ error: top.error.message }, 500)
+    const paths: string[] = []
+    for (const folder of top.data) {
+      if (folder.id) continue // a file at the root, not a volunteer folder
+      const files = await bucket.list(folder.name, { limit: 1000 })
+      if (files.error) return json({ error: files.error.message }, 500)
+      for (const f of files.data) if (f.id) paths.push(`${folder.name}/${f.name}`)
+    }
+    if (!paths.length) return json({ images: [] })
+    const signed = await bucket.createSignedUrls(paths, 3600)
+    if (signed.error) return json({ error: signed.error.message }, 500)
+    return json({ images: signed.data.filter((x) => x.signedUrl).map((x) => ({ path: x.path, url: x.signedUrl })) })
+  }
 
   // Second call from the script: it reports whether the file was saved in Drive.
   if (body.report) {
@@ -80,6 +102,7 @@ Deno.serve(async (req) => {
       ok: body.report.ok,
       rows: body.report.rows ?? null,
       tables: body.report.tables ?? null,
+      images: body.report.images ?? null,
       bytes: body.report.bytes ?? null,
       file_name: body.file_name ?? null,
       error: body.report.error?.slice(0, 500) ?? null,

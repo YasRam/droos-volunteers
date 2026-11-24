@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from './supabase'
-import type { Lookup, Volunteer, VolunteerDirectoryRow, VolunteerHr, VolunteerStats } from './types'
+import { ACCEPTANCE, STATUSES, type Lookup, type Volunteer, type VolunteerDirectoryRow, type VolunteerHr, type VolunteerStats } from './types'
 
 /** Today in Cairo as YYYY-MM-DD (the database uses the same calendar). */
 export function cairoToday(): string {
@@ -119,3 +119,17 @@ export function useHrRows(enabled: boolean) {
     },
   })
 }
+
+/** Volunteer statuses and acceptance grades: editable lists, with the defaults as fallback. */
+export function useStatusOptions() {
+  const l = useLookups()
+  const statuses = l.data?.list('حالة المتطوع') ?? []
+  const acceptance = l.data?.list('حالة القبول') ?? []
+  return {
+    statuses: statuses.length ? statuses : STATUSES,
+    acceptance: acceptance.length ? acceptance : ACCEPTANCE,
+  }
+}
+
+/** Options for a select that must still show the record's current value, even if hidden from the list. */
+export const withCurrent = (options: string[], current: string | null | undefined) => (current && !options.includes(current) ? [...options, current] : options)

@@ -1,33 +1,55 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Check, CircleAlert, CircleCheck, Eye, EyeOff, HardDrive, Link2, Lock, MessageCircle, Pencil, Plus, Trash2, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { Check, CircleAlert, CircleCheck, Download, Eye, Upload, EyeOff, HardDrive, Link2, Lock, MessageCircle, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Badge, Button, Card, Field, Input, Modal, PageHeader, Select, Spinner, Tabs } from '@/components/ui'
 import { fmtDateTime } from '@/lib/data'
 import { toastError } from '@/lib/errors'
+import { usePermissions } from '@/lib/auth'
+import { DataSection } from '@/pages/DataTools'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import type { Lookup } from '@/lib/types'
 
-type Tab = 'lists' | 'groups' | 'backup'
+type Tab = 'lists' | 'groups' | 'data'
 
 export default function Admin() {
-  const [tab, setTab] = useState<Tab>('lists')
+  const p = usePermissions()
+  const [params, setParams] = useSearchParams()
+  const tabs = [
+    ...(p.can('settings.manage') ? [{ value: 'lists' as Tab, label: 'القوائم' }, { value: 'groups' as Tab, label: 'جروبات الواتساب' }] : []),
+    ...(p.can('data.export') || p.can('backup.manage') || p.can('settings.manage') ? [{ value: 'data' as Tab, label: 'البيانات والنسخ الاحتياطية' }] : []),
+  ]
+  const tab = (tabs.find((t) => t.value === params.get('tab'))?.value ?? tabs[0]?.value) as Tab
   return (
     <>
-      <PageHeader title="الإعدادات" subtitle="القوايم اللي بتظهر في الاختيارات، وجروبات الواتساب، والنسخ الاحتياطي" />
-      <Tabs
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          { value: 'lists', label: 'القوائم' },
-          { value: 'groups', label: 'جروبات الواتساب' },
-          { value: 'backup', label: 'النسخ الاحتياطي' },
-        ]}
-      />
+      <PageHeader title={p.can('settings.manage') ? 'الإعدادات' : 'البيانات'} subtitle="القوايم، وجروبات الواتساب، وتنزيل البيانات والنسخ الاحتياطية" />
+      <Tabs value={tab} onChange={(t) => setParams({ tab: t })} tabs={tabs} />
       {tab === 'lists' && <Lists />}
       {tab === 'groups' && <Groups />}
-      {tab === 'backup' && <Backups />}
+      {tab === 'data' && (
+        <div className="space-y-6">
+          {p.can('data.export') && (
+            <section>
+              <h2 className="mb-2 font-bold">Excel</h2>
+              <DataSection />
+            </section>
+          )}
+          {p.can('backup.manage') && (
+            <section>
+              <h2 className="mb-2 font-bold">نسخة احتياطية من الموقع</h2>
+              <SiteBackup />
+            </section>
+          )}
+          {p.can('settings.manage') && (
+            <section>
+              <h2 className="mb-2 font-bold">النسخ اليومي على جوجل درايف</h2>
+              <Backups />
+            </section>
+          )}
+        </div>
+      )}
     </>
   )
 }
@@ -43,7 +65,11 @@ function useAllLookups() {
   })
 }
 
-const FIXED = new Set(['حالة المتطوع', 'حالة القبول', 'اليوم'])
+// Status lists are database enums: renaming changes every record, delete only hides.
+const ENUM_LISTS = new Set(['حالة المتطوع', 'حالة القبول'])
+// Values the app's own rules depend on (filters, the 3-month test, the tree).
+const LOCKED: Record<string, string[]> = { 'حالة المتطوع': ['تحت المتابعة', 'خارج المتابعة'], 'حالة القبول': ['اختبار', 'مقبول'] }
+const isLocked = (r: Lookup) => LOCKED[r.list]?.includes(r.value) ?? false
 const LIST_HINT: Record<string, string> = {
   اللجنة: 'لجان النشاط. التغيير هنا بيتطبق على المتطوعين وليدر اللجان.',
   الحدث: 'أنواع الأنشطة، ومع كل واحد بتختار الخانات اللي بيطلبها.',
@@ -51,6 +77,8 @@ const LIST_HINT: Record<string, string> = {
   'السنة الدراسية': 'سنين الطلاب في التدريس والجدول.',
   المكان: 'أماكن الأنشطة.',
   'القائم على المقابلة': 'اللي بيعملوا المقابلات.',
+  'حالة المتطوع': 'حالات المتطوعين. تغيير الاسم بيغيّره في كل المتطوعين. القيم اللي عليها قفل السيستم بيعتمد عليها.',
+  'حالة القبول': 'درجات القبول في المقابلة. تغيير الاسم بيغيّره في كل الملفات. القيم اللي عليها قفل السيستم بيعتمد عليها.',
 }
 const FORM_LABEL = { teaching: 'مادة + سنة + عدد طلاب', optional: 'نوع حدث اختياري', none: 'من غير نوع حدث' } as const
 
@@ -59,11 +87,10 @@ function Lists() {
   const q = useAllLookups()
   const listNames = useMemo(() => {
     const names = [...new Set((q.data ?? []).map((r) => r.list))]
-    return names.sort((a, b) => Number(FIXED.has(a)) - Number(FIXED.has(b)) || a.localeCompare(b, 'ar'))
+    return names.sort((a, b) => a.localeCompare(b, 'ar'))
   }, [q.data])
   const [picked, setPicked] = useState('')
   const current = picked || listNames[0] || ''
-  const fixed = FIXED.has(current)
   const rows = (q.data ?? []).filter((r) => r.list === current)
   const events = (q.data ?? []).filter((r) => r.list === 'الحدث').map((r) => r.value)
   const [value, setValue] = useState('')
@@ -115,7 +142,6 @@ function Lists() {
               )}
             >
               <span className="flex items-center gap-1.5">
-                {FIXED.has(n) && <Lock className="size-3.5 opacity-70" />}
                 {n}
               </span>
               <span className={clsx('text-xs', n === current ? 'opacity-80' : 'text-muted')}>{(q.data ?? []).filter((r) => r.list === n).length}</span>
@@ -127,8 +153,8 @@ function Lists() {
       <div className="min-w-0 space-y-3">
         <Card>
           <p className="font-bold">{current}</p>
-          <p className="text-xs text-muted">{fixed ? 'القايمة دي ثابتة في السيستم ومينفعش تتعدّل.' : LIST_HINT[current] ?? 'قيم بتظهر في الاختيارات.'}</p>
-          {!fixed && (
+          <p className="text-xs text-muted">{LIST_HINT[current] ?? 'قيم بتظهر في الاختيارات.'}</p>
+          {(
             <div className="mt-3 flex flex-wrap items-end gap-2">
               <div className="min-w-48 flex-1">
                 <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder="قيمة جديدة" onKeyDown={(e) => e.key === 'Enter' && add.mutate()} />
@@ -149,7 +175,10 @@ function Lists() {
           {rows.map((r) => (
             <div key={r.id} className={clsx('flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5', !r.is_active && 'bg-gray-50')}>
               <div className="min-w-0 flex-1 basis-40">
-                <p className={clsx('truncate font-semibold', !r.is_active && 'text-muted line-through')}>{r.value}</p>
+                <p className={clsx('flex items-center gap-1.5 truncate font-semibold', !r.is_active && 'text-muted line-through')}>
+                  {isLocked(r) && <Lock className="size-3.5 shrink-0 text-muted" aria-label="ثابتة" />}
+                  {r.value}
+                </p>
                 <div className="flex flex-wrap gap-1 text-xs">
                   {r.parent && <Badge>تبع {r.parent}</Badge>}
                   {current === 'اللجنة' && r.link && (
@@ -170,7 +199,7 @@ function Lists() {
                   aria-label="الخانات المطلوبة"
                 />
               )}
-              {!fixed && (
+              {!isLocked(r) && (
                 <div className="flex items-center">
                   <Button variant="ghost" size="sm" onClick={() => patch(r, { is_active: !r.is_active })} title={r.is_active ? 'إخفاء من الاختيارات' : 'إظهار في الاختيارات'} aria-label="إخفاء أو إظهار">
                     {r.is_active ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
@@ -183,7 +212,7 @@ function Lists() {
             </div>
           ))}
         </Card>
-        {!fixed && (
+        {(
           <p className="text-xs text-muted">
             <EyeOff className="inline size-3.5" /> الإخفاء بيشيل القيمة من الاختيارات بس. والمسح كمان مش بيمسح حاجة من البيانات المتسجلة: اللي اتسجل بيها بيفضل زي ما هو.
           </p>
@@ -212,7 +241,7 @@ function EditValue({ row, onClose, onDone }: { row: Lookup; onClose: () => void;
       return Number((data as { rows: number }).rows)
     },
     onSuccess: (n) => {
-      toast.success(updateData && n ? `اتغيّرت، و${n} سجل اتحدّث` : 'اتغيّرت')
+      toast.success(n && (updateData || ENUM_LISTS.has(row.list)) ? `اتغيّرت، و${n} سجل اتحدّث` : 'اتغيّرت')
       onDone()
       onClose()
     },
@@ -231,6 +260,7 @@ function EditValue({ row, onClose, onDone }: { row: Lookup; onClose: () => void;
     onError: toastError,
   })
   const n = usage.data ?? 0
+  const isEnum = ENUM_LISTS.has(row.list)
   return (
     <Modal open onClose={onClose} title={`«${row.value}» في ${row.list}`}>
       <div className="space-y-4">
@@ -238,7 +268,8 @@ function EditValue({ row, onClose, onDone }: { row: Lookup; onClose: () => void;
         <Field label="الاسم الجديد">
           <Input value={value} onChange={(e) => setValue(e.target.value)} />
         </Field>
-        {n > 0 && (
+        {isEnum && <p className="text-xs text-muted">الاسم الجديد هيتغيّر في كل البيانات مرة واحدة. والمسح هنا بيخفيها من الاختيارات بس.</p>}
+        {n > 0 && !isEnum && (
           <label className="flex items-start gap-2 text-sm">
             <input type="checkbox" className="mt-0.5 size-4 accent-brand-700" checked={updateData} onChange={(e) => setUpdateData(e.target.checked)} />
             <span>
@@ -255,9 +286,9 @@ function EditValue({ row, onClose, onDone }: { row: Lookup; onClose: () => void;
             variant="secondary"
             className="text-red-600"
             loading={remove.isPending}
-            onClick={() => confirm(n ? `تمسح «${row.value}» من القايمة؟ الـ ${n} سجل القديمة هيفضلوا زي ما هما.` : `تمسح «${row.value}»؟`) && remove.mutate()}
+            onClick={() => confirm(isEnum ? `تخفي «${row.value}» من الاختيارات؟` : n ? `تمسح «${row.value}» من القايمة؟ الـ ${n} سجل القديمة هيفضلوا زي ما هما.` : `تمسح «${row.value}»؟`) && remove.mutate()}
           >
-            <Trash2 className="size-4" /> مسح من القايمة
+            <Trash2 className="size-4" /> {isEnum ? 'إخفاء' : 'مسح من القايمة'}
           </Button>
         </div>
       </div>
@@ -276,7 +307,15 @@ function Groups() {
       return (data?.value as string | null) ?? ''
     },
   })
-  const committees = (lookups.data ?? []).filter((r) => r.list === 'اللجنة')
+  const team = useQuery({
+    queryKey: ['setting', 'team_group_link'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('app_settings').select('value').eq('key', 'team_group_link').maybeSingle()
+      if (error) throw error
+      return (data?.value as string | null) ?? ''
+    },
+  })
+  const committees = (lookups.data ?? []).filter((r) => r.list === 'اللجنة' && r.value !== 'مسئول نشاط')
   const [draft, setDraft] = useState<Record<string, string>>({})
 
   const save = useMutation({
@@ -284,8 +323,8 @@ function Groups() {
       for (const [key, v] of Object.entries(draft)) {
         const link = v.trim() || null
         if (link && !/^https:\/\/(chat\.whatsapp\.com|wa\.me)\//.test(link)) throw { message: 'اللينك لازم يبقى لينك جروب واتساب (chat.whatsapp.com)' }
-        if (key === 'general') {
-          const { error } = await supabase.from('app_settings').upsert({ key: 'whatsapp_group_link', value: link })
+        if (key === 'general' || key === 'team') {
+          const { error } = await supabase.from('app_settings').upsert({ key: key === 'team' ? 'team_group_link' : 'whatsapp_group_link', value: link })
           if (error) throw error
         } else {
           const { error } = await supabase.from('lookups').update({ link }).eq('id', Number(key))
@@ -303,7 +342,7 @@ function Groups() {
     onError: toastError,
   })
 
-  if (lookups.isLoading || general.isLoading) return <Spinner />
+  if (lookups.isLoading || general.isLoading || team.isLoading) return <Spinner />
   const row = (key: string, label: string, hint: string, current: string) => (
     <div key={key} className="grid grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-center">
       <div>
@@ -323,9 +362,10 @@ function Groups() {
   )
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted">كل متطوع بيشوف في الصفحة الرئيسية الجروب العام، وجروب لجنته الأساسية والفرعية.</p>
+      <p className="text-sm text-muted">كل متطوع بيشوف في الصفحة الرئيسية الجروب العام، وجروب لجنته الأساسية والفرعية. جروب فريق العمل بيظهر للمسئولين وليدر اللجان بس.</p>
       <Card className="divide-y divide-line p-0">
         {row('general', 'الجروب العام', 'لكل المتطوعين', general.data ?? '')}
+        {row('team', 'فريق العمل', 'بيظهر لمشروع مسئول ومسئول وليدر اللجان بس', team.data ?? '')}
         {committees.map((c) => row(String(c.id), c.value, `لمتطوعين لجنة ${c.value}`, c.link ?? ''))}
       </Card>
       <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!Object.keys(draft).length}>
@@ -443,5 +483,127 @@ function Backups() {
         )}
       </Card>
     </div>
+  )
+}
+
+type BackupFile = { app: string; exported_at: string; exported_by?: string; rows: number; counts: Record<string, number>; tables: Record<string, unknown[]> }
+
+const stamp = () => new Date().toLocaleString('sv-SE', { timeZone: 'Africa/Cairo' }).slice(0, 16).replace(' ', '_').replace(':', '')
+
+async function downloadBackup(): Promise<number> {
+  const { data, error } = await supabase.rpc('export_backup')
+  if (error) throw error
+  const text = JSON.stringify(data)
+  const gz = await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).blob()
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(gz)
+  a.download = `droos-backup-${stamp()}.json.gz`
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(a.href), 10_000)
+  return (data as BackupFile).rows
+}
+
+async function readBackup(file: File): Promise<BackupFile> {
+  const head = new Uint8Array(await file.slice(0, 2).arrayBuffer())
+  const stream = head[0] === 0x1f && head[1] === 0x8b ? file.stream().pipeThrough(new DecompressionStream('gzip')) : file.stream()
+  const parsed = JSON.parse(await new Response(stream).text())
+  if (parsed?.app !== 'droos-volunteers' || !parsed.tables) throw { message: 'الملف ده مش نسخة احتياطية من الموقع' }
+  return parsed as BackupFile
+}
+
+const TABLE_LABEL: Record<string, string> = {
+  volunteers: 'متطوع',
+  participations: 'مشاركة',
+  schedule_slots: 'حصة',
+  staff_roles: 'صلاحية',
+  certificate_requests: 'طلب شهادة',
+  audit_log: 'سطر في السجل',
+}
+
+/** Download everything as one file, or put a downloaded file back. */
+function SiteBackup() {
+  const qc = useQueryClient()
+  const [busy, setBusy] = useState(false)
+  const [pending, setPending] = useState<BackupFile | null>(null)
+  const [confirmText, setConfirmText] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const download = async () => {
+    setBusy(true)
+    try {
+      const n = await downloadBackup()
+      toast.success(`اتنزّلت نسخة فيها ${n.toLocaleString('ar-EG')} صف`)
+    } catch (e) {
+      toastError(e)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const pick = async (file?: File) => {
+    if (!file) return
+    try {
+      setPending(await readBackup(file))
+      setConfirmText('')
+    } catch (e) {
+      toastError(e)
+    } finally {
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+  const restore = useMutation({
+    mutationFn: async () => {
+      // Safety copy of what is there now, before replacing it.
+      await downloadBackup()
+      const { data, error } = await supabase.rpc('restore_backup', { p: pending })
+      if (error) throw error
+      return data as { counts: Record<string, number> }
+    },
+    onSuccess: (r) => {
+      toast.success(`اترجعت النسخة: ${r.counts.volunteers ?? 0} متطوع و${r.counts.participations ?? 0} مشاركة`)
+      setPending(null)
+      qc.invalidateQueries()
+    },
+    onError: toastError,
+  })
+
+  return (
+    <Card className="space-y-4">
+      <p className="text-sm text-muted">
+        ملف واحد فيه كل حاجة: المتطوعين والأرقام القومية والمقابلات والمشاركات والجدول والصلاحيات والسجل. نفس شكل نسخ جوجل درايف، فأي ملف منهم ينفع يترجع من هنا. فيه بيانات شخصية: احفظه في مكان آمن.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={download} loading={busy}>
+          <Download className="size-4" /> تنزيل نسخة احتياطية
+        </Button>
+        <Button variant="secondary" onClick={() => fileRef.current?.click()}>
+          <Upload className="size-4" /> استرجاع نسخة
+        </Button>
+        <input ref={fileRef} type="file" accept=".gz,.json,application/json,application/gzip" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
+      </div>
+      {pending && (
+        <Modal open onClose={() => !restore.isPending && setPending(null)} title="استرجاع نسخة احتياطية">
+          <div className="space-y-4">
+            <div className="rounded-xl bg-surface px-3 py-2 text-sm">
+              <p className="font-semibold">النسخة دي اتعملت {fmtDateTime(pending.exported_at)}</p>
+              <p className="mt-1 text-muted">
+                {Object.entries(TABLE_LABEL)
+                  .filter(([k]) => pending.tables[k])
+                  .map(([k, label]) => `${(pending.tables[k]?.length ?? 0).toLocaleString('ar-EG')} ${label}`)
+                  .join(' · ')}
+              </p>
+            </div>
+            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              كل البيانات اللي في الموقع دلوقتي هتتشال وتتحط مكانها النسخة دي. أي حاجة اتسجلت بعد تاريخ النسخة هتضيع. قبل الاسترجاع هتنزل نسخة من الموجود دلوقتي لوحدها، عشان لو حبيت ترجع.
+            </p>
+            <Field label='اكتب «استرجاع» للتأكيد'>
+              <Input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} />
+            </Field>
+            <Button className="w-full bg-red-600 hover:bg-red-700" disabled={confirmText.trim() !== 'استرجاع'} loading={restore.isPending} onClick={() => restore.mutate()}>
+              استرجع النسخة
+            </Button>
+          </div>
+        </Modal>
+      )}
+    </Card>
   )
 }

@@ -23,6 +23,7 @@ const AREAS: Record<string, string> = {
   committee_leaders: 'ليدر اللجان',
   lookups: 'القوائم',
   certificate_requests: 'شهادات التطوع',
+  backup: 'النسخ الاحتياطية',
 }
 
 const FIELD: Record<string, string> = {
@@ -130,6 +131,8 @@ function sentence(r: AuditRow): string {
         : `غيّر «${o?.value}» لـ «${n?.value}» في قايمة ${n?.list}${Number(n?.rows_updated) ? ` وحدّث ${n?.rows_updated} سجل` : ''}`
     case 'certificate_requests':
       return r.action === 'INSERT' ? `${who} طلب شهادة تطوع` : `رد على طلب شهادة ${who}: ${show(n?.status, 'status')}`
+    case 'backup':
+      return `استرجع نسخة احتياطية متاخدة ${n?.exported_at ? fmtDateTime(String(n.exported_at)) : ''} (كل البيانات اترجعت لحالتها وقتها)`
     default:
       return `${r.action} في ${r.table_name}`
   }

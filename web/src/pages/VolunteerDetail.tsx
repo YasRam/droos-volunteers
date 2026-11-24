@@ -9,10 +9,10 @@ import { Badge, Button, Card, Empty, Field, Input, PageHeader, RequestBadge, Sel
 import { VolunteerFacts } from '@/components/VolunteerFacts'
 import { ContactLinks } from '@/components/VolunteerLink'
 import { useAuth, usePermissions } from '@/lib/auth'
-import { ageFrom, fmtShort, useLookups, whatsappLink } from '@/lib/data'
+import { ageFrom, fmtShort, useLookups, useStatusOptions, whatsappLink, withCurrent } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
-import { ACCEPTANCE, POSITIONS, STATUSES, type Participation, type Volunteer, type VolunteerHr } from '@/lib/types'
+import { POSITIONS, type Participation, type Volunteer, type VolunteerHr } from '@/lib/types'
 import { NationalIdCard, PersonalFields, personalDefaults, personalSchema, toPersonalPayload, type PersonalValues } from './MyProfile'
 
 type Tab = 'data' | 'interview' | 'committee' | 'activities'
@@ -181,6 +181,7 @@ function EditPersonal({ v }: { v: Volunteer }) {
 
 /** Status, job and committees (volunteers.edit) and the interview data (hr.*). */
 function Interview({ v }: { v: Volunteer }) {
+  const opts = useStatusOptions()
   const qc = useQueryClient()
   const p = usePermissions()
   const lookups = useLookups()
@@ -248,7 +249,7 @@ function Interview({ v }: { v: Volunteer }) {
         <fieldset disabled={!canEditStatus} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <legend className="mb-2 text-sm font-bold text-brand-800 sm:col-span-2">الحالة والوظيفة واللجان</legend>
           <Field label="حالة المتطوع">
-            <Select {...form.register('status')} options={STATUSES} />
+            <Select {...form.register('status')} options={withCurrent(opts.statuses, v.status)} />
           </Field>
           <Field label="الوظيفة" hint="بتحدد مكانه في الهيكل">
             <Select {...form.register('position')} options={POSITIONS} />
@@ -264,7 +265,7 @@ function Interview({ v }: { v: Volunteer }) {
           <fieldset disabled={!canEditHr} className="grid grid-cols-1 gap-4 border-t border-line pt-4 sm:grid-cols-2">
             <legend className="mb-2 text-sm font-bold text-brand-800 sm:col-span-2">المقابلة</legend>
             <Field label="درجة القبول" hint={hr.data?.status_changed_at ? `آخر تغيير ${fmtShort(hr.data.status_changed_at)}` : undefined}>
-              <Select {...form.register('acceptance')} placeholder="—" options={ACCEPTANCE} />
+              <Select {...form.register('acceptance')} placeholder="—" options={withCurrent(opts.acceptance, hr.data?.acceptance)} />
             </Field>
             <Field label="تاريخ المقابلة">
               <Input type="date" {...form.register('interview_date')} />

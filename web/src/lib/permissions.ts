@@ -40,6 +40,7 @@ export const PERMISSION_GROUPS = [
       { key: 'stats.view', label: 'يشوف الإحصائيات' },
       { key: 'data.export', label: 'ينزّل البيانات Excel' },
       { key: 'data.import', label: 'يضيف بيانات من Excel' },
+      { key: 'backup.manage', label: 'ينزّل نسخة احتياطية كاملة ويسترجعها (فيها الرقم القومي وملاحظات HR)' },
       { key: 'log.view', label: 'يشوف السجل' },
       { key: 'settings.manage', label: 'يعدّل القوائم والإعدادات وجروبات الواتساب' },
       { key: 'roles.manage', label: 'يدّي ويشيل صلاحيات' },

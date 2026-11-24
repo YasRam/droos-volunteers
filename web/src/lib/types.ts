@@ -1,7 +1,9 @@
 /** Key of a row in public.roles (built-in: admin, activity_leader, hr, management, organizer). */
 export type AppRole = string
-export type VolunteerStatus = 'تحت المتابعة' | 'مشروع مسئول' | 'مسئول' | 'مدرب' | 'خارج المتابعة'
-export type AcceptanceGrade = 'اختبار' | 'مقبول' | 'رفض الانترفيو' | 'مرفوض' | 'معتذر' | 'معتذر نهائى' | 'مفصول'
+/** Values come from the «حالة المتطوع» list (editable); these are the defaults. */
+export type VolunteerStatus = string
+/** Values come from the «حالة القبول» list (editable); these are the defaults. */
+export type AcceptanceGrade = string
 export type RequestStatus = 'pending' | 'accepted' | 'rejected'
 /** الوظيفة: one per volunteer, drives the structure tree. */
 export type Position = 'متطوع' | 'HR' | 'تنظيم' | 'ليدر لجنة' | 'نائب ليدر النشاط' | 'ليدر النشاط'

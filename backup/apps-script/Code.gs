@@ -7,6 +7,7 @@
  *
  * - السر (token) بيفضل هنا في خصائص السكريبت بس؛ الموقع بيعرف بصمته (SHA-256) مش هو.
  * - بيحتفظ بآخر 30 نسخة يومية + أول نسخة في كل شهر.
+ * - صور البطايق بتتنسخ في فولدر «صور البطايق» جوه نفس الفولدر (الجديد بس كل يوم).
  * - لو النسخة فشلت، جوجل بيبعتلك إيميل.
  */
 
@@ -14,6 +15,7 @@ const FUNCTION_URL = 'https://vxeseshwjcnenddhiuby.supabase.co/functions/v1/back
 // Public anon key (not a secret). Only needed if the function checks JWTs.
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4ZXNlc2h3amNuZW5kZGhpdWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU0MjY0NDQsImV4cCI6MjExMTAwMjQ0NH0.KJie-4aegTr71IJjlYPhTw90x_DcAq_rtYzqusY7LJ8';
 const FOLDER_NAME = 'نسخ احتياطية - دروس التقوية';
+const IMAGES_FOLDER = 'صور البطايق';
 const KEEP_DAILY = 30;
 const HOUR = 3;
 
@@ -68,7 +70,8 @@ function backup() {
     const file = folder_().createFile(blob);
     file.setDescription('صفوف: ' + parsed.rows + ' · ' + JSON.stringify(parsed.counts));
     prune_();
-    report_(token, name, { ok: true, bytes: blob.getBytes().length, rows: parsed.rows, tables: Object.keys(parsed.counts || {}).length });
+    const images = copyImages_(token, parsed.tables && parsed.tables.volunteers);
+    report_(token, name, { ok: true, bytes: blob.getBytes().length, rows: parsed.rows, tables: Object.keys(parsed.counts || {}).length, images: images });
   } catch (e) {
     report_(token, name, { ok: false, error: String(e && e.message || e) });
     throw e;
@@ -89,6 +92,42 @@ function folder_() {
   f.setDescription('نسخ احتياطية يومية من بيانات نشاط دروس التقوية. فيها بيانات شخصية: ما تشاركش الفولدر.');
   props.setProperty('FOLDER_ID', f.getId());
   return f;
+}
+
+/** Copies ID card photos not yet in Drive. Returns how many photos the Drive folder holds. */
+function copyImages_(token, volunteers) {
+  const res = UrlFetchApp.fetch(FUNCTION_URL, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { 'x-backup-token': token, Authorization: 'Bearer ' + ANON_KEY, apikey: ANON_KEY },
+    payload: JSON.stringify({ images: true }),
+    muteHttpExceptions: true,
+  });
+  if (res.getResponseCode() !== 200) throw new Error('قايمة الصور: ' + res.getResponseCode() + ' ' + res.getContentText().slice(0, 200));
+  const list = JSON.parse(res.getContentText()).images || [];
+  const parent = folder_();
+  const found = parent.getFoldersByName(IMAGES_FOLDER);
+  const dir = found.hasNext() ? found.next() : parent.createFolder(IMAGES_FOLDER);
+
+  const have = {};
+  const it = dir.searchFiles('trashed = false');
+  let count = 0;
+  while (it.hasNext()) {
+    have[it.next().getDescription()] = true;
+    count++;
+  }
+  const who = {};
+  (volunteers || []).forEach((v) => (who[v.id] = (v.code || '') + ' ' + (v.full_name_ar || '')));
+  list.forEach((img) => {
+    if (have[img.path]) return;
+    const r = UrlFetchApp.fetch(img.url, { muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) return;
+    const vid = img.path.split('/')[0];
+    const file = dir.createFile(r.getBlob().setName(((who[vid] || vid) + ' - ' + img.path.split('/').pop()).trim()));
+    file.setDescription(img.path);
+    count++;
+  });
+  return count;
 }
 
 /** Keep the newest KEEP_DAILY files, plus the first file of every month. */

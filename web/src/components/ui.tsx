@@ -134,7 +134,8 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
   )
 }
 
-export function Badge({ tone = 'gray', children }: { tone?: 'gray' | 'brand' | 'green' | 'orange' | 'red' | 'purple' | 'blue'; children: ReactNode }) {
+export type Tone = 'gray' | 'brand' | 'green' | 'orange' | 'red' | 'purple' | 'blue'
+export function Badge({ tone = 'gray', children }: { tone?: Tone; children: ReactNode }) {
   return (
     <span
       className={cn(
@@ -154,11 +155,11 @@ export function Badge({ tone = 'gray', children }: { tone?: 'gray' | 'brand' | '
 }
 
 export function StatusBadge({ status }: { status: VolunteerStatus }) {
-  const tone = { 'مسئول': 'purple', 'مشروع مسئول': 'blue', 'تحت المتابعة': 'green', 'مدرب': 'brand', 'خارج المتابعة': 'gray' } as const
-  return <Badge tone={tone[status]}>{status}</Badge>
+  const tone: Record<string, Tone> = { 'مسئول': 'purple', 'مشروع مسئول': 'blue', 'تحت المتابعة': 'green', 'مدرب': 'brand', 'خارج المتابعة': 'gray' }
+  return <Badge tone={tone[status] ?? 'blue'}>{status}</Badge>
 }
 
-export const ACCEPTANCE_TONE = {
+export const ACCEPTANCE_TONE: Record<string, Tone> = {
   اختبار: 'orange',
   مقبول: 'green',
   'رفض الانترفيو': 'red',
@@ -166,11 +167,11 @@ export const ACCEPTANCE_TONE = {
   معتذر: 'gray',
   'معتذر نهائى': 'gray',
   مفصول: 'red',
-} as const
+}
 
-export function AcceptanceBadge({ value }: { value: keyof typeof ACCEPTANCE_TONE | null | undefined }) {
+export function AcceptanceBadge({ value }: { value: string | null | undefined }) {
   if (!value) return <Badge>لسه</Badge>
-  return <Badge tone={ACCEPTANCE_TONE[value]}>{value}</Badge>
+  return <Badge tone={ACCEPTANCE_TONE[value] ?? 'blue'}>{value}</Badge>
 }
 
 export function RequestBadge({ status }: { status: RequestStatus }) {
