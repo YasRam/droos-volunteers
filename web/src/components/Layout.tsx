@@ -35,6 +35,7 @@ import { PageErrorBoundary } from '@/components/PageErrorBoundary'
 import { LangSwitch } from '@/components/LangSwitch'
 import { PasswordButton } from '@/components/PasswordModal'
 import { PushSwitch } from './PushToggle'
+import { useJobs } from '@/lib/jobs'
 
 interface NavItem {
   to: string
@@ -137,7 +138,8 @@ export default function Layout() {
 
   // Bottom bar: the four most used for this person, the rest under "المزيد"
   const bottom = items.slice(0, 4)
-  const roleLabel = me?.position && me.position !== 'متطوع' ? me.position : p.leader ? 'ليدر لجنة' : me?.position ?? me?.role_name ?? 'متطوع'
+  const { jobOf } = useJobs()
+  const roleLabel = p.volunteerId ? jobOf({ id: p.volunteerId, position: me?.position }) : (me?.role_name ?? '')
   const displayName = me?.full_name || me?.email || ''
 
   return (

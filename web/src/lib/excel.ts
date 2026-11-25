@@ -32,7 +32,6 @@ export const VOLUNTEER_COLUMNS: Column[] = [
   { key: 'gender', header: 'النوع', readOnly: true, width: 7 },
   { key: 'registered_at', header: 'تاريخ التسجيل', kind: 'date', width: 12 },
   { key: 'status', header: 'الحالة', width: 14 },
-  { key: 'position', header: 'الوظيفة في النشاط', readOnly: true, width: 14 },
   { key: 'main_committee', header: 'اللجنة الأساسية', width: 14 },
   { key: 'sub_committee', header: 'اللجنة الفرعية', width: 14 },
   { key: 'contacted', header: 'اتواصلنا معاه', kind: 'bool', width: 10 },

@@ -8,6 +8,7 @@ import { usePermissions } from '@/lib/auth'
 import { useLookups, useVolunteers, type VolunteerWithStats } from '@/lib/data'
 import { supabase } from '@/lib/supabase'
 import type { CommitteeLeader } from '@/lib/types'
+import { useJobs } from '@/lib/jobs'
 
 const NO_COMMITTEE = 'من غير لجنة'
 
@@ -46,7 +47,6 @@ export default function Tree() {
 
   const byPosition = (pos: string) => (vols.data ?? []).filter((v) => v.position === pos)
   const top = [...byPosition('ليدر النشاط'), ...byPosition('نائب ليدر النشاط')]
-  const team = [...byPosition('HR'), ...byPosition('تنظيم')]
   const total = committees.reduce((n, c) => n + c.main.length, 0)
 
   if (vols.isLoading || people.isLoading) return <Spinner />
@@ -76,16 +76,6 @@ export default function Tree() {
           )}
         </div>
       </Card>
-      {team.length > 0 && (
-        <Card className="mt-3">
-          <p className="mb-2 text-sm font-bold text-muted">فريق HR والتنظيم</p>
-          <div className="flex flex-wrap gap-2">
-            {team.map((v) => (
-              <Person key={v.id} v={v} tone="gray" />
-            ))}
-          </div>
-        </Card>
-      )}
 
       {/* Branches */}
       <div className="ms-4 border-s-2 border-brand-200 ps-4 pt-4 sm:ms-6 sm:ps-6">
@@ -167,10 +157,11 @@ function CommitteeNode({
 }
 
 function Person({ v, tone }: { v: VolunteerWithStats; tone: 'purple' | 'brand' | 'gray' }) {
+  const { jobOf } = useJobs()
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-white py-1 ps-3 pe-1.5 text-sm font-semibold ring-1 ring-brand-200">
       <VolunteerName id={v.id} name={v.full_name_ar} />
-      <Badge tone={tone}>{v.position}</Badge>
+      <Badge tone={tone}>{jobOf(v)}</Badge>
     </span>
   )
 }

@@ -12,6 +12,7 @@ import { addDays, cairoToday, fmtDate, fmtShort, useLookups, useSetting, useStat
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import { type MonthlyParticipation, type VolunteerStats } from '@/lib/types'
+import { useJobs } from '@/lib/jobs'
 
 const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
 
@@ -24,7 +25,8 @@ export default function Home() {
   const vols = useVolunteers(seesVolunteers)
 
   const firstName = me?.full_name?.split(' ')[0] ?? me?.email?.split('@')[0]
-  const role = me?.position && me.position !== 'متطوع' ? me.position : p.leader ? 'ليدر لجنة' : me?.position ?? me?.role_name ?? 'متطوع'
+  const { jobOf } = useJobs()
+  const role = p.volunteerId ? jobOf({ id: p.volunteerId, position: me?.position }) : (me?.role_name ?? '')
 
   return (
     <div className="space-y-5">

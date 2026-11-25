@@ -16,12 +16,14 @@ import { ageFrom, fmtShort, useLookups, useStatusOptions, whatsappLink, withCurr
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import { accountCall, tempPassword } from '@/lib/account'
-import { POSITIONS, type Participation, type Volunteer, type VolunteerHr } from '@/lib/types'
+import { type Participation, type Volunteer, type VolunteerHr } from '@/lib/types'
 import { NationalIdCard, PersonalFields, personalDefaults, personalSchema, toPersonalPayload, type PersonalValues } from './MyProfile'
+import { useJobs } from '@/lib/jobs'
 
 type Tab = 'data' | 'interview' | 'committee' | 'activities'
 
 export default function VolunteerDetail() {
+  const { jobOf } = useJobs()
   const { id } = useParams<{ id: string }>()
   const p = usePermissions()
   const { me } = useAuth()
@@ -76,7 +78,7 @@ export default function VolunteerDetail() {
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
             <StatusBadge status={v.status} />
-            <Badge tone="brand">{v.position}</Badge>
+            <Badge tone="brand">{jobOf(v)}</Badge>
             <span className="ltr">{v.code}</span>
             {v.main_committee && <span>· {v.main_committee}</span>}
             {age !== null && <span>· {age} سنة</span>}
@@ -220,7 +222,6 @@ function Interview({ v }: { v: Volunteer }) {
   const form = useForm({
     values: {
       status: v.status,
-      position: v.position,
       main_committee: v.main_committee ?? '',
       sub_committee: v.sub_committee ?? '',
       acceptance: hr.data?.acceptance ?? '',
@@ -235,7 +236,7 @@ function Interview({ v }: { v: Volunteer }) {
       if (canEditStatus) {
         const a = await supabase
           .from('volunteers')
-          .update({ status: f.status, position: f.position, main_committee: f.main_committee || null, sub_committee: f.sub_committee || null })
+          .update({ status: f.status, main_committee: f.main_committee || null, sub_committee: f.sub_committee || null })
           .eq('id', v.id)
         if (a.error) throw a.error
       }
@@ -268,12 +269,9 @@ function Interview({ v }: { v: Volunteer }) {
     <Card>
       <form onSubmit={form.handleSubmit((f) => save.mutate(f))} className="space-y-5">
         <fieldset disabled={!canEditStatus} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <legend className="mb-2 text-sm font-bold text-brand-800 sm:col-span-2">الحالة والوظيفة واللجان</legend>
+          <legend className="mb-2 text-sm font-bold text-brand-800 sm:col-span-2">الحالة واللجان</legend>
           <Field label="حالة المتطوع">
             <Select {...form.register('status')} options={withCurrent(opts.statuses, v.status)} />
-          </Field>
-          <Field label="الوظيفة" hint="بتحدد مكانه في الهيكل">
-            <Select {...form.register('position')} options={POSITIONS} />
           </Field>
           <Field label="اللجنة الأساسية">
             <Select {...form.register('main_committee')} placeholder="—" options={committees} />

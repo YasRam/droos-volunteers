@@ -11,9 +11,10 @@ import { usePermissions } from '@/lib/auth'
 import { ageFrom, fmtShort, useDirectory, useHrRows, useLookups, useStatusOptions, useVolunteers, type VolunteerWithStats } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
-import { POSITIONS, type VolunteerHr, type VolunteerStatus } from '@/lib/types'
+import { type VolunteerHr, type VolunteerStatus } from '@/lib/types'
 import { ContactLinks, VolunteerName } from '@/components/VolunteerLink'
 import { PersonalFields, personalSchema, toPersonalPayload, type PersonalValues } from './MyProfile'
+import { JOB_KINDS, useJobs } from '@/lib/jobs'
 
 const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
 
@@ -55,6 +56,7 @@ const isStale = (v: VolunteerWithStats) =>
   v.status !== 'خارج المتابعة' && (!v.stats?.last_participation || Date.now() - Date.parse(v.stats.last_participation) > 30 * DAY)
 
 function FullList() {
+  const { kindOf } = useJobs()
   const opts = useStatusOptions()
   const p = usePermissions()
   const navigate = useNavigate()
@@ -81,7 +83,7 @@ function FullList() {
       if (s && !(v.full_name_ar.includes(s) || v.code.includes(s.toUpperCase()) || v.phone?.includes(s) || v.full_name_en?.toLowerCase().includes(s.toLowerCase())))
         return false
       if (filters.status && v.status !== filters.status) return false
-      if (filters.position && v.position !== filters.position) return false
+      if (filters.position && kindOf(v) !== filters.position) return false
       if (filters.acceptance && (hr.data?.get(v.id)?.acceptance ?? 'لسه') !== filters.acceptance) return false
       if (filters.committee && v.main_committee !== filters.committee && v.sub_committee !== filters.committee) return false
       if (filters.gender && v.gender !== filters.gender) return false
@@ -163,7 +165,7 @@ function FullList() {
             </Field>
           )}
           <Field label="الوظيفة">
-            <Select value={filters.position} onChange={(e) => set('position', e.target.value)} placeholder="الكل" options={POSITIONS} />
+            <Select value={filters.position} onChange={(e) => set('position', e.target.value)} placeholder="الكل" options={[...JOB_KINDS]} />
           </Field>
           <Field label="اللجنة">
             <Select value={filters.committee} onChange={(e) => set('committee', e.target.value)} placeholder="الكل" options={lookups.data?.list('اللجنة') ?? []} />
@@ -371,6 +373,7 @@ function VolunteerTable({
   onSort: (k: SortKey) => void
   onOpen: (id: string) => void
 }) {
+  const { jobOf } = useJobs()
   const [limit, setLimit] = useState(200)
   const Th = ({ k, children, className }: { k?: SortKey; children: ReactNode; className?: string }) => (
     <th className={clsx('whitespace-nowrap px-3 py-2 text-start font-semibold', className)}>
@@ -413,7 +416,7 @@ function VolunteerTable({
                 <td className="px-3 py-2">
                   <StatusBadge status={v.status} />
                 </td>
-                <td className="whitespace-nowrap px-3 py-2 text-xs">{v.position === 'متطوع' ? <span className="text-muted">متطوع</span> : <Badge tone="brand">{v.position}</Badge>}</td>
+                <td className="whitespace-nowrap px-3 py-2 text-xs">{jobOf(v) === 'متطوع' ? <span className="text-muted">متطوع</span> : <Badge tone="brand">{jobOf(v)}</Badge>}</td>
                 {full && (
                   <td className="px-3 py-2">
                     <AcceptanceBadge value={hr?.get(v.id)?.acceptance} />

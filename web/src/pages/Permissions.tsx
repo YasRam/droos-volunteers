@@ -11,6 +11,7 @@ import { toastError } from '@/lib/errors'
 import { ALL_PERMISSIONS, PERMISSION_GROUPS, type Permission } from '@/lib/permissions'
 import { supabase } from '@/lib/supabase'
 import type { CommitteeLeader, Role, StaffRole } from '@/lib/types'
+import { useJobs } from '@/lib/jobs'
 
 type Tab = 'people' | 'roles' | 'leaders'
 
@@ -112,6 +113,7 @@ function VolunteerPicker({ onPick, exclude = [] }: { onPick: (v: VolunteerWithSt
 // ------------------------------------------------------------------ people
 
 function People() {
+  const { jobOf } = useJobs()
   const staff = useStaff()
   const roles = useRoles()
   const vols = useVolunteers()
@@ -179,7 +181,7 @@ function People() {
                   </p>
                   <p className="ltr truncate text-start text-xs text-muted">{p.email}</p>
                   <div className="mt-2 flex flex-wrap gap-1">
-                    {p.volunteer ? <Badge tone="brand">{p.volunteer.position}</Badge> : <Badge>مش متطوع · بيظهر في السجل بس</Badge>}
+                    {p.volunteer ? <Badge tone="brand">{jobOf(p.volunteer)}</Badge> : <Badge>مش متطوع · بيظهر في السجل بس</Badge>}
                     {!p.active && (
                       <Badge tone="orange">
                         <Pause className="me-1 inline size-3" />
@@ -634,7 +636,6 @@ function Leaders() {
       const rows = committees.map((committee) => ({ email: normEmail(vol.email!), full_name: vol.full_name_ar, committee, volunteer_id: vol.id, role }))
       const { error } = await supabase.from('committee_leaders').upsert(rows, { onConflict: 'email,committee' })
       if (error) throw error
-      if (vol.position === 'متطوع') await supabase.from('volunteers').update({ position: role === 'ليدر' ? 'ليدر لجنة' : 'نائب ليدر لجنة' }).eq('id', vol.id)
     },
     onSuccess: () => {
       toast.success('اتحفظ')

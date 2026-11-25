@@ -6,6 +6,7 @@ import { Badge, Card, StatusBadge } from './ui'
 import { useParticipationSummary } from '@/lib/certificates'
 import { ageFrom, fmtDate } from '@/lib/data'
 import type { Volunteer } from '@/lib/types'
+import { useJobs } from '@/lib/jobs'
 
 const MONTH = 30.44 * 864e5
 
@@ -34,6 +35,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
  * and the participation totals.
  */
 export function VolunteerFacts({ v }: { v: Volunteer }) {
+  const { jobOf } = useJobs()
   const summary = useParticipationSummary(v.id)
   const age = ageFrom(v.birth_date)
   const s = summary.data
@@ -59,7 +61,7 @@ export function VolunteerFacts({ v }: { v: Volunteer }) {
           <span className="ltr">{v.code}</span>
         </Row>
         <Row label="الوظيفة">
-          <Badge tone="brand">{v.position}</Badge>
+          <Badge tone="brand">{jobOf(v)}</Badge>
         </Row>
         <Row label="الحالة">
           <StatusBadge status={v.status} />

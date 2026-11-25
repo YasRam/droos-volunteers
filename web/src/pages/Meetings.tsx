@@ -9,6 +9,7 @@ import { useAuth, usePermissions } from '@/lib/auth'
 import { cairoToday, fmtDate, useLookups, useVolunteers } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
+import { useJobs } from '@/lib/jobs'
 
 export type Meeting = {
   id: string
@@ -193,6 +194,7 @@ export default function Meetings() {
 }
 
 export function MeetingForm({ meeting, onClose }: { meeting: (Meeting & { attendees: string[] }) | null; onClose: () => void }) {
+  const { jobOf } = useJobs()
   const qc = useQueryClient()
   const { me } = useAuth()
   const p = usePermissions()
@@ -216,7 +218,7 @@ export function MeetingForm({ meeting, onClose }: { meeting: (Meeting & { attend
   const photos = usePhotos(meeting?.id)
   const [files, setFiles] = useState<File[]>([])
   const isFamily = f.event === FAMILY_DAY
-  const headRole = f.head_role || (f.head_id ? vols.data?.find((v) => v.id === f.head_id)?.position : '') || ''
+  const headRole = f.head_role || (f.head_id ? jobOf(vols.data?.find((v) => v.id === f.head_id)) : '') || ''
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['meetings'] })
     qc.invalidateQueries({ queryKey: ['followups'] })
