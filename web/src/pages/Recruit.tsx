@@ -87,7 +87,7 @@ export default function Recruit() {
   const list = tab === 'call' ? toCall : tab === 'booked' ? booked : tab === 'done' ? done : closed
   const s = search.trim()
   const shown = s ? list.filter((v) => v.full_name_ar.includes(s) || v.code.includes(s.toUpperCase()) || v.phone?.includes(s)) : list
-  const canEdit = p.can('hr.edit')
+  const canEdit = p.can('recruit.manage')
 
   return (
     <>

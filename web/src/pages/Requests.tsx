@@ -22,10 +22,10 @@ export default function Requests() {
   const [params, setParams] = useSearchParams()
   const tabs = [
     ...(p.canReview ? [{ value: 'attendance', label: 'الحضور' }] : []),
-    ...(p.can('stages.manage') ? [{ value: 'tshirts', label: 'التيشيرتات' }] : []),
+    ...(p.can('tshirts.manage') ? [{ value: 'tshirts', label: 'التيشيرتات' }] : []),
     ...(p.can('certificates.review') ? [{ value: 'certificates', label: 'شهادات التطوع' }] : []),
     ...(p.can('hr.view') ? [{ value: 'join', label: 'تسجيل تاني' }] : []),
-    ...(p.canReview || p.can('schedule.edit') ? [{ value: 'absences', label: 'اعتذارات الحصص' }] : []),
+    ...(p.can('absences.review') || p.can('schedule.edit') ? [{ value: 'absences', label: 'اعتذارات الحصص' }] : []),
   ]
   const tab = tabs.find((t) => t.value === params.get('tab'))?.value ?? tabs[0]?.value
   return (

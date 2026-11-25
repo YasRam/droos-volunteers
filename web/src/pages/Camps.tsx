@@ -21,7 +21,7 @@ const STATUS_LABEL = { confirmed: 'جاي', waitlist: 'انتظار', cancelled:
 /** Camps and mini camps: dates, seats, waiting list, attendance, and who still needs one. */
 export default function Camps() {
   const p = usePermissions()
-  const manage = p.can('stages.manage')
+  const manage = p.can('camps.manage')
   const vols = useVolunteers()
   const [editing, setEditing] = useState<Camp | 'new' | null>(null)
   const [open, setOpen] = useState<string | null>(null)

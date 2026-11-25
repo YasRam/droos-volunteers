@@ -95,7 +95,7 @@ export default function Layout() {
   const qc = useQueryClient()
   const [moreOpen, setMoreOpen] = useState(false)
   const [bellOpen, setBellOpen] = useState(false)
-  const pending = usePendingCount(p.canReview || p.can('stages.manage') || p.can('certificates.review'))
+  const pending = usePendingCount(p.canReview || p.can('tshirts.manage') || p.can('certificates.review') || p.can('absences.review'))
   const notifications = useNotifications(me?.email ?? null)
   const unread = notifications.data?.filter((n) => !n.read_at).length ?? 0
 
@@ -116,9 +116,9 @@ export default function Layout() {
   const items = useMemo<NavItem[]>(() => {
     const list: NavItem[] = [{ to: '/', label: 'الرئيسية', icon: Home }]
     if (p.volunteerId || p.canRegisterActivity) list.push({ to: '/check-in', label: 'تسجيل حضور', icon: Hand })
-    if (p.canReview || p.can('stages.manage') || p.can('certificates.review') || p.can('hr.view') || p.can('schedule.edit')) list.push({ to: '/requests', label: 'الطلبات', icon: Inbox, badge: pending.data })
-    if (p.can('hr.view')) list.push({ to: '/recruit', label: 'الجداد', icon: UserPlus })
-    if (p.can('stages.manage') || p.can('stats.view')) list.push({ to: '/camps', label: 'الكامبات', icon: Tent })
+    if (p.canReview || p.can('tshirts.manage') || p.can('certificates.review') || p.can('hr.view') || p.can('absences.review') || p.can('schedule.edit')) list.push({ to: '/requests', label: 'الطلبات', icon: Inbox, badge: pending.data })
+    if (p.can('hr.view') || p.can('recruit.manage')) list.push({ to: '/recruit', label: 'الجداد', icon: UserPlus })
+    if (p.can('camps.manage') || p.can('stats.view')) list.push({ to: '/camps', label: 'الكامبات', icon: Tent })
     if (p.canSeeVolunteers) list.push({ to: '/volunteers', label: 'المتطوعين', icon: Users })
     if (p.viewAll || p.leader) list.push({ to: '/tree', label: 'الهيكل', icon: Network })
     if (p.can('attendance.view_all') || p.can('attendance.register')) list.push({ to: '/followups', label: 'المتابعة اليومية', icon: ClipboardList })
@@ -127,7 +127,7 @@ export default function Layout() {
     if (p.volunteerId) list.push({ to: '/me', label: 'بياناتي', icon: UserRound })
     if (p.can('stats.view') || p.leader) list.push({ to: '/stats', label: 'الإحصائيات', icon: BarChart3 })
     if (p.can('stats.view')) list.push({ to: '/reports', label: 'التقارير', icon: FileBarChart })
-    if (p.can('attendance.register') || p.leader) list.push({ to: '/meetings', label: 'الاجتماعات', icon: CalendarCheck })
+    if (p.can('meetings.manage') || p.leader) list.push({ to: '/meetings', label: 'الاجتماعات', icon: CalendarCheck })
     if (p.can('roles.manage')) list.push({ to: '/permissions', label: 'الصلاحيات', icon: ShieldCheck })
     if (p.can('settings.manage')) list.push({ to: '/admin', label: 'الإعدادات', icon: Settings })
     else if (p.can('data.export') || p.can('backup.manage')) list.push({ to: '/admin?tab=data', label: 'البيانات', icon: FileSpreadsheet })

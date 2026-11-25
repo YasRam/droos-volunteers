@@ -671,4 +671,24 @@ select t.login('hr@test.com');
 select t.ok(volunteer_form((select id from volunteers where code = 'V9002')) is not null, 'HR prints anyone''s');
 commit;
 
+-- ---------- finer permissions + pause switch (29) ----------
+select t.ok((select permissions @> array['meetings.manage','absences.review'] from roles where key = 'organizer'), 'organizer keeps meetings and absences under the new names');
+select t.ok((select permissions @> array['camps.manage','tshirts.manage','rules.manage','recruit.manage','accounts.password'] from roles where key = 'admin'), 'admin has every new permission');
+select t.ok(position('camps.manage' in pg_get_functiondef('public.remind_camp(uuid)'::regprocedure)) > 0, 'camp reminder checks camps.manage');
+select t.ok(position('recruit.manage' in pg_get_functiondef('public.accept_volunteer(uuid)'::regprocedure)) > 0, 'accept checks recruit.manage');
+update staff_roles set active = false where email = 'org@test.com';
+begin;
+set local role authenticated;
+select t.login('org@test.com');
+select t.ok(app.my_permissions() = '{}', 'paused person has no permissions');
+select t.fails($$select review_absence((select id from class_absences limit 1), false)$$, 'paused person cannot review');
+commit;
+select t.ok(not ('org@test.com' = any (app.emails_with('absences.review'))), 'paused person gets no notifications');
+update staff_roles set active = true where email = 'org@test.com';
+begin;
+set local role authenticated;
+select t.login('org@test.com');
+select t.ok('meetings.manage' = any (app.my_permissions()), 'back on after un-pausing');
+commit;
+
 \echo ALL ROLE TESTS PASSED

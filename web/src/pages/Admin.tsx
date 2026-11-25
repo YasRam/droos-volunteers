@@ -21,7 +21,7 @@ export default function Admin() {
   const [params, setParams] = useSearchParams()
   const tabs = [
     ...(p.can('settings.manage') ? [{ value: 'lists' as Tab, label: 'القوائم' }, { value: 'groups' as Tab, label: 'جروبات الواتساب' }] : []),
-    ...(p.can('stages.manage') ? [{ value: 'stages' as Tab, label: 'مراحل التطوع والقواعد' }] : []),
+    ...(p.can('stages.manage') || p.can('rules.manage') ? [{ value: 'stages' as Tab, label: 'مراحل التطوع والقواعد' }] : []),
     ...(p.can('data.export') || p.can('backup.manage') || p.can('settings.manage') ? [{ value: 'data' as Tab, label: 'البيانات والنسخ الاحتياطية' }] : []),
   ]
   const tab = (tabs.find((t) => t.value === params.get('tab'))?.value ?? tabs[0]?.value) as Tab
@@ -31,7 +31,7 @@ export default function Admin() {
       <Tabs value={tab} onChange={(t) => setParams({ tab: t })} tabs={tabs} />
       {tab === 'lists' && <Lists />}
       {tab === 'groups' && <Groups />}
-      {tab === 'stages' && <StagesSettings />}
+      {tab === 'stages' && (p.can('stages.manage') ? <StagesSettings withRules={p.can('rules.manage')} /> : <RulesEditor />)}
       {tab === 'data' && (
         <div className="space-y-6">
           {p.can('data.export') && (
@@ -705,7 +705,7 @@ const SOURCE_LABEL: Record<string, string> = {
 }
 
 /** The volunteer path: rename, reorder, hide, add stages; and the activity rules text. */
-function StagesSettings() {
+function StagesSettings({ withRules }: { withRules: boolean }) {
   const qc = useQueryClient()
   const q = useQuery({
     queryKey: ['admin', 'stages'],
@@ -819,7 +819,7 @@ function StagesSettings() {
           </Button>
         </div>
       </Card>
-      <RulesEditor />
+      {withRules && <RulesEditor />}
     </div>
   )
 }

@@ -170,6 +170,7 @@ export interface StaffRole {
   full_name: string
   role: AppRole
   volunteer_id: string | null
+  active: boolean
   created_at: string
 }
 

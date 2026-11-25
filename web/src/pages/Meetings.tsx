@@ -198,11 +198,11 @@ export function MeetingForm({ meeting, onClose }: { meeting: (Meeting & { attend
   const p = usePermissions()
   const lookups = useLookups()
   const vols = useVolunteers()
-  const committees = p.can('attendance.register') ? [...new Set(['فريق العمل', ...(lookups.data?.list('اللجنة') ?? [])])] : (me?.committees ?? [])
+  const committees = p.can('meetings.manage') ? [...new Set(['فريق العمل', ...(lookups.data?.list('اللجنة') ?? [])])] : (me?.committees ?? [])
   const [f, setF] = useState({
     event: meeting?.event ?? 'أجتماع',
     meeting_date: meeting?.meeting_date ?? cairoToday(),
-    committee: meeting?.committee ?? (p.can('attendance.register') ? '' : (me?.committees?.[0] ?? '')),
+    committee: meeting?.committee ?? (p.can('meetings.manage') ? '' : (me?.committees?.[0] ?? '')),
     head_id: meeting?.head_id ?? me?.volunteer_id ?? null,
     head_name: meeting?.head_name ?? '',
     head_role: meeting?.head_role ?? '',

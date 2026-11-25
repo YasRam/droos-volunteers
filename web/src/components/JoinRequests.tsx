@@ -78,7 +78,7 @@ export function JoinRequests() {
   return (
     <div className="space-y-4">
       {q.data.map((r) => (
-        <RequestCard key={r.id} r={r} canEdit={p.can('hr.edit')} busy={review.isPending} onReview={(approve, reopen) => review.mutate({ id: r.id, approve, reopen })} />
+        <RequestCard key={r.id} r={r} canEdit={p.can('recruit.manage')} busy={review.isPending} onReview={(approve, reopen) => review.mutate({ id: r.id, approve, reopen })} />
       ))}
     </div>
   )

@@ -135,7 +135,7 @@ export default function VolunteerDetail() {
         <div className="space-y-4">
           <Interview v={v} />
           {p.can('hr.view') && <RecruitCard volunteerId={v.id} />}
-          {p.can('hr.edit') && <TempPasswordCard volunteerId={v.id} name={v.full_name_ar} email={v.email} phone={v.whatsapp || v.phone} />}
+          {p.can('accounts.password') && <TempPasswordCard volunteerId={v.id} name={v.full_name_ar} email={v.email} phone={v.whatsapp || v.phone} />}
           <FollowupCard v={v} canEdit={p.can('volunteers.edit')} canNote={p.can('volunteers.edit') || p.leader} />
         </div>
       )}
