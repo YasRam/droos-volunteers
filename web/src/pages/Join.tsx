@@ -192,8 +192,9 @@ function Shell({ children }: { children: ReactNode }) {
         <img src={`${import.meta.env.BASE_URL}logo-mark.png`} alt="" className="size-14 object-contain" />
         <div>
           <p className="font-bold">نشاط دروس التقوية</p>
-          <p className="text-xs text-muted">فرع إسكندرية</p>
+          <p className="text-xs text-muted">جمعية رسالة للأعمال الخيرية · فرع إسكندرية</p>
         </div>
+        <img src={`${import.meta.env.BASE_URL}resala.png`} alt="رسالة" className="ms-auto h-10 w-auto object-contain" />
       </div>
       {children}
     </div>

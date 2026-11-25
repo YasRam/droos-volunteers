@@ -14,7 +14,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.png', 'apple-touch-icon.png', 'logo.png', 'logo-mark.png'],
+      includeAssets: ['favicon.png', 'apple-touch-icon.png', 'logo-mark.png', 'resala.png'],
       manifest: {
         name: 'نشاط دروس التقوية',
         short_name: 'دروس التقوية',

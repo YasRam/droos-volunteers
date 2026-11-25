@@ -1518,7 +1518,12 @@
     "موقوفة": "Paused",
     "كل نوع = مجموعة أذونات. الشخص ممكن ياخد أكتر من نوع، وبياخد كل أذوناتهم مع بعض.": "Each type is a set of permissions. A person can hold several types and gets all of them combined.",
     "الصلاحية متسجلة بس مش شغالة: مش هيقدر يعمل بيها حاجة ولا هتوصله إشعاراتها لحد ما تفعّلها.": "The permission is saved but off: they can’t use it and won’t get its notifications until you turn it on.",
-    "الإذن": "Permission"
+    "الإذن": "Permission",
+    "جمعية رسالة للأعمال الخيرية · فرع إسكندرية": "Resala Charity Organization · Alexandria branch",
+    "رسالة · فرع إسكندرية": "Resala · Alexandria branch",
+    "نشاط دروس التقوية · جمعية رسالة · فرع إسكندرية": "Tutoring Activity · Resala · Alexandria branch",
+    "جمعية رسالة": "Resala",
+    "رسالة": "Resala"
   },
   "patterns": [
     [

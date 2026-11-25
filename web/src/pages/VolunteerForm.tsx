@@ -90,7 +90,10 @@ export default function VolunteerForm() {
         <header className="flex items-start justify-between gap-4 border-b-2 border-brand-700 pb-3">
           <img src={`${import.meta.env.BASE_URL}logo-mark.png`} alt="" className="size-16 shrink-0 object-contain" />
           <div className="flex-1">
-            <p className="text-xs text-muted">نشاط دروس التقوية · فرع إسكندرية</p>
+            <p className="flex items-center gap-2 text-xs text-muted">
+              <img src={`${import.meta.env.BASE_URL}resala.png`} alt="" className="h-6 w-auto object-contain" />
+              نشاط دروس التقوية · جمعية رسالة · فرع إسكندرية
+            </p>
             <h1 className="text-xl font-bold">استمارة تطوع</h1>
             <p className="mt-1 text-xs text-muted">
               كود المتطوع: <b className="ltr">{f.code}</b> · اتطبعت {fmtDate(new Date().toISOString())}

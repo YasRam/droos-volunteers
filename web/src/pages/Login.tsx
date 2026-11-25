@@ -16,8 +16,9 @@ export default function Login() {
   return (
     <div className="grid min-h-dvh place-items-center bg-gradient-to-b from-brand-50 to-surface px-6">
       <div className="w-full max-w-sm text-center">
-        <img src={`${import.meta.env.BASE_URL}logo.png`} alt="نشاط دروس التقوية" className="mx-auto h-36 w-auto object-contain" />
-        <p className="mt-1 text-muted">فرع إسكندرية</p>
+        <img src={`${import.meta.env.BASE_URL}logo-mark.png`} alt="" className="mx-auto h-32 w-auto object-contain" />
+        <h1 className="mt-3 text-2xl font-bold">نشاط دروس التقوية</h1>
+        <p className="mt-1 text-sm text-muted">جمعية رسالة للأعمال الخيرية · فرع إسكندرية</p>
         <Button
           size="lg"
           className="mt-8 w-full"
@@ -63,6 +64,7 @@ export default function Login() {
           </button>
         )}
         <LangSwitch className="mx-auto mt-6" />
+        <img src={`${import.meta.env.BASE_URL}resala.png`} alt="جمعية رسالة" className="mx-auto mt-10 h-12 w-auto object-contain opacity-90" />
       </div>
     </div>
   )
