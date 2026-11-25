@@ -189,7 +189,7 @@ function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="mx-auto min-h-dvh max-w-2xl px-4 py-8">
       <div className="mb-5 flex items-center gap-3">
-        <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="size-10" />
+        <img src={`${import.meta.env.BASE_URL}logo-mark.png`} alt="" className="size-14 object-contain" />
         <div>
           <p className="font-bold">نشاط دروس التقوية</p>
           <p className="text-xs text-muted">فرع إسكندرية</p>

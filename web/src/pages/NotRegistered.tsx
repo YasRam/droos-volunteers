@@ -6,7 +6,7 @@ export default function NotRegistered() {
   return (
     <div className="grid min-h-dvh place-items-center px-6">
       <div className="max-w-sm text-center">
-        <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="mx-auto size-16" />
+        <img src={`${import.meta.env.BASE_URL}logo-mark.png`} alt="" className="mx-auto size-16 object-contain" />
         <h1 className="mt-4 text-xl font-bold">الإيميل ده مش متسجل في النشاط</h1>
         <p className="mt-2 text-sm text-muted">
           دخلت بـ <span className="ltr font-semibold">{me?.email}</span>. اطلب من الـ HR يضيف الإيميل ده في بياناتك، أو ادخل بإيميل تاني.
@@ -23,7 +23,7 @@ export function Offline({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="grid min-h-dvh place-items-center px-6">
       <div className="max-w-sm text-center">
-        <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="mx-auto size-16" />
+        <img src={`${import.meta.env.BASE_URL}logo-mark.png`} alt="" className="mx-auto size-16 object-contain" />
         <h1 className="mt-4 text-xl font-bold">مش قادرين نوصل للسيرفر</h1>
         <p className="mt-2 text-sm text-muted">اتأكد إن النت شغال وجرب تاني.</p>
         <Button className="mt-6" onClick={onRetry}>
@@ -39,7 +39,7 @@ export function Inactive() {
   return (
     <div className="grid min-h-dvh place-items-center px-6">
       <div className="max-w-sm text-center">
-        <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="mx-auto size-16" />
+        <img src={`${import.meta.env.BASE_URL}logo-mark.png`} alt="" className="mx-auto size-16 object-contain" />
         <h1 className="mt-4 text-xl font-bold">الحساب ده مش فعال</h1>
         <p className="mt-2 text-sm text-muted">حسابك مقفول لأنك خارج المتابعة أو خرجت من النشاط. لو عايز ترجع أو ده غلط، كلّم الـ HR.</p>
         <Button className="mt-6" variant="secondary" onClick={signOut}>

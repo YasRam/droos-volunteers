@@ -16,8 +16,7 @@ export default function Login() {
   return (
     <div className="grid min-h-dvh place-items-center bg-gradient-to-b from-brand-50 to-surface px-6">
       <div className="w-full max-w-sm text-center">
-        <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="mx-auto size-20" />
-        <h1 className="mt-4 text-2xl font-bold">نشاط دروس التقوية</h1>
+        <img src={`${import.meta.env.BASE_URL}logo.png`} alt="نشاط دروس التقوية" className="mx-auto h-36 w-auto object-contain" />
         <p className="mt-1 text-muted">فرع إسكندرية</p>
         <Button
           size="lg"

@@ -88,7 +88,8 @@ export default function VolunteerForm() {
 
       <article className="rounded-2xl bg-white p-6 text-[13px] leading-6 ring-1 ring-line print:rounded-none print:p-0 print:ring-0">
         <header className="flex items-start justify-between gap-4 border-b-2 border-brand-700 pb-3">
-          <div>
+          <img src={`${import.meta.env.BASE_URL}logo-mark.png`} alt="" className="size-16 shrink-0 object-contain" />
+          <div className="flex-1">
             <p className="text-xs text-muted">نشاط دروس التقوية · فرع إسكندرية</p>
             <h1 className="text-xl font-bold">استمارة تطوع</h1>
             <p className="mt-1 text-xs text-muted">

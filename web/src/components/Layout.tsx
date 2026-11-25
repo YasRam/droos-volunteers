@@ -145,7 +145,7 @@ export default function Layout() {
       {/* Sidebar (desktop) */}
       <aside className="sticky top-0 hidden h-dvh print:!hidden w-64 shrink-0 flex-col border-e border-line bg-white lg:flex">
         <div className="flex items-center gap-2 px-5 py-5">
-          <img src={`${import.meta.env.BASE_URL}favicon.svg`} className="size-9" alt="" />
+          <img src={`${import.meta.env.BASE_URL}logo-mark.png`} className="size-9 object-contain" alt="" />
           <div>
             <p className="font-bold leading-tight">دروس التقوية</p>
             <p className="text-xs text-muted">فرع إسكندرية</p>
@@ -173,7 +173,7 @@ export default function Layout() {
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex h-14 print:hidden items-center justify-between border-b border-line bg-white/90 px-4 backdrop-blur">
           <div className="flex items-center gap-2 lg:hidden">
-            <img src={`${import.meta.env.BASE_URL}favicon.svg`} className="size-8" alt="" />
+            <img src={`${import.meta.env.BASE_URL}logo-mark.png`} className="size-8 object-contain" alt="" />
             <div className="min-w-0 leading-tight">
               <p className="truncate text-sm font-bold">{displayName}</p>
               <p className="truncate text-[11px] text-muted">{roleLabel}</p>
