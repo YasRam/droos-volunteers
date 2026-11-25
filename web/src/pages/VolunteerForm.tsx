@@ -18,7 +18,6 @@ type Form = Record<string, unknown> & {
 }
 
 const d = (x: unknown) => (x ? fmtDate(String(x)) : '')
-const yes = (b: unknown, date?: unknown) => (b ? `نعم${date ? ` (${fmtDate(String(date))})` : ''}` : 'لأ')
 
 /** استمارة التطوع: every detail, a photo box and signature lines, laid out for one A4 page. */
 export default function VolunteerForm() {
@@ -124,14 +123,7 @@ export default function VolunteerForm() {
           <Row label="الحالة" value={f.status} />
           <Row label="الوظيفة" value={[f.position, ...(f.leads ?? [])].filter(Boolean).join(' · ')} />
           <Row label="اللجنة" value={[f.main_committee, f.sub_committee].filter(Boolean).join(' / ')} />
-          <Row label="الانترفيو" value={[d(f.interview_date), f.interviewer].filter(Boolean).join(' · ')} />
-          <Row label="نتيجة الانترفيو" value={f.acceptance} />
-          <Row label="المشاركات" value={f.participations ? `${f.participations} · من ${d(f.first_activity)} لـ ${d(f.last_activity)}` : 'لسه'} wide />
-          <Row label="الميني كامب" value={yes(f.attended_minicamp, f.minicamp_date)} />
-          <Row label="الكامب" value={yes(f.attended_camp, f.camp_date)} />
-          <Row label="حفلة التخرج" value={yes(f.attended_graduation, f.graduation_date)} />
-          <Row label="التيشيرت" value={yes(f.bought_tshirt)} />
-          <Row label="الموافقة على القواعد" value={f.rules_agreed ? d(f.rules_agreed) : 'لسه'} />
+          <Row label="الموافقة على القواعد" value={d(f.rules_agreed)} />
         </Section>
 
         <section className="mt-5 break-inside-avoid">
@@ -140,7 +132,6 @@ export default function VolunteerForm() {
           </p>
           <div className="mt-8 grid grid-cols-2 gap-10 text-[12px]">
             <Sign label="إمضاء المتطوع" />
-            <Sign label="إمضاء مسئول الـ HR" />
           </div>
         </section>
       </article>
