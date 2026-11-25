@@ -1,3 +1,4 @@
+import { useTeaches } from '@/lib/students'
 import { isEn } from '../lib/i18n'
 import clsx from 'clsx'
 import {
@@ -14,6 +15,7 @@ import {
   Inbox,
   LogOut,
   Mail,
+  GraduationCap,
   Menu,
   Network,
   Settings,
@@ -98,6 +100,7 @@ export default function Layout() {
   const qc = useQueryClient()
   const [moreOpen, setMoreOpen] = useState(false)
   const [bellOpen, setBellOpen] = useState(false)
+  const teaches = useTeaches(p.volunteerId)
   const pending = usePendingCount(p.canReview || p.can('tshirts.manage') || p.can('certificates.review') || p.can('absences.review'))
   const notifications = useNotifications(me?.email ?? null)
   const unread = notifications.data?.filter((n) => !n.read_at).length ?? 0
@@ -126,6 +129,7 @@ export default function Layout() {
     if (p.viewAll || p.leader) list.push({ to: '/tree', label: 'الهيكل', icon: Network })
     if (p.can('attendance.view_all') || p.can('attendance.register')) list.push({ to: '/followups', label: 'المتابعة اليومية', icon: ClipboardList })
     list.push({ to: '/schedule', label: 'جدول الحصص', icon: CalendarDays })
+    if (p.can('students.view_all') || p.can('students.attendance') || teaches.data) list.push({ to: '/students', label: 'الطلاب', icon: GraduationCap })
     if (p.volunteerId) list.push({ to: '/me/activities', label: 'أنشطتي', icon: UsersRound })
     if (p.volunteerId) list.push({ to: '/me', label: 'بياناتي', icon: UserRound })
     if (p.can('stats.view') || p.leader) list.push({ to: '/stats', label: 'الإحصائيات', icon: BarChart3 })
@@ -137,7 +141,7 @@ export default function Layout() {
     else if (p.can('data.export') || p.can('backup.manage')) list.push({ to: '/admin?tab=data', label: 'البيانات', icon: FileSpreadsheet })
     if (p.can('log.view')) list.push({ to: '/log', label: 'السجل', icon: History })
     return list
-  }, [p, pending.data])
+  }, [p, pending.data, teaches.data])
 
   // Bottom bar: the four most used for this person, the rest under "المزيد"
   const bottom = items.slice(0, 4)

@@ -14,6 +14,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Layout from '@/components/Layout'
 import { Spinner } from '@/components/ui'
 import { useAuth, usePermissions } from '@/lib/auth'
+import { useTeaches } from '@/lib/students'
 import Login from '@/pages/Login'
 import NotRegistered, { Inactive, Offline } from '@/pages/NotRegistered'
 import Home from '@/pages/Home'
@@ -31,6 +32,7 @@ const Schedule = lazy(() => import('@/pages/Schedule'))
 const Stats = lazy(() => import('@/pages/Stats'))
 const Reports = lazy(() => import('@/pages/Reports'))
 const ManagementMail = lazy(() => import('@/pages/ManagementMail'))
+const Students = lazy(() => import('@/pages/students/Students'))
 const Meetings = lazy(() => import('@/pages/Meetings'))
 const Admin = lazy(() => import('@/pages/Admin'))
 const Permissions = lazy(() => import('@/pages/Permissions'))
@@ -46,6 +48,8 @@ function Guard({ allow, children }: { allow: boolean; children: ReactNode }) {
 export default function App() {
   const { ready, session, known, failed, retry, inactive } = useAuth()
   const p = usePermissions()
+  const teaches = useTeaches(p.volunteerId)
+  const studentsAllowed = p.can('students.view_all') || p.can('students.attendance') || Boolean(teaches.data) || teaches.isLoading
   const devAuth = import.meta.env.DEV && Boolean(import.meta.env.VITE_DEV_ACCESS_TOKEN)
   const { pathname } = useLocation()
 
@@ -83,6 +87,7 @@ export default function App() {
           <Route path="schedule" element={<Schedule />} />
           <Route path="stats" element={<Guard allow={p.can('stats.view') || p.leader}><Stats /></Guard>} />
           <Route path="reports" element={<Guard allow={p.can('stats.view')}><Reports /></Guard>} />
+          <Route path="students/*" element={<Guard allow={studentsAllowed}><Students /></Guard>} />
           <Route path="mail" element={<Guard allow={p.can('mail.management')}><ManagementMail /></Guard>} />
           <Route path="meetings" element={<Guard allow={p.can('meetings.manage') || p.leader}><Meetings /></Guard>} />
           <Route path="tree" element={<Guard allow={p.viewAll || p.leader}><Tree /></Guard>} />
