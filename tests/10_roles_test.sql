@@ -629,5 +629,8 @@ select t.ok((select (my_context()->>'inactive')::boolean), 'left the activity �
 select t.ok(app.my_volunteer_id() is null, 'and sees nothing of their own');
 commit;
 update volunteer_hr set acceptance = 'مقبول' where volunteer_id = (select id from volunteers where email = 'vol2@test.com');
+update volunteers set status = 'خارج المتابعة' where email = 'vol2@test.com';
+select t.ok(app.account_closed('vol2@test.com'), 'خارج المتابعة closes the account too');
+update volunteers set status = 'تحت المتابعة' where email = 'vol2@test.com';
 
 \echo ALL ROLE TESTS PASSED

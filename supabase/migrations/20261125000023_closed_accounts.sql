@@ -58,7 +58,7 @@ begin
   if position('account_closed' in src) = 0 then
     src := replace(src, '  return jsonb_build_object(''ok'', true, ''volunteer_id'', v.id,',
       '  if app.account_closed(p_email) then
-    return jsonb_build_object(''ok'', false, ''error'', ''الحساب ده مش فعال لأنك خرجت من النشاط. لو ده غلط كلّم الـ HR'');
+    return jsonb_build_object(''ok'', false, ''error'', ''الحساب ده مش فعال. لو ده غلط كلّم الـ HR'');
   end if;
   return jsonb_build_object(''ok'', true, ''volunteer_id'', v.id,');
     execute src;
