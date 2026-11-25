@@ -28,6 +28,22 @@ window.addEventListener('vite:preloadError', (e) => {
   reloadOnce()
 })
 
+// A new version takes over as soon as it is installed (autoUpdate); reload once so the page runs it,
+// instead of people needing two manual refreshes after every release.
+if ('serviceWorker' in navigator) {
+  const hadController = Boolean(navigator.serviceWorker.controller)
+  let reloaded = false
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloaded) return
+    reloaded = true
+    location.reload()
+  })
+  // check for a new version when the app comes back to the front
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') navigator.serviceWorker.getRegistration().then((r) => r?.update())
+  })
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
