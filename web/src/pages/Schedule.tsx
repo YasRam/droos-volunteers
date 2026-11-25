@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { Pencil, Plus } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { VolunteerName } from '@/components/VolunteerLink'
+import { VolunteerChips } from '@/components/VolunteerPick'
 import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Spinner, Tabs } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
 import { fmtTime, timeInput, useDirectory, useLookups, withCurrent } from '@/lib/data'
@@ -19,6 +20,8 @@ type View = 'day' | 'grade' | 'teacher' | 'coverage'
 
 export default function Schedule() {
   const p = usePermissions()
+  const directory = useDirectory()
+  const dirName = useCallback((id: string) => directory.data?.find((v) => v.id === id)?.full_name_ar ?? '…', [directory.data])
   const lookups = useLookups()
   const [view, setView] = useState<View>('day')
   const [day, setDay] = useState('')
@@ -41,16 +44,23 @@ export default function Schedule() {
       (!day || s.day === day) && (!grade || s.grade === grade) && (!kind || (s.kind ?? 'حصة') === kind) && (!teacher || (s.teacher_name ?? '').includes(teacher)),
   )
   const groups = useMemo(() => {
-    const key = (s: ScheduleSlot) => (view === 'day' ? s.day : view === 'grade' ? s.grade : s.teacher_name || 'من غير مدرس')
+    const keys = (s: ScheduleSlot): string[] =>
+      view === 'day'
+        ? [s.day]
+        : view === 'grade'
+          ? [s.grade]
+          : slotTeachers(s).length > 1
+            ? slotTeachers(s).map((id) => dirName(id))
+            : [s.teacher_name || 'من غير مدرس']
     const m = new Map<string, ScheduleSlot[]>()
-    for (const s of rows) m.set(key(s), [...(m.get(key(s)) ?? []), s])
+    for (const s of rows) for (const k of keys(s)) m.set(k, [...(m.get(k) ?? []), s])
     const entries = [...m.entries()]
     if (view === 'day') entries.sort((a, b) => WEEKDAYS.indexOf(a[0] as Weekday) - WEEKDAYS.indexOf(b[0] as Weekday))
     else entries.sort((a, b) => a[0].localeCompare(b[0], 'ar'))
     return entries
-  }, [rows, view])
+  }, [rows, view, dirName])
 
-  const mine = (s: ScheduleSlot) => Boolean(p.volunteerId && s.volunteer_id === p.volunteerId)
+  const mine = (s: ScheduleSlot) => Boolean(p.volunteerId && slotTeachers(s).includes(p.volunteerId))
 
   return (
     <>
@@ -105,7 +115,23 @@ export default function Schedule() {
                         {s.subject} · {view === 'grade' ? s.day : s.grade}
                       </p>
                       <p className={clsx('truncate text-xs', s.teacher_name ? 'text-muted' : 'italic text-gray-400')}>
-                        {view === 'teacher' ? s.day : s.volunteer_id ? <VolunteerName id={s.volunteer_id} name={s.teacher_name} /> : s.teacher_name || 'من غير مدرس'}
+                        {view === 'teacher' ? (
+                          s.day
+                        ) : slotTeachers(s).length > 1 ? (
+                          <>
+                            {slotTeachers(s).map((id, i) => (
+                              <span key={id}>
+                                {i > 0 && ' + '}
+                                <VolunteerName id={id} name={dirName(id)} />
+                              </span>
+                            ))}
+                            {' '}({s.teaching_mode === 'بالتبادل' ? `بالتبادل، الأسبوع ده: ${dirName(turnThisWeek(s) ?? '')}` : 'مع بعض'})
+                          </>
+                        ) : s.volunteer_id ? (
+                          <VolunteerName id={s.volunteer_id} name={s.teacher_name} />
+                        ) : (
+                          s.teacher_name || 'من غير مدرس'
+                        )}
                         {mine(s) && ' · حصتك'}
                       </p>
                       <SlotTags s={s} />
@@ -147,15 +173,19 @@ function SlotForm({ slot, onClose }: { slot: ScheduleSlot | null; onClose: () =>
       audience: slot?.audience ?? 'الكل',
       takes_attendance: slot?.takes_attendance ?? true,
       notes: slot?.notes ?? '',
+      teaching_mode: slot?.teaching_mode ?? 'مع بعض',
     },
   })
+  const [coTeachers, setCoTeachers] = useState<string[]>(slot?.co_teachers ?? [])
   const invalidate = () => qc.invalidateQueries({ queryKey: ['schedule'] })
   const save = useMutation({
     mutationFn: async (f: Parameters<Parameters<typeof form.handleSubmit>[0]>[0]) => {
       if (!f.grade || !f.subject) throw { message: 'اختار السنة والمادة' }
       if (f.ends_at <= f.starts_at) throw { message: 'وقت النهاية لازم يكون بعد البداية' }
       const teacher = f.volunteer_id ? dir.data?.find((v) => v.id === f.volunteer_id)?.full_name_ar : f.teacher_name
-      const payload = { ...f, volunteer_id: f.volunteer_id || null, teacher_name: teacher || null, place: f.place.trim() || null, notes: f.notes.trim() || null }
+      const co = coTeachers.filter((id) => id !== f.volunteer_id)
+      if (co.length && !f.volunteer_id) throw { message: 'اختار المتطوع الأساسي الأول، وبعدين ضيف اللي معاه' }
+      const payload = { ...f, volunteer_id: f.volunteer_id || null, teacher_name: teacher || null, place: f.place.trim() || null, notes: f.notes.trim() || null, co_teachers: co }
       const { error } = slot ? await supabase.from('schedule_slots').update(payload).eq('id', slot.id) : await supabase.from('schedule_slots').insert(payload)
       if (error) throw error
     },
@@ -197,6 +227,24 @@ function SlotForm({ slot, onClose }: { slot: ScheduleSlot | null; onClose: () =>
         <Field label="المتطوع">
           <Select {...form.register('volunteer_id')} placeholder="— مش متطوع —" options={(dir.data ?? []).map((v) => ({ value: v.id, label: v.full_name_ar }))} />
         </Field>
+        {form.watch('volunteer_id') && (
+          <div className="space-y-2 rounded-xl bg-surface p-3 sm:col-span-2">
+            <Field label="متطوعين تانيين على الحصة دي" hint="سيبها فاضية لو مدرس واحد">
+              <VolunteerChips value={coTeachers} onChange={setCoTeachers} />
+            </Field>
+            {coTeachers.length > 0 && (
+              <Field label="بيشتغلوا إزاي؟">
+                <Select
+                  {...form.register('teaching_mode')}
+                  options={[
+                    { value: 'مع بعض', label: 'مع بعض: كلهم في الحصة كل مرة' },
+                    { value: 'بالتبادل', label: 'بالتبادل: كل أسبوع واحد بالترتيب' },
+                  ]}
+                />
+              </Field>
+            )}
+          </div>
+        )}
         {!form.watch('volunteer_id') && (
           <div className="sm:col-span-2">
             <Field label="اسم المدرس" hint="لو المدرس مش متطوع في النشاط">
@@ -263,6 +311,17 @@ function SlotTags({ s }: { s: ScheduleSlot }) {
       ))}
     </div>
   )
+}
+
+/** Everyone on the class: the main volunteer first, then the others. */
+export const slotTeachers = (s: ScheduleSlot) => [s.volunteer_id, ...(s.co_teachers ?? [])].filter((x): x is string => Boolean(x))
+
+/** «بالتبادل»: one teacher a week, in order, counting weeks from Saturday 3 Jan 2026 (same as the server). */
+export function turnThisWeek(s: ScheduleSlot, day = new Date()) {
+  const all = slotTeachers(s)
+  if (s.teaching_mode !== 'بالتبادل' || all.length < 2) return null
+  const weeks = Math.floor((Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()) - Date.UTC(2026, 0, 3)) / (7 * 864e5))
+  return all.at(((weeks % all.length) + all.length) % all.length) ?? null
 }
 
 const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5))

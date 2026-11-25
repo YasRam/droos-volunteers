@@ -1429,7 +1429,14 @@
 "قاعدة جديدة": "New rule",
 "كل قاعدة لوحدها. لما تضيف قاعدة أو تغيّر كلامها وتحفظ، كل المتطوعين بيوصلهم إشعار ولازم يوافقوا عليها تاني. تغيير الترتيب بس مش بيطلب موافقة.": "One rule at a time. When you add or reword a rule and save, every volunteer is notified and must agree again. Reordering alone doesn't.",
 "موافق على الكل": "Agree to all",
-"وافق على كل قاعدة، ولو عندك سؤال أو اعتراض على قاعدة اكتب تعليق عليها وهنرجعلها معاك.": "Agree to each rule; if you have a question or objection, comment on it and we'll get back to you."
+"وافق على كل قاعدة، ولو عندك سؤال أو اعتراض على قاعدة اكتب تعليق عليها وهنرجعلها معاك.": "Agree to each rule; if you have a question or objection, comment on it and we'll get back to you.",
+"متطوعين تانيين على الحصة دي": "Other volunteers on this class",
+"سيبها فاضية لو مدرس واحد": "Leave empty for one teacher",
+"بيشتغلوا إزاي؟": "How do they work?",
+"مع بعض: كلهم في الحصة كل مرة": "Together: all of them every time",
+"بالتبادل: كل أسبوع واحد بالترتيب": "Taking turns: one each week, in order",
+"اختار المتطوع الأساسي الأول، وبعدين ضيف اللي معاه": "Pick the main volunteer first, then add the others",
+"مع بعض": "together"
 },
 "patterns": [
 [
@@ -2027,6 +2034,10 @@
 [
 "لسه {0}",
 "Pending {0}"
+],
+[
+"بالتبادل، الأسبوع ده: {0}",
+"taking turns, this week: {0}"
 ]
 ],
 "words": {

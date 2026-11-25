@@ -149,6 +149,8 @@ export interface ScheduleSlot {
   audience?: string
   takes_attendance?: boolean
   notes?: string | null
+  co_teachers?: string[]
+  teaching_mode?: 'مع بعض' | 'بالتبادل'
 }
 
 export interface Lookup {
