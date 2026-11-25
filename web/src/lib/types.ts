@@ -32,6 +32,7 @@ export interface MyContext {
   is_organizer: boolean
   committees: string[]
   volunteer_id: string | null
+  inactive?: boolean
 }
 
 export interface Volunteer {

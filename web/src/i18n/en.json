@@ -1414,7 +1414,9 @@
 "مفيش أي ملاحظات متسجلة عليه": "No notes recorded",
 "ملاحظات عليه": "Notes about them",
 "نسخ الرسالة": "Copy message",
-"ولا مشاركة": "No participation"
+"ولا مشاركة": "No participation",
+"الحساب ده مش فعال": "This account isn't active",
+"حسابك اتقفل لأنك خرجت من النشاط. لو عايز ترجع أو ده غلط، كلّم الـ HR.": "Your account was closed because you left the activity. To come back, or if this is a mistake, contact HR."
 },
 "patterns": [
 [

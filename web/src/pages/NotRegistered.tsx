@@ -33,3 +33,19 @@ export function Offline({ onRetry }: { onRetry: () => void }) {
     </div>
   )
 }
+
+export function Inactive() {
+  const { signOut } = useAuth()
+  return (
+    <div className="grid min-h-dvh place-items-center px-6">
+      <div className="max-w-sm text-center">
+        <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="mx-auto size-16" />
+        <h1 className="mt-4 text-xl font-bold">الحساب ده مش فعال</h1>
+        <p className="mt-2 text-sm text-muted">حسابك اتقفل لأنك خرجت من النشاط. لو عايز ترجع أو ده غلط، كلّم الـ HR.</p>
+        <Button className="mt-6" variant="secondary" onClick={signOut}>
+          خروج
+        </Button>
+      </div>
+    </div>
+  )
+}

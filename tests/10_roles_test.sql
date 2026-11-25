@@ -620,4 +620,14 @@ update volunteers set attended_graduation = true where code = 'V9003';
 select t.ok((select status::text from volunteers where code = 'V9003') = 'مسئول', 'the whole journey ends in مسئول');
 select t.fails($$select public.remind_camp((select id from camps order by camp_date limit 1))$$ , 'no reminder before login');
 
+-- ---------- closed accounts (23) ----------
+update volunteer_hr set acceptance = 'مفصول' where volunteer_id = (select id from volunteers where email = 'vol2@test.com');
+begin;
+set local role authenticated;
+select t.login('vol2@test.com');
+select t.ok((select (my_context()->>'inactive')::boolean), 'left the activity → inactive');
+select t.ok(app.my_volunteer_id() is null, 'and sees nothing of their own');
+commit;
+update volunteer_hr set acceptance = 'مقبول' where volunteer_id = (select id from volunteers where email = 'vol2@test.com');
+
 \echo ALL ROLE TESTS PASSED

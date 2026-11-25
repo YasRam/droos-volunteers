@@ -13,6 +13,8 @@ interface AuthState {
   known: boolean
   /** my_context failed (network, waking up) — not the same as an unknown email */
   failed: boolean
+  /** left the activity (مرفوض / مفصول / معتذر نهائى): signed in but closed */
+  inactive: boolean
   retry: () => void
   isLeader: boolean
   signIn: () => Promise<void>
@@ -65,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const me = meQuery.data ?? null
   const isLeader = (me?.committees.length ?? 0) > 0
-  const known = Boolean(me && (me.role || me.volunteer_id || isLeader))
+  const known = Boolean(me && (me.role || me.volunteer_id || isLeader || me.inactive))
 
   const value: AuthState = {
     session,
@@ -73,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     me,
     known,
     failed: meQuery.isError && !meQuery.data,
+    inactive: Boolean(me?.inactive),
     retry: () => void meQuery.refetch(),
     isLeader,
     signIn: async () => {

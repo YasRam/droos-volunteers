@@ -15,7 +15,7 @@ import Layout from '@/components/Layout'
 import { Spinner } from '@/components/ui'
 import { useAuth, usePermissions } from '@/lib/auth'
 import Login from '@/pages/Login'
-import NotRegistered, { Offline } from '@/pages/NotRegistered'
+import NotRegistered, { Inactive, Offline } from '@/pages/NotRegistered'
 import Home from '@/pages/Home'
 
 const MyActivities = lazy(() => import('@/pages/MyActivities'))
@@ -42,7 +42,7 @@ function Guard({ allow, children }: { allow: boolean; children: ReactNode }) {
 }
 
 export default function App() {
-  const { ready, session, known, failed, retry } = useAuth()
+  const { ready, session, known, failed, retry, inactive } = useAuth()
   const p = usePermissions()
   const devAuth = import.meta.env.DEV && Boolean(import.meta.env.VITE_DEV_ACCESS_TOKEN)
   const { pathname } = useLocation()
@@ -58,6 +58,7 @@ export default function App() {
   if (!session && !devAuth) return <Login />
   if (failed) return <Offline onRetry={retry} />
   if (!known) return <NotRegistered />
+  if (inactive) return <Inactive />
 
   return (
     <PageErrorBoundary>
