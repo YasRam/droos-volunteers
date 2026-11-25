@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { CertificateCard } from '@/components/CertificateCard'
 import { VolunteerFacts } from '@/components/VolunteerFacts'
 import MyActivities from '@/pages/MyActivities'
+import { Link } from 'react-router-dom'
 import { Button, Card, Field, Input, PageHeader, Spinner, Textarea } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
 import { useSetting } from '@/lib/data'
@@ -197,7 +198,15 @@ export default function MyProfile() {
 
   return (
     <>
-      <PageHeader title="بياناتي" subtitle={<span className="ltr">{v.code}</span>} />
+      <PageHeader
+        title="بياناتي"
+        subtitle={<span className="ltr">{v.code}</span>}
+        actions={
+          <Link to="/me/form">
+            <Button variant="secondary">استمارة التطوع والصورة</Button>
+          </Link>
+        }
+      />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <Card>

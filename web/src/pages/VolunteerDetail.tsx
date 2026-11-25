@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, MessageCircle, Phone, Trash2 } from 'lucide-react'
+import { ArrowRight, MessageCircle, Phone, Printer, Trash2 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -84,6 +84,13 @@ export default function VolunteerDetail() {
         }
         actions={
           <>
+            {(p.can('hr.view') || p.can('volunteers.edit')) && (
+              <Link to={`/volunteers/${v.id}/form`}>
+                <Button variant="secondary">
+                  <Printer className="size-4" /> الاستمارة
+                </Button>
+              </Link>
+            )}
             {v.phone && (
               <a href={`tel:${v.phone}`}>
                 <Button variant="secondary">

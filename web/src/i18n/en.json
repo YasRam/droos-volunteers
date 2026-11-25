@@ -364,7 +364,7 @@
 "بيظهر": "Showing",
 "بيظهر لمشروع مسئول ومسئول وليدر اللجان بس": "Shown only to candidates, responsible volunteers and committee leaders",
 "بيعدّ...": "Counting...",
-"تاريخ التسجيل": "Registration date",
+"تاريخ التسجيل": "Registered on",
 "تاريخ الكامب": "Camp date",
 "تاريخ المقابلة": "Interview date",
 "تاريخ الميلاد": "Birth date",
@@ -541,7 +541,7 @@
 "عرض بس. التعديل محتاج صلاحية تعديل المتطوعين أو المقابلة.": "View only. Editing needs the edit-volunteers or interview permission.",
 "عرض جدول": "Table view",
 "عرض كروت": "Card view",
-"عرف النشاط منين": "How they heard about us",
+"عرف النشاط منين": "How they heard of us",
 "عرفت نشاط دروس التقوية إزاي": "How did you hear about the tutoring activity",
 "عرفتنا منين": "How did you hear about us",
 "عرفنا منين": "How they heard about us",
@@ -1450,7 +1450,26 @@
 "لما مدرس يعتذر عن حصة، طلبه بيظهر هنا.": "When a teacher excuses themselves from a class, it shows here.",
 "موافقة": "Approve",
 "اعتذارات الحصص": "Class excuses",
-"طالب يعتذر": "asked to be excused"
+"طالب يعتذر": "asked to be excused",
+"اطبع": "Print",
+"غيّر الصورة": "Change photo",
+"ضيف صورة": "Add photo",
+"الطباعة بتطلع صفحة A4 من غير القايمة. لو مفيش صورة بيطلع مكان فاضي تلزق فيه صورة.": "Prints one A4 page without the menu. With no photo there's an empty box to stick one in.",
+"استمارة تطوع": "Volunteer form",
+"مكان الصورة": "Photo",
+"البيانات الشخصية": "Personal details",
+"بيانات النشاط": "Activity details",
+"الاستمارة": "Form",
+"استمارة التطوع والصورة": "Volunteer form & photo",
+"الصورة اتحفظت": "Photo saved",
+"الصورة أكبر من 3 ميجا": "The photo is over 3 MB",
+"مش متاح": "Not available",
+"الاستمارة بتظهر لصاحبها وللـ HR بس.": "The form is only for its owner and HR.",
+"إمضاء المتطوع": "Volunteer's signature",
+"إمضاء مسئول الـ HR": "HR signature",
+"أقر أنا الموقع أدناه إن البيانات دي صحيحة، وإني قريت قواعد نشاط دروس التقوية وموافق عليها، وهلتزم بيها طول فترة تطوعي.": "I, the undersigned, confirm these details are correct and that I have read and agree to the rules of the tutoring activity, and will follow them throughout my volunteering.",
+"الموافقة على القواعد": "Rules agreed",
+"الكلية والسنة": "College and year"
 },
 "patterns": [
 [
@@ -2056,6 +2075,10 @@
 [
 "السبب: {0}",
 "Reason: {0}"
+],
+[
+"اعتذر {0} مرة في آخر 3 شهور",
+"Excused {0} times in the last 3 months"
 ]
 ],
 "words": {

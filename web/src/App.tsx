@@ -36,6 +36,7 @@ const Permissions = lazy(() => import('@/pages/Permissions'))
 const Tree = lazy(() => import('@/pages/Tree'))
 const AuditLog = lazy(() => import('@/pages/AuditLog'))
 const Join = lazy(() => import('@/pages/Join'))
+const VolunteerForm = lazy(() => import('@/pages/VolunteerForm'))
 
 function Guard({ allow, children }: { allow: boolean; children: ReactNode }) {
   return allow ? <>{children}</> : <Navigate to="/" replace />
@@ -67,6 +68,8 @@ export default function App() {
         <Route element={<Layout />}>
           <Route index element={<Home />} />
           <Route path="me" element={<Guard allow={Boolean(p.volunteerId)}><MyProfile /></Guard>} />
+          <Route path="me/form" element={<Guard allow={Boolean(p.volunteerId)}><VolunteerForm /></Guard>} />
+          <Route path="volunteers/:id/form" element={<Guard allow={p.can('hr.view') || p.can('volunteers.edit')}><VolunteerForm /></Guard>} />
           <Route path="me/activities" element={<Guard allow={Boolean(p.volunteerId)}><MyActivities /></Guard>} />
           <Route path="volunteers" element={<Guard allow={p.canSeeVolunteers}><Volunteers /></Guard>} />
           <Route path="volunteers/:id" element={<Guard allow={p.viewAll || p.leader}><VolunteerDetail /></Guard>} />

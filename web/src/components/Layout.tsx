@@ -143,7 +143,7 @@ export default function Layout() {
   return (
     <div className="min-h-dvh lg:flex">
       {/* Sidebar (desktop) */}
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-e border-line bg-white lg:flex">
+      <aside className="sticky top-0 hidden h-dvh print:!hidden w-64 shrink-0 flex-col border-e border-line bg-white lg:flex">
         <div className="flex items-center gap-2 px-5 py-5">
           <img src={`${import.meta.env.BASE_URL}favicon.svg`} className="size-9" alt="" />
           <div>
@@ -171,7 +171,7 @@ export default function Layout() {
 
       <div className="min-w-0 flex-1">
         {/* Top bar */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-white/90 px-4 backdrop-blur">
+        <header className="sticky top-0 z-30 flex h-14 print:hidden items-center justify-between border-b border-line bg-white/90 px-4 backdrop-blur">
           <div className="flex items-center gap-2 lg:hidden">
             <img src={`${import.meta.env.BASE_URL}favicon.svg`} className="size-8" alt="" />
             <div className="min-w-0 leading-tight">
@@ -225,7 +225,7 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className="mx-auto max-w-5xl px-4 pb-28 pt-4 lg:pb-10">
+        <main className="mx-auto max-w-5xl px-4 pb-28 pt-4 lg:pb-10 print:max-w-none print:p-0">
           <PageErrorBoundary key={location.pathname}>
               <Suspense fallback={<Spinner />}>
                 <Outlet />
@@ -235,7 +235,7 @@ export default function Layout() {
       </div>
 
       {/* Bottom bar (mobile) */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 print:hidden grid grid-cols-5 border-t border-line bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
         {bottom.map((it) => (
           <BottomLink key={it.to} item={it} />
         ))}

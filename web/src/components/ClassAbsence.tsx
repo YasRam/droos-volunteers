@@ -96,6 +96,18 @@ export function AbsenceRequests() {
       return data as (Absence & { slot: Pick<ScheduleSlot, 'subject' | 'grade' | 'day' | 'starts_at' | 'place'>; volunteer: { full_name_ar: string } })[]
     },
   })
+  // how often each teacher excused themselves lately, so excuses don't become a habit
+  const history = useQuery({
+    queryKey: ['class-absences', 'history'],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10)
+      const { data, error } = await supabase.from('class_absences').select('volunteer_id').eq('status', 'approved').gte('on_date', since)
+      if (error) throw error
+      const m = new Map<string, number>()
+      for (const r of data as { volunteer_id: string }[]) m.set(r.volunteer_id, (m.get(r.volunteer_id) ?? 0) + 1)
+      return m
+    },
+  })
   const review = useMutation({
     mutationFn: async (a: { id: string; approve: boolean }) => {
       const { error } = await supabase.rpc('review_absence', { p_id: a.id, p_approve: a.approve })
@@ -124,6 +136,9 @@ export function AbsenceRequests() {
               {a.slot.place ? ` · ${a.slot.place}` : ''}
             </p>
             {a.reason && <p className="text-sm text-muted">السبب: {a.reason}</p>}
+            <p className={`text-xs ${(history.data?.get(a.volunteer_id) ?? 0) >= 2 ? 'font-bold text-red-600' : 'text-muted'}`}>
+              اعتذر {history.data?.get(a.volunteer_id) ?? 0} مرة في آخر 3 شهور
+            </p>
           </div>
           <Badge tone="orange">مستني</Badge>
           <div className="flex gap-2">

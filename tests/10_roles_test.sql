@@ -660,4 +660,15 @@ commit;
 select t.ok((select status from class_absences limit 1) = 'approved', 'organizer approves the excuse');
 select t.ok(exists (select 1 from notifications n join volunteers v on v.email = n.recipient_email where v.code = 'V9002' and n.title = 'تغيير في حصة'), 'the other teacher is told');
 
+-- ---------- volunteer form (28) ----------
+select t.ok(position('مستنيينك' in pg_get_functiondef('app.remind_classes_tomorrow()'::regprocedure)) > 0, 'night reminder no longer links to the excuse');
+begin;
+set local role authenticated;
+select t.login('vol1@test.com');
+select t.ok((volunteer_form(app.my_volunteer_id())->>'full_name_ar') is not null, 'volunteer prints their own form');
+select t.ok(volunteer_form((select id from volunteers where code = 'V9002')) is null, 'but not someone else''s');
+select t.login('hr@test.com');
+select t.ok(volunteer_form((select id from volunteers where code = 'V9002')) is not null, 'HR prints anyone''s');
+commit;
+
 \echo ALL ROLE TESTS PASSED
