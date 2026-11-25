@@ -433,12 +433,21 @@ select t.login('vol2@test.com');
 select t.ok(register_camp((select id from camps limit 1)) = 'waitlist', 'full camp → waiting list');
 select t.fails(format('select volunteer_stages(%L)', :'v9001'), 'volunteer cannot see others stages');
 commit;
-update app_settings set value = 'القواعد' where key = 'rules_text';
 begin;
 set local role authenticated;
+select t.login('admin@test.com');
+select t.ok(save_rules('[{"body":"القاعدة الأولى"},{"body":"القاعدة التانية"}]') = 2, 'admin saves two rules');
 select t.login('vol1@test.com');
+select t.ok(not answer_rules(jsonb_build_array(jsonb_build_object('rule_id', (select id from activity_rules order by sort_order limit 1), 'agreed', true),
+                                               jsonb_build_object('rule_id', (select id from activity_rules order by sort_order offset 1 limit 1), 'agreed', false, 'comment', 'محتاج توضيح'))), 'part agreed, one comment → not done');
+select t.ok(not (select done from volunteer_stages() where key = 'rules'), 'rules stage waits for every rule');
 select accept_rules();
 select t.ok((select done from volunteer_stages() where key = 'rules'), 'rules stage done after accepting');
+select t.login('admin@test.com');
+select t.ok(save_rules(jsonb_build_array(jsonb_build_object('id', (select id from activity_rules order by sort_order limit 1), 'body', 'القاعدة الأولى'),
+                                         jsonb_build_object('id', (select id from activity_rules order by sort_order offset 1 limit 1), 'body', 'القاعدة التانية بعد التعديل'))) = 1, 'one rule reworded');
+select t.login('vol1@test.com');
+select t.ok(not (select done from volunteer_stages() where key = 'rules'), 'a reworded rule needs agreeing again');
 select cancel_camp((select id from camps limit 1));
 commit;
 select t.ok((select r.status from camp_registrations r join volunteers v on v.id = r.volunteer_id where v.code = 'V9002') = 'confirmed', 'waiting list moves up');

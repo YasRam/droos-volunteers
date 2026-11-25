@@ -3,9 +3,10 @@ import clsx from 'clsx'
 import { ArrowDown, ArrowUp, Check, CircleAlert, CircleCheck, Download, Eye, Upload, EyeOff, HardDrive, Link2, Lock, MessageCircle, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Badge, Button, Card, Field, Input, Modal, PageHeader, Select, Spinner, Tabs, Textarea } from '@/components/ui'
+import { Badge, Button, Card, Field, Input, Modal, PageHeader, Select, Spinner, Tabs } from '@/components/ui'
 import { fmtDateTime } from '@/lib/data'
 import { toastError } from '@/lib/errors'
+import { RulesEditor } from '@/components/Rules'
 import { usePermissions } from '@/lib/auth'
 import { DataSection } from '@/pages/DataTools'
 import { useSearchParams } from 'react-router-dom'
@@ -823,49 +824,3 @@ function StagesSettings() {
   )
 }
 
-function RulesEditor() {
-  const qc = useQueryClient()
-  const q = useQuery({
-    queryKey: ['setting', 'rules'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('app_settings').select('key, value').in('key', ['rules_text', 'rules_version'])
-      if (error) throw error
-      const m = Object.fromEntries((data as { key: string; value: string | null }[]).map((r) => [r.key, r.value]))
-      return { text: m.rules_text ?? '', version: Number(m.rules_version ?? 1) }
-    },
-  })
-  const [text, setText] = useState<string | null>(null)
-  const [again, setAgain] = useState(false)
-  const save = useMutation({
-    mutationFn: async () => {
-      const rows = [{ key: 'rules_text', value: (text ?? '').trim() || null }]
-      if (again) rows.push({ key: 'rules_version', value: String((q.data?.version ?? 1) + 1) })
-      const { error } = await supabase.from('app_settings').upsert(rows)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      toast.success(again ? 'اتحفظت، وكل المتطوعين محتاجين يوافقوا تاني' : 'اتحفظت')
-      setText(null)
-      setAgain(false)
-      qc.invalidateQueries({ queryKey: ['setting'] })
-      qc.invalidateQueries({ queryKey: ['stages'] })
-    },
-    onError: toastError,
-  })
-  if (q.isLoading) return <Spinner />
-  const value = text ?? q.data?.text ?? ''
-  return (
-    <Card>
-      <p className="font-bold">قواعد النشاط</p>
-      <p className="mb-3 text-xs text-muted">كل متطوع بيقراها ويوافق عليها من الصفحة الرئيسية. النسخة رقم {q.data?.version}.</p>
-      <Textarea value={value} onChange={(e) => setText(e.target.value)} rows={12} placeholder="اكتب أو الصق القواعد هنا" />
-      <label className="mt-3 flex items-center gap-2 text-sm">
-        <input type="checkbox" className="size-4 accent-brand-700" checked={again} onChange={(e) => setAgain(e.target.checked)} />
-        تعديل مهم: اطلب من كل المتطوعين يوافقوا تاني
-      </label>
-      <Button className="mt-3" onClick={() => save.mutate()} loading={save.isPending} disabled={text === null && !again}>
-        حفظ القواعد
-      </Button>
-    </Card>
-  )
-}

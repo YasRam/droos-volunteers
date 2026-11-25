@@ -1112,7 +1112,7 @@
 "مكانك متأكد": "Seat confirmed",
 "ملاحظات للمتطوعين": "Notes for volunteers",
 "مواعيد جاية": "Upcoming dates",
-"موافق": "Accept",
+"موافق": "Agree",
 "ميعاد جديد": "New date",
 "هاجي، سجّلني": "I'm coming, register me",
 "وصف قصير (اختياري)": "Short description (optional)",
@@ -1417,7 +1417,19 @@
 "ولا مشاركة": "No participation",
 "الحساب ده مش فعال": "This account isn't active",
 "حسابك اتقفل لأنك خرجت من النشاط. لو عايز ترجع أو ده غلط، كلّم الـ HR.": "Your account was closed because you left the activity. To come back, or if this is a mistake, contact HR.",
-"حسابك مقفول لأنك خارج المتابعة أو خرجت من النشاط. لو عايز ترجع أو ده غلط، كلّم الـ HR.": "Your account is closed because you're out of follow-up or left the activity. To come back, or if this is a mistake, contact HR."
+"حسابك مقفول لأنك خارج المتابعة أو خرجت من النشاط. لو عايز ترجع أو ده غلط، كلّم الـ HR.": "Your account is closed because you're out of follow-up or left the activity. To come back, or if this is a mistake, contact HR.",
+"اتحفظ. القواعد اللي عليها تعليق هنرجعلها معاك": "Saved. We'll get back to you on the rules you commented on",
+"اتعدلت": "Changed",
+"اتعدلت (هيوافقوا تاني)": "Changed (they'll agree again)",
+"اكتب سؤالك أو تعليقك على القاعدة دي": "Write your question or comment on this rule",
+"تعليقك": "Your comment",
+"جديدة": "New",
+"شكرًا! وافقت على كل القواعد": "Thanks! You agreed to all rules",
+"عندي تعليق": "I have a comment",
+"قاعدة جديدة": "New rule",
+"كل قاعدة لوحدها. لما تضيف قاعدة أو تغيّر كلامها وتحفظ، كل المتطوعين بيوصلهم إشعار ولازم يوافقوا عليها تاني. تغيير الترتيب بس مش بيطلب موافقة.": "One rule at a time. When you add or reword a rule and save, every volunteer is notified and must agree again. Reordering alone doesn't.",
+"موافق على الكل": "Agree to all",
+"وافق على كل قاعدة، ولو عندك سؤال أو اعتراض على قاعدة اكتب تعليق عليها وهنرجعلها معاك.": "Agree to each rule; if you have a question or objection, comment on it and we'll get back to you."
 },
 "patterns": [
 [
@@ -1999,6 +2011,22 @@
 [
 "• ملاحظة متابعة: {0}",
 "• Follow-up note: {0}"
+],
+[
+"اتحفظت، واتبعت إشعار للمتطوعين بـ {0} قاعدة جديدة أو متعدلة",
+"Saved; volunteers notified about {0} new or changed rules"
+],
+[
+"تعليقات نرجعلها ({0})",
+"Comments to follow up ({0})"
+],
+[
+"وافق {0}",
+"Agreed {0}"
+],
+[
+"لسه {0}",
+"Pending {0}"
 ]
 ],
 "words": {

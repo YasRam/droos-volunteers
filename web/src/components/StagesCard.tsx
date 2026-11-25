@@ -7,6 +7,7 @@ import { Badge, Button, Card, Field, Input, Modal, Select, Spinner } from '@/com
 import { usePermissions } from '@/lib/auth'
 import { cairoToday, fmtDate, fmtShort } from '@/lib/data'
 import { toastError } from '@/lib/errors'
+import { RulesModal } from '@/components/Rules'
 import { supabase } from '@/lib/supabase'
 
 export type Stage = {
@@ -162,50 +163,6 @@ function useMyTshirt(enabled = true) {
       return data as { id: string; size: string | null } | null
     },
   })
-}
-
-function RulesModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  const rules = useQuery({
-    queryKey: ['setting', 'rules_text'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('app_settings').select('value').eq('key', 'rules_text').maybeSingle()
-      if (error) throw error
-      return (data?.value as string | null) ?? ''
-    },
-  })
-  const [read, setRead] = useState(false)
-  const accept = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.rpc('accept_rules')
-      if (error) throw error
-    },
-    onSuccess: () => {
-      toast.success('شكرًا! اتسجلت موافقتك')
-      onDone()
-      onClose()
-    },
-    onError: toastError,
-  })
-  return (
-    <Modal open onClose={onClose} title="قواعد النشاط">
-      {rules.isLoading ? (
-        <Spinner />
-      ) : !rules.data ? (
-        <p className="text-sm text-muted">القواعد لسه متكتبتش. هتظهر هنا أول ما الإدارة تضيفها.</p>
-      ) : (
-        <div className="space-y-4">
-          <div className="max-h-96 overflow-y-auto whitespace-pre-line rounded-xl bg-surface px-4 py-3 text-sm leading-7">{rules.data}</div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" className="size-4 accent-brand-700" checked={read} onChange={(e) => setRead(e.target.checked)} />
-            قريت القواعد وموافق عليها
-          </label>
-          <Button className="w-full" disabled={!read} loading={accept.isPending} onClick={() => accept.mutate()}>
-            موافق
-          </Button>
-        </div>
-      )}
-    </Modal>
-  )
 }
 
 function TshirtModal({ volunteerId, onClose, onDone }: { volunteerId: string; onClose: () => void; onDone: () => void }) {
