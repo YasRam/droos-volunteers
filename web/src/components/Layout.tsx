@@ -51,7 +51,7 @@ function usePendingCount(enabled: boolean) {
     queryFn: async () => {
       // Everything waiting in «الطلبات»: attendance, t-shirts, certificates (each only if visible to this user)
       const counts = await Promise.all(
-        ['participations', 'tshirt_requests', 'certificate_requests', 'registration_requests'].map(async (t) => {
+        ['participations', 'tshirt_requests', 'certificate_requests', 'registration_requests', 'class_absences'].map(async (t) => {
           const { count, error } = await supabase.from(t).select('id', { count: 'exact', head: true }).eq('status', 'pending')
           return error ? 0 : (count ?? 0)
         }),
@@ -116,7 +116,7 @@ export default function Layout() {
   const items = useMemo<NavItem[]>(() => {
     const list: NavItem[] = [{ to: '/', label: 'الرئيسية', icon: Home }]
     if (p.volunteerId || p.canRegisterActivity) list.push({ to: '/check-in', label: 'تسجيل حضور', icon: Hand })
-    if (p.canReview || p.can('stages.manage') || p.can('certificates.review') || p.can('hr.view')) list.push({ to: '/requests', label: 'الطلبات', icon: Inbox, badge: pending.data })
+    if (p.canReview || p.can('stages.manage') || p.can('certificates.review') || p.can('hr.view') || p.can('schedule.edit')) list.push({ to: '/requests', label: 'الطلبات', icon: Inbox, badge: pending.data })
     if (p.can('hr.view')) list.push({ to: '/recruit', label: 'الجداد', icon: UserPlus })
     if (p.can('stages.manage') || p.can('stats.view')) list.push({ to: '/camps', label: 'الكامبات', icon: Tent })
     if (p.canSeeVolunteers) list.push({ to: '/volunteers', label: 'المتطوعين', icon: Users })

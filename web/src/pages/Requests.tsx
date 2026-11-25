@@ -7,6 +7,7 @@ import { Badge, Button, Card, Empty, PageHeader, Spinner, Tabs } from '@/compone
 import { usePermissions } from '@/lib/auth'
 import Certificates from './Certificates'
 import { JoinRequests } from '@/components/JoinRequests'
+import { AbsenceRequests } from '@/components/ClassAbsence'
 import { useSearchParams } from 'react-router-dom'
 import { fmtShort, useDirectory } from '@/lib/data'
 import { toastError } from '@/lib/errors'
@@ -24,6 +25,7 @@ export default function Requests() {
     ...(p.can('stages.manage') ? [{ value: 'tshirts', label: 'التيشيرتات' }] : []),
     ...(p.can('certificates.review') ? [{ value: 'certificates', label: 'شهادات التطوع' }] : []),
     ...(p.can('hr.view') ? [{ value: 'join', label: 'تسجيل تاني' }] : []),
+    ...(p.canReview || p.can('schedule.edit') ? [{ value: 'absences', label: 'اعتذارات الحصص' }] : []),
   ]
   const tab = tabs.find((t) => t.value === params.get('tab'))?.value ?? tabs[0]?.value
   return (
@@ -34,6 +36,7 @@ export default function Requests() {
       {tab === 'tshirts' && <Tshirts />}
       {tab === 'certificates' && <Certificates embedded />}
       {tab === 'join' && <JoinRequests />}
+      {tab === 'absences' && <AbsenceRequests />}
     </>
   )
 }

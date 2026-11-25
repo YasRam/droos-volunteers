@@ -642,4 +642,22 @@ update volunteers set status = 'خارج المتابعة' where email = 'vol2@t
 select t.ok(app.account_closed('vol2@test.com'), 'خارج المتابعة closes the account too');
 update volunteers set status = 'تحت المتابعة' where email = 'vol2@test.com';
 
+-- ---------- class reminders and excuses (27) ----------
+select t.ok(app.weekday_of('2026-11-28') = 'السبت' and app.weekday_of('2026-11-27') = 'الجمعة', 'weekday names');
+insert into schedule_slots (day, grade, subject, volunteer_id, co_teachers, starts_at, ends_at)
+values (app.weekday_of(app.today() + 1), '1 ب', 'تجربة تذكير', (select id from volunteers where code = 'V9001'),
+        array[(select id from volunteers where code = 'V9002')], '16:00', '17:00');
+select t.ok(app.remind_classes_tomorrow() >= 1, 'night-before reminder sent');
+select t.ok(app.remind_classes_tomorrow() = 0, 'only once');
+begin;
+set local role authenticated;
+select t.login('vol1@test.com');
+select t.fails($$select request_absence((select id from schedule_slots where subject = 'تجربة تذكير'), app.today(), 'x')$$, 'no excuse on the day itself');
+select request_absence((select id from schedule_slots where subject = 'تجربة تذكير'), app.today() + 1, 'امتحان');
+select t.login('org@test.com');
+select review_absence((select id from class_absences limit 1), true);
+commit;
+select t.ok((select status from class_absences limit 1) = 'approved', 'organizer approves the excuse');
+select t.ok(exists (select 1 from notifications n join volunteers v on v.email = n.recipient_email where v.code = 'V9002' and n.title = 'تغيير في حصة'), 'the other teacher is told');
+
 \echo ALL ROLE TESTS PASSED

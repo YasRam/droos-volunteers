@@ -1,14 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { Pencil, Plus } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { AbsenceModal, useUpcomingAbsences } from '@/components/ClassAbsence'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { VolunteerName } from '@/components/VolunteerLink'
 import { VolunteerChips } from '@/components/VolunteerPick'
 import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Spinner, Tabs } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
-import { fmtTime, timeInput, useDirectory, useLookups, withCurrent } from '@/lib/data'
+import { fmtDate, fmtTime, timeInput, useDirectory, useLookups, withCurrent } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import { WEEKDAYS, type ScheduleSlot, type Weekday } from '@/lib/types'
@@ -29,6 +31,9 @@ export default function Schedule() {
   const [teacher, setTeacher] = useState('')
   const [kind, setKind] = useState('')
   const [editing, setEditing] = useState<ScheduleSlot | 'new' | null>(null)
+  const [params, setParams] = useSearchParams()
+  const [excuse, setExcuse] = useState<{ slot: ScheduleSlot; date?: string } | null>(null)
+  const absences = useUpcomingAbsences()
 
   const q = useQuery({
     queryKey: ['schedule'],
@@ -38,6 +43,15 @@ export default function Schedule() {
       return (data as ScheduleSlot[]).sort((a, b) => WEEKDAYS.indexOf(a.day) - WEEKDAYS.indexOf(b.day) || a.starts_at.localeCompare(b.starts_at))
     },
   })
+  // opened from the night-before reminder: /schedule?absence=<slot>&date=<day>
+  useEffect(() => {
+    const id = params.get('absence')
+    const slot = id ? q.data?.find((s) => s.id === id) : undefined
+    if (slot) {
+      setExcuse({ slot, date: params.get('date') ?? undefined })
+      setParams({}, { replace: true })
+    }
+  }, [params, q.data, setParams])
 
   const rows = (q.data ?? []).filter(
     (s) =>
@@ -135,7 +149,19 @@ export default function Schedule() {
                         {mine(s) && ' · حصتك'}
                       </p>
                       <SlotTags s={s} />
+                      {(absences.data ?? [])
+                        .filter((a) => a.slot_id === s.id)
+                        .map((a) => (
+                          <Badge key={a.id} tone={a.status === 'approved' ? 'red' : 'orange'}>
+                            {dirName(a.volunteer_id)} {a.status === 'approved' ? 'معتذر' : 'طالب يعتذر'} {fmtDate(a.on_date)}
+                          </Badge>
+                        ))}
                     </div>
+                    {mine(s) && (
+                      <Button size="sm" variant="ghost" onClick={() => setExcuse({ slot: s })}>
+                        اعتذار
+                      </Button>
+                    )}
                     {p.canEditSchedule && (
                       <button onClick={() => setEditing(s)} className="rounded-lg p-1.5 text-muted hover:bg-surface" aria-label="تعديل">
                         <Pencil className="size-4" />
@@ -150,6 +176,7 @@ export default function Schedule() {
       )}
       </>
       )}
+      {excuse && <AbsenceModal slot={excuse.slot} date={excuse.date} onClose={() => setExcuse(null)} />}
       {editing && <SlotForm slot={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
     </>
   )

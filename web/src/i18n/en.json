@@ -689,7 +689,7 @@
 "مشروع Apps Script جديد": "New Apps Script project",
 "مشروع مسئول": "Candidate for responsible",
 "مشروع مسئول (الاسم أزرق)": "Candidate (blue name)",
-"معتذر": "Excused",
+"معتذر": "excused",
 "معتذر نهائى": "Excused permanently",
 "مفصول": "Dismissed",
 "مفيش": "None",
@@ -793,7 +793,7 @@
 "ينزّل نسخة احتياطية كاملة ويسترجعها (فيها الرقم القومي وملاحظات HR)": "Downloads a full backup and restores it (includes national ID and HR notes)",
 "يوافق ويرفض طلبات الحضور": "Approves and rejects attendance requests",
 "يوليو": "July",
-"يوم": "days",
+"يوم": "Day",
 "يوم ·": "days ·",
 "يونيو": "June",
 "— مش متطوع —": "— not a volunteer —",
@@ -1436,7 +1436,21 @@
 "مع بعض: كلهم في الحصة كل مرة": "Together: all of them every time",
 "بالتبادل: كل أسبوع واحد بالترتيب": "Taking turns: one each week, in order",
 "اختار المتطوع الأساسي الأول، وبعدين ضيف اللي معاه": "Pick the main volunteer first, then add the others",
-"مع بعض": "together"
+"مع بعض": "together",
+"اعتذار": "Excuse",
+"اعتذار عن حصة": "Excuse from a class",
+"السبب": "Reason",
+"مثلاً: عندي امتحان": "e.g. I have an exam",
+"الاعتذار لازم يكون قبل يوم الحصة. في نفس اليوم كلّم التنظيم على طول.": "Excuses must be sent before the class day. On the day itself, call the organizers.",
+"ابعت الاعتذار": "Send the excuse",
+"اعتذارك وصل للتنظيم، وهيوصلك ردهم": "Your excuse reached the organizers; you'll get their answer",
+"اتقبل، واتبعت إشعار للمدرس واللي معاه في الحصة": "Approved; the teacher and co-teachers were notified",
+"اترفض، واتبعت إشعار للمدرس": "Rejected; the teacher was notified",
+"مفيش اعتذارات مستنية": "No pending excuses",
+"لما مدرس يعتذر عن حصة، طلبه بيظهر هنا.": "When a teacher excuses themselves from a class, it shows here.",
+"موافقة": "Approve",
+"اعتذارات الحصص": "Class excuses",
+"طالب يعتذر": "asked to be excused"
 },
 "patterns": [
 [
@@ -2038,6 +2052,10 @@
 [
 "بالتبادل، الأسبوع ده: {0}",
 "taking turns, this week: {0}"
+],
+[
+"السبب: {0}",
+"Reason: {0}"
 ]
 ],
 "words": {

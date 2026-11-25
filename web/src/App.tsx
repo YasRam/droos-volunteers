@@ -73,7 +73,7 @@ export default function App() {
           <Route path="check-in" element={<Guard allow={Boolean(p.volunteerId) || p.canRegisterActivity}><RegisterActivity /></Guard>} />
           <Route path="register" element={<Navigate to="/check-in" replace />} />
           <Route path="followups" element={<Guard allow={p.can('attendance.view_all') || p.can('attendance.register')}><FollowUps /></Guard>} />
-          <Route path="requests/*" element={<Guard allow={p.canReview || p.can('stages.manage') || p.can('certificates.review') || p.can('hr.view')}><Requests /></Guard>} />
+          <Route path="requests/*" element={<Guard allow={p.canReview || p.can('stages.manage') || p.can('certificates.review') || p.can('hr.view') || p.can('schedule.edit')}><Requests /></Guard>} />
           <Route path="recruit" element={<Guard allow={p.can('hr.view')}><Recruit /></Guard>} />
           <Route path="camps" element={<Guard allow={p.can('stages.manage') || p.can('stats.view')}><Camps /></Guard>} />
           <Route path="schedule" element={<Schedule />} />
