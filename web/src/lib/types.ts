@@ -6,8 +6,8 @@ export type VolunteerStatus = string
 export type AcceptanceGrade = string
 export type RequestStatus = 'pending' | 'accepted' | 'rejected'
 /** الوظيفة: one per volunteer, drives the structure tree. */
-export type Position = 'متطوع' | 'HR' | 'تنظيم' | 'ليدر لجنة' | 'نائب ليدر النشاط' | 'ليدر النشاط'
-export const POSITIONS: Position[] = ['متطوع', 'HR', 'تنظيم', 'ليدر لجنة', 'نائب ليدر النشاط', 'ليدر النشاط']
+export type Position = 'متطوع' | 'HR' | 'تنظيم' | 'ليدر لجنة' | 'نائب ليدر لجنة' | 'نائب ليدر النشاط' | 'ليدر النشاط'
+export const POSITIONS: Position[] = ['متطوع', 'HR', 'تنظيم', 'ليدر لجنة', 'نائب ليدر لجنة', 'نائب ليدر النشاط', 'ليدر النشاط']
 export type Weekday = 'السبت' | 'الأحد' | 'الاثنين' | 'الثلاثاء' | 'الأربعاء' | 'الخميس' | 'الجمعة'
 
 export const STATUSES: VolunteerStatus[] = ['تحت المتابعة', 'مشروع مسئول', 'مسئول', 'مدرب', 'خارج المتابعة']
@@ -184,6 +184,7 @@ export interface CommitteeLeader {
   committee: string
   full_name: string
   volunteer_id: string | null
+  role?: 'ليدر' | 'نائب'
 }
 
 export interface Notification {

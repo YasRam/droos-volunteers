@@ -103,7 +103,7 @@ const EVAL_GROUPS: { group: string; cols: { key: keyof EvalRow; label: string; t
 async function sendToSheet(report: 'eval' | 'meetings', month: string) {
   const { data: urlRow } = await supabase.from('app_settings').select('value').eq('key', 'sheets_webapp_url').maybeSingle()
   const url = urlRow?.value as string | undefined
-  if (!url) throw { message: 'الكتابة الفورية في الشيت محتاجة «لينك السكريبت» في «ربط الشيتات». من غيره الشيت بيتحدّث لوحده كل ساعة.' }
+  if (!url) throw { message: 'الزرار ده محتاج «لينك السكريبت» في التقارير ← ربط الشيتات (خطواته مكتوبة هناك).' }
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
   if (!token) throw { message: 'ادخل الموقع تاني' }
@@ -112,6 +112,24 @@ async function sendToSheet(report: 'eval' | 'meetings', month: string) {
   const out = (await res.json().catch(() => null)) as { ok: boolean; error?: string; url?: string; rows?: number; tab?: string } | null
   if (!out?.ok) throw { message: out?.error ?? 'السكريبت مردش' }
   return out
+}
+
+/** One tap: the evaluation sheet and the meetings sheet of the chosen month. */
+function SyncAll({ month }: { month: string }) {
+  const sync = useMutation({
+    mutationFn: async () => {
+      const a = await sendToSheet('eval', month)
+      const b = await sendToSheet('meetings', month)
+      return [a, b]
+    },
+    onSuccess: () => toast.success('الشيتين اتحدّثوا'),
+    onError: toastError,
+  })
+  return (
+    <Button onClick={() => sync.mutate()} loading={sync.isPending}>
+      <Send className="size-4" /> حدّث الشيتات دلوقتي
+    </Button>
+  )
 }
 
 function SendButton({ report, month, label }: { report: 'eval' | 'meetings'; month: string; label: string }) {
@@ -151,7 +169,7 @@ export default function Reports() {
   const [month, setMonth] = useState(cairoToday().slice(0, 7))
   return (
     <>
-      <PageHeader title="التقارير" subtitle="التقارير اللي بتتبعت كل شهر، بنفس شكل الشيتات" />
+      <PageHeader title="التقارير" subtitle="التقارير اللي بتتبعت كل شهر، بنفس شكل الشيتات" actions={<SyncAll month={month} />} />
       <Tabs tabs={tabs} value={tab} onChange={(t) => setParams({ tab: t })} />
       {(tab === 'eval' || tab === 'meetings') && (
         <Card className="mb-4 max-w-xs">
@@ -376,6 +394,17 @@ function SheetLinks() {
   return (
     <Card className="max-w-3xl space-y-4">
       <p className="text-sm text-muted">الشيتات دي بتاعتكم على جوجل درايف. الزرار بيكتب فيها هي نفسها، في تابة الشهر.</p>
+      <details className="rounded-xl bg-surface p-3 text-sm">
+        <summary className="cursor-pointer font-semibold">إزاي أجيب «لينك السكريبت»؟</summary>
+        <ol className="mt-2 list-decimal space-y-1 ps-5">
+          <li>افتح السكريبت «نسخ احتياطي - دروس التقوية» من script.google.com بحساب y.r.a.elnobe.</li>
+          <li>فوق على اليمين: Deploy ← New deployment.</li>
+          <li>جنب «Select type» دوس على الترس واختار Web app.</li>
+          <li>Execute as: Me — Who has access: Anyone. ودوس Deploy (لو طلب موافقة، وافق).</li>
+          <li>انسخ «Web app URL» اللي بيخلص بـ /exec وحطه في الخانة تحت واحفظ.</li>
+        </ol>
+        <p className="mt-2 text-xs text-muted">السكريبت مش بيكتب حاجة غير لو اللي داس الزرار داخل الموقع ومعاه صلاحية الإحصائيات.</p>
+      </details>
       {keys.map((k) => (
         <Field key={k.key} label={k.label} hint={k.hint}>
           <div className="flex items-center gap-2">

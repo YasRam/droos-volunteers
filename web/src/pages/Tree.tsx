@@ -58,26 +58,34 @@ export default function Tree() {
         <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="دوّر على متطوع في الشجرة" className="ps-10" />
       </div>
 
-      {/* Root: activity leader and deputy, then HR and organizers */}
+      {/* Root: the activity leader and deputy only */}
       <Card className="border-brand-200 bg-brand-50/60">
         <p className="mb-2 flex items-center gap-2 font-bold text-brand-800">
           <Crown className="size-5" /> قيادة النشاط
         </p>
         <div className="flex flex-wrap gap-2">
           {top.length ? (
-            top.map((v) => <Person key={v.id} v={v} tone={v.position === 'ليدر النشاط' ? 'purple' : 'brand'} />)
+            top.map((v) => (
+              <span key={v.id} className="inline-flex items-center gap-1">
+                <span className="text-xs text-muted">{v.position === 'ليدر النشاط' ? 'ليدر النشاط:' : 'النائب:'}</span>
+                <Person v={v} tone={v.position === 'ليدر النشاط' ? 'purple' : 'brand'} />
+              </span>
+            ))
           ) : (
-            <span className="text-sm text-muted">مفيش حد وظيفته «ليدر النشاط». حددها من ملف المتطوع ← الحالة والمقابلة.</span>
+            <span className="text-sm text-muted">لسه محدش متحدد. حددهم من الصلاحيات ← القيادة واللجان.</span>
           )}
         </div>
-        {team.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2 border-t border-brand-100 pt-3">
+      </Card>
+      {team.length > 0 && (
+        <Card className="mt-3">
+          <p className="mb-2 text-sm font-bold text-muted">فريق HR والتنظيم</p>
+          <div className="flex flex-wrap gap-2">
             {team.map((v) => (
               <Person key={v.id} v={v} tone="gray" />
             ))}
           </div>
-        )}
-      </Card>
+        </Card>
+      )}
 
       {/* Branches */}
       <div className="ms-4 border-s-2 border-brand-200 ps-4 pt-4 sm:ms-6 sm:ps-6">
@@ -118,7 +126,7 @@ function CommitteeNode({
         <span className="min-w-0 flex-1">
           <span className="block font-bold">{name}</span>
           <span className="block truncate text-xs text-muted">
-            {name === NO_COMMITTEE ? 'متطوعين مالهمش لجنة' : leaders.length ? 'الليدر: ' + leaders.map((l) => l.full_name).join('، ') : 'مفيش ليدر للجنة دي'}
+            {name === NO_COMMITTEE ? 'متطوعين مالهمش لجنة' : leaders.length ? leaders.map((l) => `${l.role ?? 'ليدر'}: ${l.full_name}`).join(' · ') : 'مفيش ليدر للجنة دي'}
           </span>
         </span>
         <Badge tone="brand">{main.length}</Badge>
@@ -131,7 +139,7 @@ function CommitteeNode({
             <div className="mb-3 flex flex-wrap gap-2">
               {leaders.map((l) => (
                 <span key={l.email} className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
-                  <Shield className="size-3.5" /> <VolunteerName id={l.volunteer_id!} name={l.full_name} />
+                  <Shield className="size-3.5" /> {l.role ?? 'ليدر'}: <VolunteerName id={l.volunteer_id!} name={l.full_name} />
                 </span>
               ))}
             </div>

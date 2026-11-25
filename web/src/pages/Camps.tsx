@@ -15,7 +15,7 @@ import { supabase } from '@/lib/supabase'
 type CampStat = { camp_id: string; kind: string; camp_date: string; title: string | null; capacity: number | null; confirmed: number; waitlist: number; cancelled: number; attended: number }
 type Reg = { camp_id: string; volunteer_id: string; status: 'confirmed' | 'waitlist' | 'cancelled'; attended: boolean; registered_at: string }
 
-const STATUS_LABEL = { confirmed: 'متأكد', waitlist: 'انتظار', cancelled: 'لغى' } as const
+const STATUS_LABEL = { confirmed: 'جاي', waitlist: 'انتظار', cancelled: 'اعتذر' } as const
 
 /** Camps and mini camps: dates, seats, waiting list, attendance, and who still needs one. */
 export default function Camps() {
@@ -231,6 +231,11 @@ function Registrations({ camp, manage }: { camp: Camp; manage: boolean }) {
           )}
         </div>
       )}
+      {manage && rows.length > 0 && (
+        <p className="mb-2 text-xs text-muted">
+          «جاي» يعني أكّد إنه هييجي. لو حد اعتذر بيفضل ظاهر هنا، وأول واحد في الانتظار بياخد مكانه لوحده. «حضر» علّمها يوم الكامب للي حضر فعلاً.
+        </p>
+      )}
       {q.isLoading ? (
         <Spinner />
       ) : !rows.length ? (
@@ -243,20 +248,26 @@ function Registrations({ camp, manage }: { camp: Camp; manage: boolean }) {
               <Badge tone={r.status === 'confirmed' ? 'green' : r.status === 'waitlist' ? 'orange' : 'gray'}>{STATUS_LABEL[r.status]}</Badge>
               {manage && (
                 <>
-                  <label className="flex items-center gap-1 text-xs">
-                    <input
-                      type="checkbox"
-                      className="size-4 accent-brand-700"
-                      checked={r.attended}
-                      onChange={(e) => run.mutate(() => supabase.rpc('set_camp_attendance', { p_camp: camp.id, p_volunteer: r.volunteer_id, p_attended: e.target.checked }))}
-                    />
-                    حضر
-                  </label>
-                  {r.status !== 'cancelled' && (
+                  {r.status === 'cancelled' ? (
+                    <Button variant="ghost" size="sm" onClick={() => run.mutate(() => supabase.rpc('register_camp', { p_camp: camp.id, p_volunteer: r.volunteer_id }))}>
+                      رجّعه
+                    </Button>
+                  ) : (
                     <Button variant="ghost" size="sm" className="text-red-600" onClick={() => run.mutate(() => supabase.rpc('cancel_camp', { p_camp: camp.id, p_volunteer: r.volunteer_id }))}>
-                      إلغاء
+                      اعتذر
                     </Button>
                   )}
+                  <button
+                    type="button"
+                    disabled={run.isPending}
+                    onClick={() => run.mutate(() => supabase.rpc('set_camp_attendance', { p_camp: camp.id, p_volunteer: r.volunteer_id, p_attended: !r.attended }))}
+                    className={clsx(
+                      'rounded-full px-3 py-1 text-xs font-bold ring-1 transition disabled:opacity-50',
+                      r.attended ? 'bg-emerald-600 text-white ring-emerald-600' : 'bg-white text-muted ring-line hover:ring-emerald-400',
+                    )}
+                  >
+                    {r.attended ? '✓ حضر' : 'حضر؟'}
+                  </button>
                 </>
               )}
             </div>
@@ -279,8 +290,16 @@ function CampForm({ camp, onClose }: { camp: Camp | null; onClose: () => void })
     notes: camp?.notes ?? '',
     registration_open: camp?.registration_open ?? true,
   })
+  const dateProblem = !f.camp_date
+    ? 'اختار اليوم'
+    : f.end_date && f.end_date < f.camp_date
+      ? '«لحد يوم» لازم يكون بعد اليوم نفسه أو هو'
+      : f.capacity && !(Number(f.capacity) > 0)
+        ? 'عدد الأماكن لازم يكون رقم أكبر من صفر'
+        : null
   const save = useMutation({
     mutationFn: async () => {
+      if (dateProblem) throw { message: dateProblem }
       const payload = {
         kind: f.kind,
         title: f.title.trim() || null,
@@ -325,8 +344,8 @@ function CampForm({ camp, onClose }: { camp: Camp | null; onClose: () => void })
         <Field label="اليوم">
           <Input type="date" value={f.camp_date} onChange={set('camp_date')} />
         </Field>
-        <Field label="لحد يوم (لو أكتر من يوم)">
-          <Input type="date" value={f.end_date} onChange={set('end_date')} />
+        <Field label="لحد يوم (لو أكتر من يوم)" error={f.end_date && f.end_date < f.camp_date ? 'لازم يكون بعد اليوم نفسه' : undefined}>
+          <Input type="date" value={f.end_date} min={f.camp_date} onChange={set('end_date')} />
         </Field>
         <Field label="المكان">
           <Input value={f.place} onChange={set('place')} />

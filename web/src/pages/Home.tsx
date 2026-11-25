@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Cake, ChevronLeft, Clock3, Hand, MessageCircle, Users } from 'lucide-react'
+import { Cake, ChevronLeft, Hand, MessageCircle } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -8,7 +8,7 @@ import { PushCard } from '@/components/PushToggle'
 import { StagesCard } from '@/components/StagesCard'
 import { Button, Card } from '@/components/ui'
 import { useAuth, usePermissions } from '@/lib/auth'
-import { addDays, cairoToday, fmtDate, fmtShort, useHrRows, useLookups, useSetting, useStatusOptions, useVolunteers, whatsappLink, type VolunteerWithStats } from '@/lib/data'
+import { addDays, cairoToday, fmtDate, fmtShort, useLookups, useSetting, useStatusOptions, useVolunteers, whatsappLink, type VolunteerWithStats } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import { type MonthlyParticipation, type VolunteerStats } from '@/lib/types'
@@ -24,14 +24,14 @@ export default function Home() {
   const vols = useVolunteers(seesVolunteers)
 
   const firstName = me?.full_name?.split(' ')[0] ?? me?.email?.split('@')[0]
-  const role = me?.role_name ?? (p.leader ? 'ليدر لجنة' : 'متطوع')
+  const role = me?.position && me.position !== 'متطوع' ? me.position : p.leader ? 'ليدر لجنة' : me?.position ?? me?.role_name ?? 'متطوع'
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-xl font-bold">أهلاً {firstName} 👋</h1>
         <p className="text-sm text-muted">
-          {fmtDate(today)} · دخلت بصلاحية <span className="font-semibold text-brand-700">{role}</span>
+          {fmtDate(today)} · <span className="font-semibold text-brand-700">{role}</span>
         </p>
       </div>
 
@@ -57,7 +57,6 @@ export default function Home() {
       {(p.leader || p.can('hr.view')) && <TestOverdue />}
       {seesVolunteers && <VolunteerNumbers vols={vols.data} full={p.viewAll} leader={!p.viewAll && p.leader} today={today} />}
       {seesVolunteers && <Birthdays vols={vols.data} today={today} />}
-      {p.viewAll && <LongTest vols={vols.data} today={today} canEdit={p.can('hr.edit')} />}
 
       <WhatsAppGroups general={groupLink.data ?? null} volunteerId={me?.volunteer_id ?? null} leaderOf={p.leader ? (me?.committees ?? []) : []} />
     </div>
@@ -310,66 +309,9 @@ function BirthdayRow({ v }: { v: VolunteerWithStats }) {
   )
 }
 
-/** «اختبار» with no acceptance change for 90 days: the rule says they become «مقبول». */
-function LongTest({ vols, today, canEdit }: { vols?: VolunteerWithStats[]; today: string; canEdit: boolean }) {
-  const qc = useQueryClient()
-  const hr = useHrRows(true)
-  const cutoff = addDays(today, -90)
-  const list = (vols ?? [])
-    .map((v) => {
-      const h = hr.data?.get(v.id)
-      const since = (h?.status_changed_at ?? h?.interview_date ?? v.registered_at)?.slice(0, 10)
-      return { v, h, since }
-    })
-    .filter((x) => x.h?.acceptance === 'اختبار' && x.since && x.since < cutoff)
-    .sort((a, b) => a.since!.localeCompare(b.since!))
-
-  const accept = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from('volunteer_hr').update({ acceptance: 'مقبول' }).in('volunteer_id', list.map((x) => x.v.id))
-      if (error) throw error
-    },
-    onSuccess: () => {
-      toast.success(`${list.length} بقوا مقبولين`)
-      qc.invalidateQueries({ queryKey: ['volunteer_hr'] })
-    },
-    onError: toastError,
-  })
-
-  if (!vols || !hr.data) return null
-  return (
-    <Section
-      title="في الاختبار من أكتر من 3 شهور"
-      hint="درجة القبول «اختبار» ومتغيرتش من 90 يوم. القاعدة إنهم يبقوا «مقبول»."
-      action={
-        canEdit && list.length > 0 && (
-          <Button size="sm" variant="secondary" loading={accept.isPending} onClick={() => confirm(`تخلّي الـ ${list.length} دول «مقبول»؟`) && accept.mutate()}>
-            اعتبرهم مقبولين
-          </Button>
-        )
-      }
-    >
-      {!list.length ? (
-        <Card className="text-sm text-muted">مفيش حد في الاختبار من أكتر من 3 شهور 👌</Card>
-      ) : (
-        <Card className="max-h-80 divide-y divide-line overflow-y-auto p-0">
-          {list.map(({ v, since }) => (
-            <Link key={v.id} to={`/volunteers/${v.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface">
-              <Users className="size-4 shrink-0 text-muted" />
-              <span className="min-w-0 flex-1 truncate text-sm font-semibold">{v.full_name_ar}</span>
-              <span className="flex shrink-0 items-center gap-1 text-xs text-orange-600">
-                <Clock3 className="size-3.5" /> من {fmtShort(since)}
-              </span>
-            </Link>
-          ))}
-        </Card>
-      )}
-    </Section>
-  )
-}
-
 /** Volunteers 3 months or more in «اختبار»: the leader decides. */
 function TestOverdue() {
+  const qc = useQueryClient()
   const q = useQuery({
     queryKey: ['test-overdue'],
     queryFn: async () => {
@@ -378,21 +320,36 @@ function TestOverdue() {
       return data as { id: string; code: string; full_name_ar: string; committee: string | null; since: string }[]
     },
   })
+  const accept = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc('accept_volunteer', { p_volunteer: id })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('بقى «مقبول»')
+      qc.invalidateQueries({ queryKey: ['test-overdue'] })
+      qc.invalidateQueries({ queryKey: ['volunteer_hr'] })
+    },
+    onError: toastError,
+  })
   const rows = q.data ?? []
   if (!rows.length) return null
   return (
     <Card className="border-orange-200 bg-orange-50">
-      <p className="font-bold">عدّى عليهم 3 شهور في «اختبار» ({rows.length})</p>
-      <p className="text-xs text-muted">محتاجين قرار: مقبول ولا لأ. افتح المتطوع وغيّر النتيجة من «الحالة والمقابلة».</p>
-      <ul className="mt-2 max-h-64 divide-y divide-orange-100 overflow-y-auto text-sm">
+      <p className="font-bold">عدّى عليهم 3 شهور أو أكتر في «اختبار» ({rows.length})</p>
+      <p className="text-xs text-muted">محتاجين قرار. «مقبول» بتقبله على طول، أو افتح المتطوع لو محتاج تشوف ملفه الأول.</p>
+      <ul className="mt-2 max-h-80 divide-y divide-orange-100 overflow-y-auto text-sm">
         {rows.map((r) => (
-          <li key={r.id}>
-            <Link to={`/volunteers/${r.id}`} className="flex items-center justify-between gap-2 py-1.5 hover:text-brand-700">
-              <span className="truncate font-semibold">{r.full_name_ar}</span>
-              <span className="shrink-0 text-xs text-muted">
-                {r.committee ?? '—'} · من {fmtShort(r.since)}
+          <li key={r.id} className="flex items-center gap-2 py-1.5">
+            <Link to={`/volunteers/${r.id}`} className="min-w-0 flex-1 hover:text-brand-700">
+              <span className="block truncate font-semibold">{r.full_name_ar}</span>
+              <span className="block text-xs text-muted">
+                {r.committee ?? 'من غير لجنة'} · من {fmtDate(r.since)}
               </span>
             </Link>
+            <Button size="sm" variant="secondary" loading={accept.isPending && accept.variables === r.id} onClick={() => accept.mutate(r.id)}>
+              مقبول
+            </Button>
           </li>
         ))}
       </ul>

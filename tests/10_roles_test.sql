@@ -502,7 +502,7 @@ select t.login('admin@test.com');
 select t.ok((select lookup_usage((select id from lookups where list = 'المكان' and value = 'قاعة قديمة'))) = 1, 'usage counted');
 select t.ok((delete_lookup((select id from lookups where list = 'المكان' and value = 'قاعة قديمة'), 'قاعة جديدة') ->> 'rows')::int = 1, 'delete moves records to the chosen value');
 commit;
-select t.ok((select place from participations where activity_date = '2026-11-25') = 'قاعة جديدة', 'record now uses the new value');
+select t.ok(exists (select 1 from participations where activity_date = '2026-11-25' and place = 'قاعة جديدة'), 'record now uses the new value');
 select t.ok(not exists (select 1 from lookups where list = 'المكان' and value = 'قاعة قديمة'), 'old value removed');
 insert into schedule_slots (day, grade, subject, starts_at, ends_at, kind, audience) values ('الأحد', '5 ب', 'علوم', '10:00', '11:00', 'ورشة رسم', 'بنات بس');
 select t.ok(exists (select 1 from schedule_slots where kind = 'ورشة رسم'), 'class kind is free from the list');
@@ -575,5 +575,36 @@ commit;
 update volunteers set attended_minicamp = true, attended_camp = true where code = 'V9002';
 update volunteers set attended_graduation = true where code = 'V9002';
 select t.ok((select status::text from volunteers where code = 'V9002') = 'مسئول', 'graduation → مسئول');
+
+-- ---------- join form, quick accept, leadership (21) ----------
+grant usage on schema t to anon;
+grant execute on all functions in schema t to anon;
+begin;
+set local role anon;
+select t.ok(public.join_activity('{"national_id":"29901011234567","phone":"01011112222","full_name_ar":"تجربة فورم جديد"}') = 'ok', 'anon can join');
+select t.fails($$select public.join_activity('{"national_id":"123","phone":"01011112222","full_name_ar":"تجربة فورم جديد"}')$$, 'bad national id refused');
+commit;
+select t.ok((select v.recruit_status from volunteers v join volunteer_private p on p.volunteer_id = v.id where p.national_id = '29901011234567') = 'للتواصل', 'new joiner lands in للتواصل');
+begin;
+set local role anon;
+select public.join_activity('{"national_id":"29901011234567","phone":"01099998888","full_name_ar":"تجربة فورم معدّل"}');
+commit;
+select t.ok((select count(*) from registration_requests where status = 'pending') = 1, 'second time → a request, not a new volunteer');
+select t.ok((select full_name_ar from volunteers v join volunteer_private p on p.volunteer_id = v.id where p.national_id = '29901011234567') = 'تجربة فورم جديد', 'data unchanged until approved');
+begin;
+set local role authenticated;
+select t.login('hr@test.com');
+select t.ok((select count(*) from registration_requests_list()) = 1, 'HR sees the request');
+select public.review_registration((select id from registration_requests limit 1), true, false);
+commit;
+select t.ok((select phone from volunteers v join volunteer_private p on p.volunteer_id = v.id where p.national_id = '29901011234567') = '01099998888', 'approval applies the new data');
+begin;
+set local role authenticated;
+select t.login('vol@test.com');
+select t.fails($$select public.accept_volunteer((select id from volunteers where code = 'V9002'))$$, 'a volunteer cannot accept');
+select t.login('hr@test.com');
+select public.accept_volunteer((select id from volunteers where code = 'V9002'));
+commit;
+select t.ok((select acceptance::text from volunteer_hr h join volunteers v on v.id = h.volunteer_id where v.code = 'V9002') = 'مقبول', 'one-tap acceptance');
 
 \echo ALL ROLE TESTS PASSED

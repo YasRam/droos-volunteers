@@ -134,7 +134,9 @@ export default function ActivityFields({
   const errors = formState.errors
   const listId = useId()
   // Types already used with this event first, then the rest
-  const subjects = [...new Set([...(lookups.data?.list('نوع الحدث', event) ?? []), ...(lookups.data?.list('نوع الحدث') ?? [])])]
+  // Only this event's own list (teaching shows subjects, not interview names); a general list only if it has none
+  const ownSubjects = lookups.data?.list('نوع الحدث', event) ?? []
+  const subjects = ownSubjects.length ? ownSubjects : (lookups.data?.list('نوع الحدث') ?? [])
   const grades = lookups.data?.list('السنة الدراسية') ?? []
   // Content preparation follows the class date until it is changed by hand
   const day = watch('activity_date')

@@ -94,12 +94,15 @@ function FullList() {
     })
     const val = (v: VolunteerWithStats): string | number =>
       sort.key === 'name' ? v.full_name_ar : sort.key === 'last' ? (v.stats?.last_participation ?? '') : (v.stats?.[sort.key] ?? 0)
+    // By name: grouped by status in the list's order first, so people who left sink to the bottom
+    const rank = (st: string) => (st === 'خارج المتابعة' ? 999 : Math.max(0, opts.statuses.indexOf(st)))
     return list.sort((a, b) => {
+      if (sort.key === 'name' && a.status !== b.status) return rank(a.status) - rank(b.status)
       const x = val(a)
       const y = val(b)
       return (typeof x === 'string' ? x.localeCompare(String(y), 'ar') : x - Number(y)) * sort.dir
     })
-  }, [vols.data, hr.data, search, filters, sort])
+  }, [vols.data, hr.data, search, filters, sort, opts.statuses])
 
   const groups = useMemo(() => {
     const order: VolunteerStatus[] = ['مسئول', 'مشروع مسئول', 'مدرب', 'تحت المتابعة', 'خارج المتابعة']

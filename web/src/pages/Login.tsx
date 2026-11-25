@@ -7,7 +7,7 @@ import { toastError } from '@/lib/errors'
 export default function Login() {
   const { signIn, signInWithPassword } = useAuth()
   const [loading, setLoading] = useState(false)
-  const [withPw, setWithPw] = useState(false)
+  const [withPw, setWithPw] = useState(true)
   const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
   const [busy, setBusy] = useState(false)

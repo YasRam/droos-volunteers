@@ -6,6 +6,7 @@ import { VolunteerName } from '@/components/VolunteerLink'
 import { Badge, Button, Card, Empty, PageHeader, Spinner, Tabs } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
 import Certificates from './Certificates'
+import { JoinRequests } from '@/components/JoinRequests'
 import { useSearchParams } from 'react-router-dom'
 import { fmtShort, useDirectory } from '@/lib/data'
 import { toastError } from '@/lib/errors'
@@ -22,15 +23,17 @@ export default function Requests() {
     ...(p.canReview ? [{ value: 'attendance', label: 'الحضور' }] : []),
     ...(p.can('stages.manage') ? [{ value: 'tshirts', label: 'التيشيرتات' }] : []),
     ...(p.can('certificates.review') ? [{ value: 'certificates', label: 'شهادات التطوع' }] : []),
+    ...(p.can('hr.view') ? [{ value: 'join', label: 'تسجيل تاني' }] : []),
   ]
   const tab = tabs.find((t) => t.value === params.get('tab'))?.value ?? tabs[0]?.value
   return (
     <>
-      <PageHeader title="الطلبات" subtitle="طلبات الحضور والتيشيرت وشهادات التطوع" />
+      <PageHeader title="الطلبات" subtitle="طلبات الحضور والتيشيرت وشهادات التطوع، والمتطوعين اللي سجّلوا تاني من فورم التسجيل" />
       {tabs.length > 1 && <Tabs tabs={tabs} value={tab} onChange={(t) => setParams({ tab: t })} />}
       {tab === 'attendance' && <Attendance />}
       {tab === 'tshirts' && <Tshirts />}
       {tab === 'certificates' && <Certificates embedded />}
+      {tab === 'join' && <JoinRequests />}
     </>
   )
 }

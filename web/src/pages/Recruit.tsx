@@ -90,7 +90,11 @@ export default function Recruit() {
 
   return (
     <>
-      <PageHeader title="الجداد" subtitle="التواصل مع المتطوعين الجداد، ومواعيد الانترفيو ونتايجها. كل خطوة بتتسجل في تاريخ المتطوع." />
+      <PageHeader
+        title="الجداد"
+        subtitle="التواصل مع المتطوعين الجداد، ومواعيد الانترفيو ونتايجها. كل خطوة بتتسجل في تاريخ المتطوع."
+        actions={<JoinLink />}
+      />
       <Tabs tabs={tabs} value={tab} onChange={(t) => setParams({ tab: t })} />
       <div className="relative mb-3 max-w-sm">
         <Search className="absolute start-3 top-2.5 size-5 text-muted" />
@@ -345,5 +349,28 @@ function ResultForm({ v, onClose }: { v: V; onClose: () => void }) {
         </Button>
       </div>
     </Modal>
+  )
+}
+
+/** The public join form: copy or share its link. Whoever fills it lands in «للتواصل». */
+function JoinLink() {
+  const url = `${location.origin}${import.meta.env.BASE_URL}join`
+  const text = `عايز تتطوع في نشاط دروس التقوية؟ سجّل بياناتك من هنا: ${url}`
+  return (
+    <div className="flex gap-2">
+      <Button
+        size="sm"
+        variant="secondary"
+        onClick={async () => {
+          await navigator.clipboard.writeText(url)
+          toast.success('لينك فورم التسجيل اتنسخ')
+        }}
+      >
+        نسخ لينك فورم التسجيل
+      </Button>
+      <a href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer" className="rounded-xl bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white">
+        ابعته واتساب
+      </a>
+    </div>
   )
 }

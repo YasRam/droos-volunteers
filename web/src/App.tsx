@@ -10,7 +10,7 @@ const lazy = <T extends ComponentType<any>>(load: () => Promise<{ default: T }>)
       throw e
     }),
   )
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Layout from '@/components/Layout'
 import { Spinner } from '@/components/ui'
 import { useAuth, usePermissions } from '@/lib/auth'
@@ -35,6 +35,7 @@ const Admin = lazy(() => import('@/pages/Admin'))
 const Permissions = lazy(() => import('@/pages/Permissions'))
 const Tree = lazy(() => import('@/pages/Tree'))
 const AuditLog = lazy(() => import('@/pages/AuditLog'))
+const Join = lazy(() => import('@/pages/Join'))
 
 function Guard({ allow, children }: { allow: boolean; children: ReactNode }) {
   return allow ? <>{children}</> : <Navigate to="/" replace />
@@ -44,7 +45,15 @@ export default function App() {
   const { ready, session, known, failed, retry } = useAuth()
   const p = usePermissions()
   const devAuth = import.meta.env.DEV && Boolean(import.meta.env.VITE_DEV_ACCESS_TOKEN)
+  const { pathname } = useLocation()
 
+  // The join form is public: no sign-in
+  if (pathname === '/join')
+    return (
+      <Suspense fallback={<Spinner />}>
+        <Join />
+      </Suspense>
+    )
   if (!ready) return <Spinner label="لحظة..." />
   if (!session && !devAuth) return <Login />
   if (failed) return <Offline onRetry={retry} />
@@ -63,7 +72,7 @@ export default function App() {
           <Route path="check-in" element={<Guard allow={Boolean(p.volunteerId) || p.canRegisterActivity}><RegisterActivity /></Guard>} />
           <Route path="register" element={<Navigate to="/check-in" replace />} />
           <Route path="followups" element={<Guard allow={p.can('attendance.view_all') || p.can('attendance.register')}><FollowUps /></Guard>} />
-          <Route path="requests/*" element={<Guard allow={p.canReview || p.can('stages.manage') || p.can('certificates.review')}><Requests /></Guard>} />
+          <Route path="requests/*" element={<Guard allow={p.canReview || p.can('stages.manage') || p.can('certificates.review') || p.can('hr.view')}><Requests /></Guard>} />
           <Route path="recruit" element={<Guard allow={p.can('hr.view')}><Recruit /></Guard>} />
           <Route path="camps" element={<Guard allow={p.can('stages.manage') || p.can('stats.view')}><Camps /></Guard>} />
           <Route path="schedule" element={<Schedule />} />

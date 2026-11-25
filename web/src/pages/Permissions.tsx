@@ -25,7 +25,7 @@ export default function Permissions() {
         tabs={[
           { value: 'people', label: 'الأشخاص' },
           { value: 'roles', label: 'أنواع الصلاحيات' },
-          { value: 'leaders', label: 'ليدر اللجان' },
+          { value: 'leaders', label: 'القيادة واللجان' },
         ]}
       />
       {tab === 'people' && <People />}
@@ -464,6 +464,7 @@ function Leaders() {
   })
   const [vol, setVol] = useState<VolunteerWithStats>()
   const [committees, setCommittees] = useState<string[]>([])
+  const [role, setRole] = useState<'ليدر' | 'نائب'>('ليدر')
   const refresh = () => qc.invalidateQueries({ queryKey: ['committee_leaders'] })
 
   const add = useMutation({
@@ -471,10 +472,10 @@ function Leaders() {
       if (!vol) throw { message: 'اختار المتطوع' }
       if (!vol.email) throw { message: 'المتطوع ده مالوش إيميل. ضيف إيميله في ملفه الأول.' }
       if (!committees.length) throw { message: 'اختار لجنة واحدة على الأقل' }
-      const rows = committees.map((committee) => ({ email: normEmail(vol.email!), full_name: vol.full_name_ar, committee, volunteer_id: vol.id }))
+      const rows = committees.map((committee) => ({ email: normEmail(vol.email!), full_name: vol.full_name_ar, committee, volunteer_id: vol.id, role }))
       const { error } = await supabase.from('committee_leaders').upsert(rows, { onConflict: 'email,committee' })
       if (error) throw error
-      if (vol.position === 'متطوع') await supabase.from('volunteers').update({ position: 'ليدر لجنة' }).eq('id', vol.id)
+      if (vol.position === 'متطوع') await supabase.from('volunteers').update({ position: role === 'ليدر' ? 'ليدر لجنة' : 'نائب ليدر لجنة' }).eq('id', vol.id)
     },
     onSuccess: () => {
       toast.success('اتحفظ')
@@ -494,13 +495,24 @@ function Leaders() {
     onError: toastError,
   })
 
-  const grouped = [...new Set((q.data ?? []).map((r) => r.committee))].map((c) => ({ committee: c, rows: (q.data ?? []).filter((r) => r.committee === c) }))
+  const grouped = [...new Set((q.data ?? []).map((r) => r.committee))].map((c) => ({
+    committee: c,
+    rows: (q.data ?? []).filter((r) => r.committee === c).sort((a, b) => (a.role === 'نائب' ? 1 : 0) - (b.role === 'نائب' ? 1 : 0)),
+  }))
   return (
     <div className="space-y-4">
+      <Leadership />
       <Card>
-        <p className="mb-1 font-bold">إضافة ليدر لجنة</p>
-        <p className="mb-3 text-xs text-muted">اختار المتطوع واللجان اللي هيقودها. وظيفته بتبقى «ليدر لجنة» لو كانت «متطوع».</p>
+        <p className="mb-1 font-bold">إضافة ليدر أو نائب للجنة</p>
+        <p className="mb-3 text-xs text-muted">اختار المتطوع واللجان. الليدر والنائب ليهم نفس الصلاحيات على لجنتهم.</p>
         <div className="space-y-3">
+          <div className="flex gap-1.5">
+            {(['ليدر', 'نائب'] as const).map((r) => (
+              <button key={r} type="button" onClick={() => setRole(r)} className={clsx('rounded-full px-4 py-1 text-sm font-semibold', role === r ? 'bg-brand-700 text-white' : 'bg-white ring-1 ring-line')}>
+                {r}
+              </button>
+            ))}
+          </div>
           {vol ? (
             <div className="flex items-center justify-between rounded-xl bg-brand-50 px-3 py-2">
               <span className="font-semibold text-brand-800">{vol.full_name_ar}</span>
@@ -542,6 +554,7 @@ function Leaders() {
                       <p className="truncate font-semibold">{r.volunteer_id ? <VolunteerName id={r.volunteer_id} name={r.full_name} /> : r.full_name}</p>
                       <p className="ltr truncate text-start text-xs text-muted">{r.email}</p>
                     </div>
+                    <Badge tone={r.role === 'نائب' ? 'gray' : 'brand'}>{r.role ?? 'ليدر'}</Badge>
                     {!r.volunteer_id && <Badge tone="orange">مش مربوط بمتطوع</Badge>}
                     <Button variant="ghost" size="sm" className="text-red-600" onClick={() => confirm(`تشيل ${r.full_name} من ليدر ${r.committee}؟`) && remove.mutate(r)} aria-label="شيل">
                       <Trash2 className="size-4" />
@@ -554,5 +567,56 @@ function Leaders() {
         </div>
       )}
     </div>
+  )
+}
+
+/** The activity has one leader and one deputy: jobs on the volunteer, not committees. */
+function Leadership() {
+  const qc = useQueryClient()
+  const vols = useVolunteers()
+  const current = (pos: string) => vols.data?.find((v) => v.position === pos)
+  const setPos = useMutation({
+    mutationFn: async ({ pos, v }: { pos: 'ليدر النشاط' | 'نائب ليدر النشاط'; v?: VolunteerWithStats }) => {
+      const old = current(pos)
+      if (old) {
+        const { error } = await supabase.from('volunteers').update({ position: 'متطوع' }).eq('id', old.id)
+        if (error) throw error
+      }
+      if (v) {
+        const { error } = await supabase.from('volunteers').update({ position: pos }).eq('id', v.id)
+        if (error) throw error
+      }
+    },
+    onSuccess: () => {
+      toast.success('اتحفظ')
+      qc.invalidateQueries({ queryKey: ['volunteers'] })
+    },
+    onError: toastError,
+  })
+  return (
+    <Card className="border-brand-200 bg-brand-50/60">
+      <p className="mb-1 font-bold text-brand-800">قيادة النشاط</p>
+      <p className="mb-3 text-xs text-muted">شخص واحد ليدر النشاط وشخص واحد نائب. دي وظيفة مش لجنة، والصلاحيات بتتحدد من «الأنواع».</p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {(['ليدر النشاط', 'نائب ليدر النشاط'] as const).map((pos) => {
+          const v = current(pos)
+          return (
+            <div key={pos}>
+              <p className="mb-1 text-sm font-semibold">{pos}</p>
+              {v ? (
+                <div className="flex items-center justify-between rounded-xl bg-white px-3 py-2 ring-1 ring-line">
+                  <VolunteerName id={v.id} name={v.full_name_ar} className="font-semibold" />
+                  <Button variant="ghost" size="sm" className="text-red-600" onClick={() => confirm(`تشيل ${v.full_name_ar} من «${pos}»؟`) && setPos.mutate({ pos })}>
+                    شيل
+                  </Button>
+                </div>
+              ) : (
+                <VolunteerPicker onPick={(picked) => setPos.mutate({ pos, v: picked })} />
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </Card>
   )
 }
