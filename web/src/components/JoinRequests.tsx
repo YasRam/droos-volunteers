@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import clsx from 'clsx'
+import { useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { VolunteerName } from '@/components/VolunteerLink'
 import { Badge, Button, Card, Empty, Spinner } from '@/components/ui'
@@ -21,9 +22,13 @@ interface Row {
   recruit_status: string | null
   out_reason: string | null
   hr_notes: string | null
-  last_outcome: string | null
-  last_notes: string | null
-  last_at: string | null
+  interview_date: string | null
+  follow_notes: string[] | null
+  participations: number
+  last_activity: string | null
+  registered_at: string | null
+  history: { at: string; kind: string; outcome: string | null; notes: string | null }[]
+  earlier_requests: number
 }
 
 const LABELS: [string, string][] = [
@@ -92,45 +97,54 @@ function RequestCard({ r, canEdit, busy, onReview }: { r: Row; canEdit: boolean;
         {r.acceptance && <Badge tone={CLOSED.includes(r.acceptance) ? 'red' : 'brand'}>{r.acceptance}</Badge>}
       </div>
 
-      {(closed || r.out_reason || r.hr_notes || r.last_notes) && (
-        <div className="mt-3 space-y-1 rounded-xl bg-orange-50 p-3 text-sm">
-          <p className="font-bold text-orange-800">حالته قبل كده</p>
-          {r.out_reason && <p>سبب الخروج: {r.out_reason}</p>}
-          {r.last_outcome && (
-            <p>
-              آخر حاجة اتسجلت: {r.last_outcome}
-              {r.last_notes ? ` — ${r.last_notes}` : ''} {r.last_at && <span className="text-xs text-muted">({fmtDate(r.last_at)})</span>}
-            </p>
-          )}
-          {r.hr_notes && <p>ملاحظات الـ HR: {r.hr_notes}</p>}
-          {!r.out_reason && !r.last_notes && !r.hr_notes && <p className="text-muted">مفيش سبب متسجل</p>}
-        </div>
-      )}
+      {/* Who this person is to us */}
+      <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+        <Fact label="متسجل من">{r.registered_at ? fmtDate(r.registered_at) : '—'}</Fact>
+        <Fact label="المشاركات">{r.participations ? `${r.participations} · آخرها ${r.last_activity ? fmtDate(r.last_activity) : '—'}` : 'ولا مشاركة'}</Fact>
+        <Fact label="الانترفيو">{r.interview_date ? `${fmtDate(r.interview_date)} · ${r.acceptance ?? '—'}` : 'لسه'}</Fact>
+        <Fact label="قايمة الجداد">{r.recruit_status ?? '—'}{r.earlier_requests ? ` · سجّل تاني ${r.earlier_requests} مرة قبل كده` : ''}</Fact>
+      </div>
 
-      {changed.length ? (
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-muted">
-                <th className="py-1 text-start font-semibold">الخانة</th>
-                <th className="py-1 text-start font-semibold">قبل</th>
-                <th className="py-1 text-start font-semibold">بعد</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {changed.map(([k, label]) => (
-                <tr key={k}>
+      <div className={clsx('mt-3 space-y-1.5 rounded-xl p-3 text-sm', closed ? 'bg-orange-50' : 'bg-surface')}>
+        <p className={clsx('font-bold', closed ? 'text-orange-800' : 'text-ink')}>ملاحظات عليه</p>
+        {r.out_reason && <p>• سبب الخروج: <b>{r.out_reason}</b></p>}
+        {r.hr_notes && <p>• ملاحظات الـ HR: {r.hr_notes}</p>}
+        {(r.follow_notes ?? []).map((n, i) => (
+          <p key={i}>• ملاحظة متابعة: {n}</p>
+        ))}
+        {r.history.map((h, i) => (
+          <p key={i}>
+            • {h.kind === 'call' ? 'مكالمة' : h.kind === 'interview' ? 'انترفيو' : 'رجوع للتواصل'}: <b>{h.outcome ?? '—'}</b>
+            {h.notes ? ` — ${h.notes}` : ''} <span className="text-xs text-muted">({fmtDate(h.at)})</span>
+          </p>
+        ))}
+        {!r.out_reason && !r.hr_notes && !(r.follow_notes ?? []).length && !r.history.length && <p className="text-muted">مفيش أي ملاحظات متسجلة عليه</p>}
+      </div>
+
+      <div className="mt-3 overflow-x-auto">
+        <p className="mb-1 text-sm font-bold">البيانات {changed.length ? `(اتغير ${changed.length})` : '(متغيرش حاجة)'}</p>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-xs text-muted">
+              <th className="py-1 text-start font-semibold">الخانة</th>
+              <th className="py-1 text-start font-semibold">اللي عندنا</th>
+              <th className="py-1 text-start font-semibold">اللي كتبه دلوقتي</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {LABELS.filter(([k]) => r.data[k] || r.prev_data[k]).map(([k, label]) => {
+              const diff = Boolean(r.data[k]) && r.data[k] !== r.prev_data[k]
+              return (
+                <tr key={k} className={diff ? 'bg-amber-50' : undefined}>
                   <td className="py-1.5 pe-3 text-muted">{label}</td>
-                  <td className="py-1.5 pe-3 text-red-700 line-through decoration-red-300">{r.prev_data[k] || '—'}</td>
-                  <td className="py-1.5 font-semibold text-emerald-700">{r.data[k]}</td>
+                  <td className={clsx('py-1.5 pe-3', diff && 'text-red-700')}>{r.prev_data[k] || '—'}</td>
+                  <td className={clsx('py-1.5', diff ? 'font-semibold text-emerald-700' : 'text-muted')}>{r.data[k] || '—'}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <p className="mt-3 text-sm text-muted">البيانات زي ما هي، مفيش حاجة اتغيرت.</p>
-      )}
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
 
       {canEdit && (
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
@@ -151,5 +165,14 @@ function RequestCard({ r, canEdit, busy, onReview }: { r: Row; canEdit: boolean;
         </div>
       )}
     </Card>
+  )
+}
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="rounded-xl bg-surface px-3 py-2">
+      <p className="text-xs text-muted">{label}</p>
+      <p className="font-semibold">{children}</p>
+    </div>
   )
 }

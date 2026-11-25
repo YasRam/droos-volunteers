@@ -15,6 +15,7 @@ import { useAuth, usePermissions } from '@/lib/auth'
 import { ageFrom, fmtShort, useLookups, useStatusOptions, whatsappLink, withCurrent } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
+import { accountCall, tempPassword } from '@/lib/account'
 import { POSITIONS, type Participation, type Volunteer, type VolunteerHr } from '@/lib/types'
 import { NationalIdCard, PersonalFields, personalDefaults, personalSchema, toPersonalPayload, type PersonalValues } from './MyProfile'
 
@@ -127,6 +128,7 @@ export default function VolunteerDetail() {
         <div className="space-y-4">
           <Interview v={v} />
           {p.can('hr.view') && <RecruitCard volunteerId={v.id} />}
+          {p.can('hr.edit') && <TempPasswordCard volunteerId={v.id} name={v.full_name_ar} email={v.email} phone={v.whatsapp || v.phone} />}
           <FollowupCard v={v} canEdit={p.can('volunteers.edit')} canNote={p.can('volunteers.edit') || p.leader} />
         </div>
       )}
@@ -479,6 +481,55 @@ function RecruitCard({ volunteerId }: { volunteerId: string }) {
     <Card>
       <p className="font-bold text-brand-800">تاريخ التواصل والانترفيو</p>
       <RecruitHistory logs={rows} />
+    </Card>
+  )
+}
+
+/** HR makes a temporary password for someone who can't sign in with Google, and sends it on WhatsApp. */
+function TempPasswordCard({ volunteerId, name, email, phone }: { volunteerId: string; name: string; email: string | null; phone: string | null }) {
+  const [pw, setPw] = useState<string | null>(null)
+  const make = useMutation({
+    mutationFn: async () => {
+      const password = tempPassword()
+      await accountCall({ action: 'set_password', volunteer_id: volunteerId, password }, true)
+      return password
+    },
+    onSuccess: (password) => setPw(password),
+    onError: toastError,
+  })
+  const site = `${location.origin}${import.meta.env.BASE_URL}`
+  const msg = pw ? `أهلاً ${name.split(' ')[0]} 👋\nتقدر تدخل موقع النشاط من ${site}\nالإيميل: ${email}\nكلمة السر: ${pw}\nغيّرها من «كلمة السر» في القايمة بعد ما تدخل.` : ''
+  const wa = phone ? `https://wa.me/2${phone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}` : null
+  return (
+    <Card>
+      <p className="font-bold">الدخول من غير جوجل</p>
+      {!email ? (
+        <p className="mt-1 text-sm text-muted">ضيف إيميل للمتطوع الأول.</p>
+      ) : pw ? (
+        <div className="mt-2 space-y-2 text-sm">
+          <p>
+            كلمة السر المؤقتة: <span className="ltr rounded bg-surface px-2 py-0.5 font-mono font-bold">{pw}</span>
+          </p>
+          <p className="text-xs text-muted">مش هتظهر تاني. ابعتهاله دلوقتي.</p>
+          <div className="flex gap-2">
+            {wa && (
+              <a href={wa} target="_blank" rel="noreferrer" className="rounded-xl bg-emerald-600 px-3 py-1.5 font-semibold text-white">
+                ابعتها واتساب
+              </a>
+            )}
+            <Button size="sm" variant="secondary" onClick={() => navigator.clipboard.writeText(msg).then(() => toast.success('اتنسخت'))}>
+              نسخ الرسالة
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-2">
+          <p className="mb-2 text-sm text-muted">لو مش عارف يدخل بجوجل: اعمله كلمة سر مؤقتة وابعتهاله، ويدخل بالإيميل وكلمة السر.</p>
+          <Button size="sm" variant="secondary" loading={make.isPending} onClick={() => make.mutate()}>
+            اعمل كلمة سر مؤقتة
+          </Button>
+        </div>
+      )}
     </Card>
   )
 }

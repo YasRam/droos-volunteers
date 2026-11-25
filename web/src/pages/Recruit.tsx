@@ -4,6 +4,7 @@ import { CalendarClock, History, PhoneCall, RotateCcw, Search, UserCheck } from 
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
+import { JoinFormEditor } from '@/components/JoinFormEditor'
 import { ContactLinks, VolunteerName } from '@/components/VolunteerLink'
 import { VolunteerSelect } from '@/components/VolunteerPick'
 import { AcceptanceBadge, Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Spinner, Tabs, Textarea } from '@/components/ui'
@@ -93,7 +94,12 @@ export default function Recruit() {
       <PageHeader
         title="الجداد"
         subtitle="التواصل مع المتطوعين الجداد، ومواعيد الانترفيو ونتايجها. كل خطوة بتتسجل في تاريخ المتطوع."
-        actions={<JoinLink />}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <JoinLink />
+            {p.can('settings.manage') && <JoinFormEditor />}
+          </div>
+        }
       />
       <Tabs tabs={tabs} value={tab} onChange={(t) => setParams({ tab: t })} />
       <div className="relative mb-3 max-w-sm">

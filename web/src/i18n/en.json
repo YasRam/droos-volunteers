@@ -1368,7 +1368,53 @@
 "نائب ليدر لجنة": "Committee deputy",
 "نسخ لينك فورم التسجيل": "Copy join form link",
 "وافق على الجديد": "Approve new data",
-"✓ حضر": "✓ Attended"
+"✓ حضر": "✓ Attended",
+"أول مرة تدخل أو نسيت كلمة السر؟": "First time, or forgot your password?",
+"ابعتها واتساب": "Send on WhatsApp",
+"اتسجلت قبل القواعد. افتح كل واحد وصلّح الكامبات أو الحالة.": "Recorded before the rules. Open each one and fix the camps or status.",
+"اتنسخت": "Copied",
+"احفظ وادخل": "Save and sign in",
+"اختياري": "Optional",
+"اعمل كلمة سر": "Create a password",
+"اعمل كلمة سر مؤقتة": "Create a temporary password",
+"اكتب الإيميل والرقم القومي والموبايل زي ما هم متسجلين في النشاط، واختار كلمة سر.": "Enter your email, national ID and mobile as registered with the activity, and choose a password.",
+"الاسم والرقم القومي والموبايل مطلوبين دايماً.": "Name, national ID and mobile are always required.",
+"الخانات": "Fields",
+"الخدمة دي لسه مش متفعّلة، كلّم الأدمن": "This isn't enabled yet, contact the admin",
+"الدخول من غير جوجل": "Sign-in without Google",
+"الرحلة: تحت المتابعة ← الميني كامب ← مشروع مسئول ← الكامب ← حفلة التخرج ← مسئول. السيستم مش بيسمح بخطوة قبل اللي قبلها.": "The journey: Under follow-up → Mini camp → Responsible-in-training → Camp → Graduation → Responsible. No step before the previous one.",
+"العنوان": "Title",
+"الفورم اتحفظ": "Form saved",
+"الكلام اللي تحت العنوان": "Text under the title",
+"الكلية والسنة الدراسية": "College and year",
+"اللي عندنا": "What we have",
+"اللي كتبه دلوقتي": "What they wrote now",
+"الميعاد عدّى، مفيش تذكير": "Date passed, no reminder",
+"بيظهر زرار «ادخل جروب الواتساب» في رسالة بعد الإرسال. سيبه فاضي لو مش عايزه": "Shows a «Join the WhatsApp group» button after sending. Leave empty for none",
+"تعديل الفورم والرسالة": "Edit form and message",
+"رجوع للتواصل": "Back to contact",
+"رسالة بعد الإرسال": "Message after sending",
+"ضيف إيميل للمتطوع الأول.": "Add the volunteer's email first.",
+"عنوان رسالة بعد الإرسال": "Title after sending",
+"فورم التسجيل": "Join form",
+"قايمة الجداد": "New-volunteers list",
+"كلمة السر (8 على الأقل)": "Password (8+)",
+"كلمة السر اتحفظت": "Password saved",
+"كلمة السر المؤقتة:": "Temporary password:",
+"كلمة السر مش زي بعض": "Passwords don't match",
+"لو بياناتك مش متسجلة صح أو مالكش إيميل في النشاط، كلّم الـ HR يظبطوها أو يعملولك كلمة سر.": "If your data isn't right or you have no email with the activity, ask HR to fix it or make you a password.",
+"لو مش عارف يدخل بجوجل: اعمله كلمة سر مؤقتة وابعتهاله، ويدخل بالإيميل وكلمة السر.": "If they can't sign in with Google: make a temporary password and send it; they sign in with email and password.",
+"لينك الجروب لازم يبدأ بـ https://chat.whatsapp.com/": "The group link must start with https://chat.whatsapp.com/",
+"لينك جروب الواتساب": "WhatsApp group link",
+"متسجل من": "Registered",
+"مخفية": "Hidden",
+"مش قادرين نوصل للسيرفر، اتأكد من النت": "Can't reach the server, check your connection",
+"مش هتظهر تاني. ابعتهاله دلوقتي.": "It won't show again. Send it now.",
+"مطلوبة": "Required",
+"مفيش أي ملاحظات متسجلة عليه": "No notes recorded",
+"ملاحظات عليه": "Notes about them",
+"نسخ الرسالة": "Copy message",
+"ولا مشاركة": "No participation"
 },
 "patterns": [
 [
@@ -1918,6 +1964,38 @@
 [
 "عايز تتطوع في نشاط دروس التقوية؟ سجّل بياناتك من هنا: {0}",
 "Want to volunteer with the tutoring activity? Register here: {0}"
+],
+[
+"(اتغير {0})",
+"({0} changed)"
+],
+[
+"{0} · آخرها {1}",
+"{0} · last {1}"
+],
+[
+"· سجّل تاني {0} مرة قبل كده",
+"· re-registered {0} times before"
+],
+[
+"خانة «{0}» مطلوبة",
+"«{0}» is required"
+],
+[
+"بيانات قديمة مخالفة للرحلة ({0})",
+"Old records breaking the journey ({0})"
+],
+[
+"• سبب الخروج: {0}",
+"• Reason for leaving: {0}"
+],
+[
+"• ملاحظات الـ HR: {0}",
+"• HR notes: {0}"
+],
+[
+"• ملاحظة متابعة: {0}",
+"• Follow-up note: {0}"
 ]
 ],
 "words": {

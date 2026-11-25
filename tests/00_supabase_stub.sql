@@ -22,6 +22,7 @@ create table if not exists cron.job (jobid bigint, jobname text);
 create or replace function cron.unschedule(id bigint) returns boolean language sql as $$ select true $$;
 
 grant usage on schema public, extensions, auth to anon, authenticated, service_role;
+create table if not exists auth.users (id uuid primary key default gen_random_uuid(), email text);
 grant execute on all functions in schema auth to anon, authenticated, service_role;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;

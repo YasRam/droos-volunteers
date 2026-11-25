@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { BellRing, Pencil, Plus, Users } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { Link } from 'react-router-dom'
 import type { Camp } from '@/components/StagesCard'
 import { VolunteerName } from '@/components/VolunteerLink'
 import { VolunteerSearch } from '@/components/VolunteerPick'
@@ -62,7 +63,7 @@ export default function Camps() {
     <>
       <PageHeader
         title="الكامبات وحفلة التخرج"
-        subtitle="الميني كامب والكامب وحفلة التخرج: المواعيد، والأماكن، وقايمة الانتظار، والحضور. بيتسجلوا عند المتطوع ومش في المتابعة اليومية، ولازم يحضرهم كلهم قبل ما يبقى «مسئول»."
+        subtitle="الرحلة: تحت المتابعة ← الميني كامب ← مشروع مسئول ← الكامب ← حفلة التخرج ← مسئول. السيستم مش بيسمح بخطوة قبل اللي قبلها."
         actions={
           manage && (
             <Button onClick={() => setEditing('new')}>
@@ -71,6 +72,7 @@ export default function Camps() {
           )
         }
       />
+      {manage && <JourneyProblems />}
       <Tabs
         value={kind}
         onChange={(k) => setKind(k as typeof kind)}
@@ -224,10 +226,12 @@ function Registrations({ camp, manage }: { camp: Camp; manage: boolean }) {
               onPick={(v) => run.mutate(() => supabase.rpc('register_camp', { p_camp: camp.id, p_volunteer: v.id }))}
             />
           </div>
-          {(
+          {(camp.end_date ?? camp.camp_date) >= cairoToday() ? (
             <Button variant="secondary" size="sm" loading={remind.isPending} onClick={() => remind.mutate()}>
               <BellRing className="size-4" /> ابعت تذكير للي لسه محضروش
             </Button>
+          ) : (
+            <span className="text-xs text-muted">الميعاد عدّى، مفيش تذكير</span>
           )}
         </div>
       )}
@@ -374,5 +378,34 @@ function CampForm({ camp, onClose }: { camp: Camp | null; onClose: () => void })
         </div>
       </div>
     </Modal>
+  )
+}
+
+/** Records that break the journey (from before the rules): fix them from each volunteer's file. */
+function JourneyProblems() {
+  const q = useQuery({
+    queryKey: ['journey-problems'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('journey_problems')
+      if (error) throw error
+      return data as { id: string; code: string; full_name_ar: string; status: string; problem: string }[]
+    },
+  })
+  if (!q.data?.length) return null
+  return (
+    <Card className="mb-4 border-red-200 bg-red-50">
+      <p className="font-bold text-red-800">بيانات قديمة مخالفة للرحلة ({q.data.length})</p>
+      <p className="text-xs text-muted">اتسجلت قبل القواعد. افتح كل واحد وصلّح الكامبات أو الحالة.</p>
+      <ul className="mt-2 max-h-56 divide-y divide-red-100 overflow-y-auto text-sm">
+        {q.data.map((r, i) => (
+          <li key={r.id + i} className="flex justify-between gap-2 py-1.5">
+            <Link to={`/volunteers/${r.id}`} className="truncate font-semibold hover:text-brand-700">
+              {r.full_name_ar}
+            </Link>
+            <span className="shrink-0 text-xs text-red-700">{r.problem}</span>
+          </li>
+        ))}
+      </ul>
+    </Card>
   )
 }

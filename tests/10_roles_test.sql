@@ -414,7 +414,7 @@ select t.ok((select not takes_attendance from schedule_slots where place = 'قا
 -- ---------- stages, camps, t-shirts, rules ----------
 insert into camps (kind, camp_date, capacity) values ('ميني كامب', app.today() + 10, 1);
 select id as v9001 from volunteers where code = 'V9001' \gset
-update volunteers set bought_tshirt = false, attended_minicamp = false where code in ('V9001', 'V9002');
+update volunteers set status = 'تحت المتابعة', bought_tshirt = false, attended_graduation = false, attended_camp = false, attended_minicamp = false where code in ('V9001', 'V9002');
 begin;
 set local role authenticated;
 select t.login('vol1@test.com');
@@ -606,5 +606,18 @@ select t.login('hr@test.com');
 select public.accept_volunteer((select id from volunteers where code = 'V9002'));
 commit;
 select t.ok((select acceptance::text from volunteer_hr h join volunteers v on v.id = h.volunteer_id where v.code = 'V9002') = 'مقبول', 'one-tap acceptance');
+
+-- ---------- journey rules (22) ----------
+update volunteers set status = 'تحت المتابعة', attended_graduation = false, attended_camp = false, attended_minicamp = false where code = 'V9003';
+select t.fails($$update volunteers set status = 'مشروع مسئول' where code = 'V9003'$$, 'مشروع مسئول needs the mini camp');
+select t.fails($$update volunteers set attended_minicamp = true, attended_camp = true where code = 'V9003'$$, 'camp needs مشروع مسئول');
+update volunteers set attended_minicamp = true where code = 'V9003';
+update volunteers set status = 'مشروع مسئول' where code = 'V9003';
+select t.fails($$update volunteers set attended_graduation = true where code = 'V9003'$$, 'graduation needs the camp');
+select t.fails($$update volunteers set attended_minicamp = false where code = 'V9003'$$, 'no step back');
+update volunteers set attended_camp = true where code = 'V9003';
+update volunteers set attended_graduation = true where code = 'V9003';
+select t.ok((select status::text from volunteers where code = 'V9003') = 'مسئول', 'the whole journey ends in مسئول');
+select t.fails($$select public.remind_camp((select id from camps order by camp_date limit 1))$$ , 'no reminder before login');
 
 \echo ALL ROLE TESTS PASSED

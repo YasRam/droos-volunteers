@@ -16,6 +16,8 @@ export function errorMessage(err: unknown): string {
   }
   if (e.code === '23514') {
     const m = e.message ?? ''
+    // our own rules (the volunteer journey) already speak Arabic
+    if (/[\u0600-\u06FF]/.test(m)) return m
     if (/phone|whatsapp/.test(m)) return 'رقم التليفون لازم يكون 11 رقم ويبدأ بـ 01'
     if (/national_id/.test(m)) return 'الرقم القومي لازم يكون 14 رقم'
     if (/end_date/.test(m)) return 'تاريخ النهاية لازم يكون بعد تاريخ البداية أو نفس اليوم'
