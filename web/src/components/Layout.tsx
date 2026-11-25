@@ -148,9 +148,8 @@ export default function Layout() {
           <img src={`${import.meta.env.BASE_URL}logo-mark.png`} className="size-9 object-contain" alt="" />
           <div>
             <p className="font-bold leading-tight">دروس التقوية</p>
-            <p className="text-xs text-muted">رسالة · فرع إسكندرية</p>
+            <p className="text-xs text-muted">فرع إسكندرية</p>
           </div>
-          <img src={`${import.meta.env.BASE_URL}resala.png`} className="ms-auto h-8 w-auto object-contain" alt="رسالة" />
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3">
           {items.map((it) => (

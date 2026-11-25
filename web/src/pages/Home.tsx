@@ -28,11 +28,15 @@ export default function Home() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-bold">أهلاً {firstName} 👋</h1>
-        <p className="text-sm text-muted">
-          {fmtDate(today)} · <span className="font-semibold text-brand-700">{role}</span>
-        </p>
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl font-bold">أهلاً {firstName} 👋</h1>
+          <p className="text-sm text-muted">
+            {fmtDate(today)} · <span className="font-semibold text-brand-700">{role}</span>
+          </p>
+        </div>
+        <img src={`${import.meta.env.BASE_URL}logo-mark.png`} alt="دروس التقوية" className="h-12 w-auto shrink-0 object-contain" />
+        <img src={`${import.meta.env.BASE_URL}resala.png`} alt="رسالة" className="h-8 w-auto shrink-0 object-contain" />
       </div>
 
       <PushCard />

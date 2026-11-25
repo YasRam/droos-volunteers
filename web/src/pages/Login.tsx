@@ -16,12 +16,16 @@ export default function Login() {
   return (
     <div className="grid min-h-dvh place-items-center bg-gradient-to-b from-brand-50 to-surface px-6">
       <div className="w-full max-w-sm text-center">
-        <img src={`${import.meta.env.BASE_URL}logo-mark.png`} alt="" className="mx-auto h-32 w-auto object-contain" />
-        <h1 className="mt-3 text-2xl font-bold">نشاط دروس التقوية</h1>
-        <p className="mt-1 text-sm text-muted">جمعية رسالة للأعمال الخيرية · فرع إسكندرية</p>
+        <div className="flex items-center justify-center gap-5">
+          <img src={`${import.meta.env.BASE_URL}logo-mark.png`} alt="" className="h-20 w-auto object-contain" />
+          <span className="h-12 w-px bg-line" />
+          <img src={`${import.meta.env.BASE_URL}resala.png`} alt="جمعية رسالة" className="h-10 w-auto object-contain" />
+        </div>
+        <h1 className="mt-3 text-xl font-bold">نشاط دروس التقوية</h1>
+        <p className="text-xs text-muted">جمعية رسالة للأعمال الخيرية · فرع إسكندرية</p>
         <Button
           size="lg"
-          className="mt-8 w-full"
+          className="mt-6 w-full"
           loading={loading}
           onClick={async () => {
             setLoading(true)
@@ -35,10 +39,10 @@ export default function Login() {
         >
           <GoogleIcon /> الدخول بحساب جوجل
         </Button>
-        <p className="mt-4 text-xs text-muted">ادخل بنفس الإيميل اللي مسجّل بيه في النشاط</p>
+        <p className="mt-2 text-xs text-muted">ادخل بنفس الإيميل اللي مسجّل بيه في النشاط</p>
         {withPw ? (
           <form
-            className="mt-6 space-y-2 text-start"
+            className="mt-4 space-y-2 text-start"
             onSubmit={async (e) => {
               e.preventDefault()
               setBusy(true)
@@ -59,12 +63,11 @@ export default function Login() {
             <FirstPassword onDone={(e, pw) => signInWithPassword(e, pw).catch(toastError)} />
           </form>
         ) : (
-          <button className="mt-6 text-sm font-semibold text-brand-700" onClick={() => setWithPw(true)}>
+          <button className="mt-4 text-sm font-semibold text-brand-700" onClick={() => setWithPw(true)}>
             الدخول بالإيميل وكلمة السر
           </button>
         )}
-        <LangSwitch className="mx-auto mt-6" />
-        <img src={`${import.meta.env.BASE_URL}resala.png`} alt="جمعية رسالة" className="mx-auto mt-10 h-12 w-auto object-contain opacity-90" />
+        <LangSwitch className="mx-auto mt-4" />
       </div>
     </div>
   )

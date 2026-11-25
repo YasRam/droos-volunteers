@@ -87,22 +87,20 @@ export default function VolunteerForm() {
       </div>
 
       <article className="rounded-2xl bg-white p-6 text-[13px] leading-6 ring-1 ring-line print:rounded-none print:p-0 print:ring-0">
-        <header className="flex items-start justify-between gap-4 border-b-2 border-brand-700 pb-3">
-          <img src={`${import.meta.env.BASE_URL}logo-mark.png`} alt="" className="size-16 shrink-0 object-contain" />
-          <div className="flex-1">
-            <p className="flex items-center gap-2 text-xs text-muted">
-              <img src={`${import.meta.env.BASE_URL}resala.png`} alt="" className="h-6 w-auto object-contain" />
-              نشاط دروس التقوية · جمعية رسالة · فرع إسكندرية
-            </p>
+        <header className="flex items-center justify-between gap-4 border-b-2 border-brand-700 pb-3">
+          <img src={`${import.meta.env.BASE_URL}logo-mark.png`} alt="" className="h-20 w-auto shrink-0 object-contain" />
+          <div className="flex-1 text-center">
+            <p className="text-xs text-muted">نشاط دروس التقوية · جمعية رسالة للأعمال الخيرية · فرع إسكندرية</p>
             <h1 className="text-xl font-bold">استمارة تطوع</h1>
             <p className="mt-1 text-xs text-muted">
               كود المتطوع: <b className="ltr">{f.code}</b> · اتطبعت {fmtDate(new Date().toISOString())}
             </p>
           </div>
-          <div className="grid h-[40mm] w-[30mm] shrink-0 place-items-center overflow-hidden rounded border border-dashed border-gray-400 text-center text-[11px] text-gray-400">
-            {photo ? <img src={photo} alt="" className="h-full w-full object-cover" /> : 'مكان الصورة'}
-          </div>
+          <img src={`${import.meta.env.BASE_URL}resala.png`} alt="" className="h-12 w-auto shrink-0 object-contain" />
         </header>
+        <div className="mx-auto mt-3 grid h-[40mm] w-[30mm] place-items-center overflow-hidden rounded border border-dashed border-gray-400 text-center text-[11px] text-gray-400">
+          {photo ? <img src={photo} alt="" className="h-full w-full object-cover" /> : 'مكان الصورة'}
+        </div>
 
         <Section title="البيانات الشخصية">
           <Row label="الاسم بالعربي" value={f.full_name_ar} wide />
