@@ -1,3 +1,4 @@
+import { isEn } from '../lib/i18n'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { Cake, ChevronLeft, Hand, MessageCircle } from 'lucide-react'
@@ -24,7 +25,7 @@ export default function Home() {
   const seesVolunteers = p.viewAll || p.leader
   const vols = useVolunteers(seesVolunteers)
 
-  const firstName = me?.full_name?.split(' ')[0] ?? me?.email?.split('@')[0]
+  const firstName = ((isEn && me?.full_name_en) || me?.full_name)?.split(' ')[0] ?? me?.email?.split('@')[0]
   const { jobOf } = useJobs()
   const role = p.volunteerId ? jobOf({ id: p.volunteerId, position: me?.position }) : (me?.role_name ?? '')
 

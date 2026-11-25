@@ -13,18 +13,19 @@ import {
   Download,
   Eye,
   FileText,
+  GraduationCap,
   History,
   IdCard,
   KeyRound,
   ListChecks,
-  type LucideIcon,
+  Mail,
   MessageSquareLock,
   PhoneCall,
   Route,
   ScrollText,
   Settings,
-  Shirt,
   ShieldCheck,
+  Shirt,
   Tent,
   Trash2,
   Upload,
@@ -33,6 +34,7 @@ import {
   UserPlus,
   Users,
   UsersRound,
+  type LucideIcon,
 } from 'lucide-react'
 
 export interface PermissionItem {
@@ -108,6 +110,21 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    title: 'الطلاب',
+    icon: GraduationCap,
+    items: [
+      { key: 'students.view_all', label: 'يشوف كل الطلاب', hint: 'الأسامي والحضور والمجموعات والاستدعاءات (من غير تليفونات)', icon: Eye },
+      { key: 'students.view_contacts', label: 'بيانات التواصل', hint: 'تليفونات الطلاب والعنوان وبيانات ولي الأمر', icon: BookUser },
+      { key: 'students.view_sensitive', label: 'البيانات الحساسة', hint: 'الرقم القومي والدخل والدعم والملاحظات الصحية', icon: IdCard },
+      { key: 'students.edit', label: 'يضيف ويعدّل طلاب', hint: 'الطلاب والقبول والمجموعات ولمين الحصة', icon: UserPen },
+      { key: 'students.attendance', label: 'يسجّل حضور أي حصة', hint: 'المدرس بيسجّل حصته من غير الصلاحية دي', icon: CalendarCheck },
+      { key: 'students.flags', label: 'الاستدعاء والإجازات', hint: 'استدعاء ولي أمر، فصل مؤقت، إجازة', icon: CalendarX },
+      { key: 'students.flags_lift', label: 'يلغي الفصل المؤقت', hint: '', icon: CheckCheck },
+      { key: 'students.review', label: 'طلبات الطلاب والحصص', hint: 'إلغاء وتأجيل وإيقاف الحصص، الفصل، تعديل البيانات', icon: ListChecks },
+      { key: 'students.accounts', label: 'حسابات أولياء الأمور', hint: 'يعمل حساب ويغيّر الكود', icon: KeyRound },
+    ],
+  },
+  {
     title: 'التقارير والبيانات',
     icon: BarChart3,
     items: [
@@ -116,6 +133,7 @@ export const PERMISSION_GROUPS = [
       { key: 'data.import', label: 'يرفع من Excel', hint: '', icon: Upload },
       { key: 'backup.manage', label: 'النسخ الاحتياطية', hint: 'نسخة كاملة فيها الرقم القومي وملاحظات HR', icon: DatabaseBackup },
       { key: 'log.view', label: 'السجل', hint: 'مين عمل إيه وإمتى', icon: History },
+      { key: 'mail.management', label: 'إيميلات الإدارة', hint: 'يبعت الأكسس والتطورات والطلبات ويظبط الإيميل اليومي', icon: Mail },
     ],
   },
   {

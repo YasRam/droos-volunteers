@@ -21,6 +21,8 @@ export const REQUEST_LABEL: Record<RequestStatus, string> = {
 export interface MyContext {
   email: string | null
   full_name: string | null
+  /** English name, null when the volunteer has none */
+  full_name_en?: string | null
   role: AppRole | null
   role_name: string | null
   roles: string[]

@@ -16,6 +16,8 @@ data/seed_data.sql                   الداتا الحالية جاهزة لل
 data/seed_data_report.json           اللي اتصلّح أو اتشال أثناء التحويل
 tests/run_local.sh                   يشغّل كل حاجة على Postgres محلي
 tests/10_roles_test.sql              اختبارات الصلاحيات لكل دور
+tests/20_students_test.sql           اختبارات الطلاب: مين يشوف أنهي طالب، والحاجز حوالين حسابات الأسر
+tests/30_mail_test.sql               اختبارات إيميلات الإدارة: الجديد بس، والتعديلات، ومين يبعت
 ```
 
 ## التشغيل على Supabase (مرة واحدة)
@@ -40,6 +42,20 @@ tests/10_roles_test.sql              اختبارات الصلاحيات لكل 
    update staff_roles set role = 'admin' where email = 'your.email@gmail.com';
    ```
 
+## الطلاب (migrations 31 و32)
+
+بيانات الطلاب في schema لوحدها اسمها `students`. بعد `db push`:
+1. Settings → API → Exposed schemas: ضيف `students` (من غيرها الموقع والنسخ الاحتياطي مش هيوصلوا للطلاب).
+2. اعمل deploy تاني لدالة `backup` (بقت بتنسخ جداول الطلاب).
+
+## إيميلات الإدارة (migration 34)
+
+السكريبت بيرد «رد على الكل» على إيميل الإدارة، فلازم يشتغل على الحساب اللي الإدارة بتكلمه: `droosmng@gmail.com`.
+1. انسخ `backup/apps-script/Code.gs` و`appsscript.json` في السكريبت على حساب droosmng (لو لسه على حساب تاني، انقله الأول وشغّل `setup` وحط كود الربط الجديد في الموقع).
+2. شغّل `setupMail` مرة ووافق على صلاحيات Gmail الجديدة. بيعمل إيميل الفجر (5) وإيميل التعديلات (11 بالليل).
+3. اعمل deploy جديد للـ Web app (نفس اللينك لو اخترت «Manage deployments ← Edit»)، واعمل deploy تاني لدالة `backup`.
+4. من الموقع: إيميلات الإدارة ← الإعدادات: راجع العناوين وشغّل «بيتبعتوا لوحدهم».
+
 ## تحديث الداتا من الشيت قبل الإطلاق
 
 ```bash
@@ -51,7 +67,7 @@ python3 scripts/sheet_to_sql.py data/source/sheet.xlsx data/seed_data.sql
 
 ```bash
 sudo service postgresql start
-tests/run_local.sh tests/10_roles_test.sql     # لازم يطبع ALL ROLE TESTS PASSED
+tests/run_local.sh tests/10_roles_test.sql tests/20_students_test.sql tests/30_mail_test.sql   # لازم يطبع ALL ... PASSED لكل واحد
 tests/run_local.sh data/seed_data.sql          # تحميل الداتا الحقيقية على نسخة محلية
 ```
 

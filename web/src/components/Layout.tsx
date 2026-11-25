@@ -1,27 +1,29 @@
+import { isEn } from '../lib/i18n'
 import clsx from 'clsx'
 import {
-  Bell,
   BarChart3,
+  Bell,
+  CalendarCheck,
   CalendarDays,
   ClipboardList,
+  FileBarChart,
+  FileSpreadsheet,
   Hand,
   History,
   Home,
   Inbox,
   LogOut,
-  FileBarChart,
-  Tent,
-  UserPlus,
-  CalendarCheck,
+  Mail,
   Menu,
+  Network,
   Settings,
+  ShieldCheck,
+  Tent,
   User,
+  UserPlus,
   UserRound,
   Users,
   UsersRound,
-  FileSpreadsheet,
-  ShieldCheck,
-  Network,
 } from 'lucide-react'
 import { Suspense, useEffect, useMemo, useState, type ComponentType } from 'react'
 import { Spinner } from '@/components/ui'
@@ -128,6 +130,7 @@ export default function Layout() {
     if (p.volunteerId) list.push({ to: '/me', label: 'بياناتي', icon: UserRound })
     if (p.can('stats.view') || p.leader) list.push({ to: '/stats', label: 'الإحصائيات', icon: BarChart3 })
     if (p.can('stats.view')) list.push({ to: '/reports', label: 'التقارير', icon: FileBarChart })
+    if (p.can('mail.management')) list.push({ to: '/mail', label: 'إيميلات الإدارة', icon: Mail })
     if (p.can('meetings.manage') || p.leader) list.push({ to: '/meetings', label: 'الاجتماعات', icon: CalendarCheck })
     if (p.can('roles.manage')) list.push({ to: '/permissions', label: 'الصلاحيات', icon: ShieldCheck })
     if (p.can('settings.manage')) list.push({ to: '/admin', label: 'الإعدادات', icon: Settings })
@@ -140,7 +143,7 @@ export default function Layout() {
   const bottom = items.slice(0, 4)
   const { jobOf } = useJobs()
   const roleLabel = p.volunteerId ? jobOf({ id: p.volunteerId, position: me?.position }) : (me?.role_name ?? '')
-  const displayName = me?.full_name || me?.email || ''
+  const displayName = (isEn && me?.full_name_en) || me?.full_name || me?.email || ''
 
   return (
     <div className="min-h-dvh lg:flex">

@@ -30,6 +30,7 @@ const Recruit = lazy(() => import('@/pages/Recruit'))
 const Schedule = lazy(() => import('@/pages/Schedule'))
 const Stats = lazy(() => import('@/pages/Stats'))
 const Reports = lazy(() => import('@/pages/Reports'))
+const ManagementMail = lazy(() => import('@/pages/ManagementMail'))
 const Meetings = lazy(() => import('@/pages/Meetings'))
 const Admin = lazy(() => import('@/pages/Admin'))
 const Permissions = lazy(() => import('@/pages/Permissions'))
@@ -82,6 +83,7 @@ export default function App() {
           <Route path="schedule" element={<Schedule />} />
           <Route path="stats" element={<Guard allow={p.can('stats.view') || p.leader}><Stats /></Guard>} />
           <Route path="reports" element={<Guard allow={p.can('stats.view')}><Reports /></Guard>} />
+          <Route path="mail" element={<Guard allow={p.can('mail.management')}><ManagementMail /></Guard>} />
           <Route path="meetings" element={<Guard allow={p.can('meetings.manage') || p.leader}><Meetings /></Guard>} />
           <Route path="tree" element={<Guard allow={p.viewAll || p.leader}><Tree /></Guard>} />
           <Route path="data" element={<Navigate to="/admin?tab=data" replace />} />

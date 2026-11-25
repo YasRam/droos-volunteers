@@ -24,10 +24,13 @@ const TABLES: Record<string, string[]> = {
   participations: ['id'],
   meeting_photos: ['id'],
   schedule_slots: ['id'],
+  class_absences: ['id'],
   certificate_requests: ['id'],
   stages: ['key'],
   stage_done: ['volunteer_id', 'stage_key'],
   rules_acceptances: ['volunteer_id', 'version'],
+  activity_rules: ['id'],
+  rule_answers: ['volunteer_id', 'rule_id'],
   tshirt_requests: ['id'],
   camps: ['id'],
   camp_registrations: ['camp_id', 'volunteer_id'],
@@ -35,6 +38,37 @@ const TABLES: Record<string, string[]> = {
   registration_requests: ['id'],
   notifications: ['id'],
   audit_log: ['id'],
+  mail_settings: ['id'],
+  mail_items: ['kind', 'item_id'],
+  mail_log: ['id'],
+  // students (schema «students»; needs it in Settings → API → Exposed schemas)
+  'students.settings': ['id'],
+  'students.org_info': ['id'],
+  'students.terms': ['id'],
+  'students.grades': ['code'],
+  'students.attendance_marks': ['code'],
+  'students.guardians': ['id'],
+  'students.students': ['id'],
+  'students.student_private': ['student_id'],
+  'students.phones': ['id'],
+  'students.accounts': ['user_id'],
+  'students.applications': ['id'],
+  'students.enrollments': ['id'],
+  'students.groups': ['id'],
+  'students.group_members': ['group_id', 'student_id'],
+  'students.whatsapp_groups': ['id'],
+  'students.class_sessions': ['id'],
+  'students.audiences': ['id'],
+  'students.schedule_pauses': ['id'],
+  'students.slot_requests': ['id'],
+  'students.attendance': ['session_id', 'student_id'],
+  'students.exam_results': ['session_id', 'student_id'],
+  'students.flags': ['id'],
+  'students.leaves': ['id'],
+  'students.notes': ['id'],
+  'students.announcements': ['id'],
+  'students.change_requests': ['id'],
+  'students.dismissal_requests': ['id'],
 }
 
 const PAGE = 1000
@@ -62,7 +96,8 @@ function same(a: string, b: string) {
 async function dump(table: string, keys: string[]) {
   const rows: unknown[] = []
   for (let from = 0; ; from += PAGE) {
-    let q = db.from(table).select('*')
+    const [schema, name] = table.includes('.') ? table.split('.') : ['public', table]
+    let q = db.schema(schema).from(name).select('*')
     for (const k of keys) q = q.order(k, { ascending: true })
     const { data, error } = await q.range(from, from + PAGE - 1)
     if (error) throw new Error(`${table}: ${error.message}`)
@@ -87,6 +122,29 @@ Deno.serve(async (req) => {
     images?: boolean
     sheets?: { month: string }
     report?: { ok: boolean; bytes?: number; rows?: number; tables?: number; images?: number; error?: string }
+    mail?: 'batch' | 'edits'
+    mail_sent?: { kind: string; ids: string[]; subject?: string; ok: boolean; error?: string; body?: string }
+  }
+
+  // Management emails (the script sends them from droosmng): what to send, and what was sent
+  if (body.mail === 'batch' || body.mail === 'edits') {
+    const r = await db.rpc(body.mail === 'batch' ? 'mail_followup_batch' : 'mail_followup_edits')
+    if (r.error) return json({ error: r.error.message }, 500)
+    const out = r.data as { meetings?: { photos: string[]; photo_urls?: string[] }[] }
+    for (const m of out.meetings ?? []) {
+      if (!m.photos?.length) continue
+      const signed = await db.storage.from('activity-photos').createSignedUrls(m.photos, 3600)
+      m.photo_urls = (signed.data ?? []).map((x) => x.signedUrl).filter(Boolean) as string[]
+    }
+    return json(out)
+  }
+  if (body.mail_sent) {
+    const m = body.mail_sent
+    const r = await db.rpc('mail_mark_sent', {
+      p_kind: m.kind, p_ids: m.ids ?? [], p_subject: m.subject ?? null, p_ok: !!m.ok, p_error: m.error ?? null, p_body: m.body ?? null,
+    })
+    if (r.error) return json({ error: r.error.message }, 500)
+    return json({ ok: true })
   }
 
   // Sheet sync: the month's evaluation and meetings rows, plus where to write them
@@ -144,7 +202,7 @@ Deno.serve(async (req) => {
       rows += data[t].length
     }
     const counts = Object.fromEntries(Object.keys(TABLES).map((t) => [t, data[t].length]))
-    return json({ app: 'droos-volunteers', schema: 12, exported_at: new Date().toISOString(), counts, rows, tables: data })
+    return json({ app: 'droos-volunteers', schema: 32, exported_at: new Date().toISOString(), counts, rows, tables: data })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     await db.from('backup_runs').insert({ ok: false, error: msg.slice(0, 500) })
