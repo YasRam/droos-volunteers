@@ -1,12 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Camera, Printer } from 'lucide-react'
-import { useRef, type ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Printer } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useParams } from 'react-router-dom'
-import { toast } from 'sonner'
 import { Button, Empty, Spinner } from '@/components/ui'
+import { PhotoButton } from '@/components/VolunteerPhoto'
 import { usePermissions } from '@/lib/auth'
 import { ageFrom, fmtDate } from '@/lib/data'
-import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 
 type Form = Record<string, unknown> & {
@@ -24,8 +23,6 @@ export default function VolunteerForm() {
   const params = useParams()
   const p = usePermissions()
   const id = params.id ?? p.volunteerId
-  const qc = useQueryClient()
-  const file = useRef<HTMLInputElement>(null)
   const q = useQuery({
     queryKey: ['volunteer-form', id],
     enabled: Boolean(id),
@@ -41,23 +38,6 @@ export default function VolunteerForm() {
       return f ? { f, photo } : null
     },
   })
-  const upload = useMutation({
-    mutationFn: async (picked: File) => {
-      if (picked.size > 3 * 1024 * 1024) throw { message: 'الصورة أكبر من 3 ميجا' }
-      const ext = picked.type === 'image/png' ? 'png' : picked.type === 'image/webp' ? 'webp' : 'jpg'
-      const path = `${id}/photo.${ext}`
-      const { error } = await supabase.storage.from('photos').upload(path, picked, { upsert: true, contentType: picked.type })
-      if (error) throw error
-      const { error: e2 } = await supabase.rpc('set_photo', { p_volunteer: id, p_path: path })
-      if (e2) throw e2
-    },
-    onSuccess: () => {
-      toast.success('الصورة اتحفظت')
-      qc.invalidateQueries({ queryKey: ['volunteer-form', id] })
-    },
-    onError: toastError,
-  })
-
   if (q.isLoading) return <Spinner />
   if (!q.data) return <Empty title="مش متاح">الاستمارة بتظهر لصاحبها وللـ HR بس.</Empty>
   const { f, photo } = q.data
@@ -69,20 +49,7 @@ export default function VolunteerForm() {
         <Button onClick={() => window.print()}>
           <Printer className="size-4" /> اطبع
         </Button>
-        <Button variant="secondary" loading={upload.isPending} onClick={() => file.current?.click()}>
-          <Camera className="size-4" /> {photo ? 'غيّر الصورة' : 'ضيف صورة'}
-        </Button>
-        <input
-          ref={file}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="hidden"
-          onChange={(e) => {
-            const picked = e.target.files?.[0]
-            if (picked) upload.mutate(picked)
-            e.target.value = ''
-          }}
-        />
+        {id && <PhotoButton id={id} hasPhoto={Boolean(photo)} />}
         <p className="w-full text-xs text-muted">الطباعة بتطلع صفحة A4 من غير القايمة. لو مفيش صورة بيطلع مكان فاضي تلزق فيه صورة.</p>
       </div>
 
@@ -115,15 +82,10 @@ export default function VolunteerForm() {
           <Row label="المؤهل" value={f.qualification} />
           <Row label="الكلية والسنة" value={f.study_year} />
           <Row label="الشغل" value={f.job} />
-          <Row label="فيسبوك" value={f.facebook} ltr wide />
-          <Row label="المواعيد المناسبة" value={f.availability_notes} wide />
-          <Row label="عرف النشاط منين" value={f.referral_source} wide />
         </Section>
 
         <Section title="بيانات النشاط">
           <Row label="تاريخ التسجيل" value={d(f.registered_at)} />
-          <Row label="الحالة" value={f.status} />
-          <Row label="الوظيفة" value={[f.position, ...(f.leads ?? [])].filter(Boolean).join(' · ')} />
           <Row label="اللجنة" value={[f.main_committee, f.sub_committee].filter(Boolean).join(' / ')} />
           <Row label="الموافقة على القواعد" value={d(f.rules_agreed)} />
         </Section>
