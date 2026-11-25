@@ -181,7 +181,7 @@ export default function Layout() {
           </div>
           <div className="hidden min-w-0 lg:block">
             <span className="font-bold">{displayName}</span>
-            <span className="ms-2 text-sm text-muted">{roleLabel}</span>
+            {roleLabel && <span className="text-sm text-muted">{' · '}{roleLabel}</span>}
           </div>
           <div className="relative">
             <button
