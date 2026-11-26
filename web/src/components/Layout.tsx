@@ -29,7 +29,6 @@ import {
   UserPlus,
   UserRound,
   Users,
-  UsersRound,
   ScrollText,
 } from 'lucide-react'
 import { Suspense, useEffect, useMemo, useState, type ComponentType } from 'react'
@@ -64,7 +63,7 @@ function usePendingCount(enabled: boolean) {
     queryFn: async () => {
       // Everything waiting in «الطلبات»: attendance, t-shirts, certificates (each only if visible to this user)
       const counts = await Promise.all(
-        ['participations', 'tshirt_requests', 'certificate_requests', 'registration_requests', 'class_absences'].map(async (t) => {
+        ['participations', 'tshirt_requests', 'certificate_requests', 'registration_requests', 'class_absences', 'profile_requests'].map(async (t) => {
           const { count, error } = await supabase.from(t).select('id', { count: 'exact', head: true }).eq('status', 'pending')
           return error ? 0 : (count ?? 0)
         }),
@@ -109,7 +108,7 @@ export default function Layout() {
   const [moreOpen, setMoreOpen] = useState(false)
   const [bellOpen, setBellOpen] = useState(false)
   const teaches = useTeaches(p.volunteerId)
-  const pending = usePendingCount(p.canReview || p.can('tshirts.manage') || p.can('certificates.review') || p.can('absences.review'))
+  const pending = usePendingCount(p.canReview || p.can('tshirts.manage') || p.can('certificates.review') || p.can('absences.review') || p.can('hr.edit') || p.can('volunteers.edit'))
   const notifications = useNotifications(me?.email ?? null)
   const unread = notifications.data?.filter((n) => !n.read_at).length ?? 0
 
@@ -131,8 +130,7 @@ export default function Layout() {
     const list: NavItem[] = [{ to: '/', label: 'الرئيسية', icon: Home }]
     if (p.volunteerId || p.canRegisterActivity) list.push({ to: '/check-in', label: 'تسجيل حضور', icon: Hand })
     if (p.volunteerId) list.push({ to: '/me', label: 'بياناتي', icon: UserRound })
-    if (p.volunteerId) list.push({ to: '/me/activities', label: 'أنشطتي', icon: UsersRound })
-    if (p.canReview || p.can('tshirts.manage') || p.can('certificates.review') || p.can('hr.view') || p.can('absences.review') || p.can('schedule.edit'))
+    if (p.canReview || p.can('tshirts.manage') || p.can('certificates.review') || p.can('hr.view') || p.can('hr.edit') || p.can('volunteers.edit') || p.can('absences.review') || p.can('schedule.edit'))
       list.push({ to: '/requests', label: 'الطلبات', icon: Inbox, badge: pending.data })
 
     // المتطوعين

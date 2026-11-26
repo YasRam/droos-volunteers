@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Printer } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { Button, Empty, Spinner } from '@/components/ui'
 import { PhotoButton } from '@/components/VolunteerPhoto'
 import { usePermissions } from '@/lib/auth'
@@ -49,7 +49,11 @@ export default function VolunteerForm() {
         <Button onClick={() => window.print()}>
           <Printer className="size-4" /> اطبع
         </Button>
-        {id && <PhotoButton id={id} hasPhoto={Boolean(photo)} />}
+        {id && (p.can('hr.edit') || p.can('volunteers.edit')) ? (
+          <PhotoButton id={id} hasPhoto={Boolean(photo)} />
+        ) : (
+          <Link to="/me" className="self-center text-sm font-semibold text-brand-700">{photo ? 'تغيير الصورة' : 'ضيف صورة'} من «بياناتي»</Link>
+        )}
         <p className="w-full text-xs text-muted">الطباعة بتطلع صفحة A4 من غير القايمة. لو مفيش صورة بيطلع مكان فاضي تلزق فيه صورة.</p>
       </div>
 

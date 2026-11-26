@@ -8,6 +8,7 @@ import { usePermissions } from '@/lib/auth'
 import Certificates from './Certificates'
 import { JoinRequests } from '@/components/JoinRequests'
 import { AbsenceRequests } from '@/components/ClassAbsence'
+import { ProfileRequests } from '@/components/ProfileRequests'
 import { useSearchParams } from 'react-router-dom'
 import { fmtShort, useDirectory } from '@/lib/data'
 import { toastError } from '@/lib/errors'
@@ -26,6 +27,7 @@ export default function Requests() {
     ...(p.can('certificates.review') ? [{ value: 'certificates', label: 'شهادات التطوع' }] : []),
     ...(p.can('hr.view') ? [{ value: 'join', label: 'تسجيل تاني' }] : []),
     ...(p.can('absences.review') || p.can('schedule.edit') ? [{ value: 'absences', label: 'اعتذارات الحصص' }] : []),
+    ...(p.can('hr.edit') || p.can('volunteers.edit') ? [{ value: 'profiles', label: 'تعديل البيانات' }] : []),
   ]
   const tab = tabs.find((t) => t.value === params.get('tab'))?.value ?? tabs[0]?.value
   return (
@@ -37,6 +39,7 @@ export default function Requests() {
       {tab === 'certificates' && <Certificates embedded />}
       {tab === 'join' && <JoinRequests />}
       {tab === 'absences' && <AbsenceRequests />}
+      {tab === 'profiles' && <ProfileRequests />}
     </>
   )
 }

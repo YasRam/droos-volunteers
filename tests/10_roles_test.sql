@@ -54,8 +54,7 @@ select t.ok((select count(*) from volunteers) = 1, 'volunteer sees only own row'
 select t.ok((select count(*) from volunteer_hr) = 0, 'volunteer cannot read HR data');
 select t.ok((select count(*) from volunteer_private) = 1, 'volunteer reads own national id');
 select t.ok((select count(*) from volunteer_directory) = 0, 'volunteer has no directory');
-update volunteers set job = 'مهندس' where code = 'V9001';
-select t.ok((select job from volunteers where code = 'V9001') = 'مهندس', 'volunteer edits own personal data');
+select t.fails($$update volunteers set job = 'مهندس' where code = 'V9001'$$, 'volunteer changes own personal data by request only');
 select t.fails($$update volunteers set status = 'مسئول' where code = 'V9001'$$, 'volunteer cannot change status');
 select t.fails($$update volunteers set bought_tshirt = true where code = 'V9001'$$, 'volunteer cannot change committee data');
 update volunteers set job = 'x' where code = 'V9002';
@@ -369,8 +368,7 @@ set local role authenticated;
 select t.login('vol1@test.com');
 select t.fails($$select save_meeting('{"meeting_date":"2026-11-05","committee":"تدريس"}'::jsonb, '{}')$$, 'volunteer cannot record a meeting');
 select t.fails($$update volunteers set follower_id = id where code = 'V9001'$$, 'volunteer cannot set their own follower');
-update volunteers set facebook = 'fb.com/me' where code = 'V9001';
-select t.ok((select facebook from volunteers where code = 'V9001') = 'fb.com/me', 'volunteer sets own facebook');
+select t.fails($$update volunteers set facebook = 'fb.com/me' where code = 'V9001'$$, 'facebook too: by request only');
 select t.login('leader@test.com');
 select save_meeting(jsonb_build_object('meeting_date', '2026-11-05', 'committee', (select committee from committee_leaders limit 1), 'goal', 'خطة الشهر', 'meeting_type', 'اونلاين'),
                     array(select id from volunteers where code in ('V9001', 'V9003')));

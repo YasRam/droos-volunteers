@@ -19,7 +19,6 @@ import Login from '@/pages/Login'
 import NotRegistered, { Inactive, Offline } from '@/pages/NotRegistered'
 import Home from '@/pages/Home'
 
-const MyActivities = lazy(() => import('@/pages/MyActivities'))
 const MyProfile = lazy(() => import('@/pages/MyProfile'))
 const Volunteers = lazy(() => import('@/pages/Volunteers'))
 const VolunteerDetail = lazy(() => import('@/pages/VolunteerDetail'))
@@ -92,13 +91,13 @@ export default function App() {
           <Route path="me" element={<Guard allow={Boolean(p.volunteerId)}><MyProfile /></Guard>} />
           <Route path="me/form" element={<Guard allow={Boolean(p.volunteerId)}><VolunteerForm /></Guard>} />
           <Route path="volunteers/:id/form" element={<Guard allow={p.can('hr.view') || p.can('volunteers.edit')}><VolunteerForm /></Guard>} />
-          <Route path="me/activities" element={<Guard allow={Boolean(p.volunteerId)}><MyActivities /></Guard>} />
+          <Route path="me/activities" element={<Navigate to="/me" replace />} />
           <Route path="volunteers" element={<Guard allow={p.canSeeVolunteers}><Volunteers /></Guard>} />
           <Route path="volunteers/:id" element={<Guard allow={p.viewAll || p.leader}><VolunteerDetail /></Guard>} />
           <Route path="check-in" element={<Guard allow={Boolean(p.volunteerId) || p.canRegisterActivity}><RegisterActivity /></Guard>} />
           <Route path="register" element={<Navigate to="/check-in" replace />} />
           <Route path="followups" element={<Guard allow={p.can('attendance.view_all') || p.can('attendance.register')}><FollowUps /></Guard>} />
-          <Route path="requests/*" element={<Guard allow={p.canReview || p.can('tshirts.manage') || p.can('certificates.review') || p.can('hr.view') || p.can('absences.review') || p.can('schedule.edit')}><Requests /></Guard>} />
+          <Route path="requests/*" element={<Guard allow={p.canReview || p.can('hr.edit') || p.can('volunteers.edit') || p.can('tshirts.manage') || p.can('certificates.review') || p.can('hr.view') || p.can('absences.review') || p.can('schedule.edit')}><Requests /></Guard>} />
           <Route path="recruit" element={<Guard allow={p.can('hr.view') || p.can('recruit.manage')}><Recruit /></Guard>} />
           <Route path="camps" element={<Guard allow={p.can('camps.manage') || p.can('stats.view')}><Camps /></Guard>} />
           <Route path="classes" element={<Classes />} />

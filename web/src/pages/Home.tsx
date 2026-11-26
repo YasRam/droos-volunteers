@@ -169,7 +169,7 @@ function MyNumbers({ volunteerId }: { volunteerId: string }) {
       title="مشاركاتك"
       hint={q.data?.last_participation ? `آخر مشاركة ليك: ${fmtShort(q.data.last_participation)}` : 'المشاركات المقبولة بس هي اللي بتتحسب'}
       action={
-        <Link to="/me/activities" className="flex items-center text-sm font-semibold text-brand-700">
+        <Link to="/me" className="flex items-center text-sm font-semibold text-brand-700">
           كل أنشطتي <ChevronLeft className="size-4" />
         </Link>
       }
