@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { CalendarClock, ClipboardCheck, Megaphone, Plus, Users } from 'lucide-react'
+import { CalendarClock, ClipboardCheck, Megaphone, Plus, UserRoundCog, Users } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { AbsenceModal } from '@/components/ClassAbsence'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Spinner, Tabs, Textarea } from '@/components/ui'
@@ -16,7 +18,7 @@ import { useStudentAccess } from './Students'
 type Slot = ScheduleSlot & { starts_on: string | null; ends_on: string | null; status: string }
 type Tab = 'day' | 'weekly'
 
-function useSlots() {
+export function useSlots() {
   return useQuery({
     queryKey: ['students', 'slots'],
     queryFn: async () => {
@@ -27,7 +29,7 @@ function useSlots() {
   })
 }
 
-function useAudiences() {
+export function useAudiences() {
   return useQuery({
     queryKey: ['students', 'audiences'],
     queryFn: async () => {
@@ -50,11 +52,15 @@ export default function Classes() {
   )
 }
 
-function DayView() {
+export function DayView() {
   const a = useStudentAccess()
   const p = usePermissions()
   const qc = useQueryClient()
-  const [day, setDay] = useState(cairoToday())
+  const [params] = useSearchParams()
+  const [day, setDay] = useState(params.get('date') || cairoToday())
+  const [excuse, setExcuse] = useState<{ slot: Slot; date: string } | null>(null)
+  const [pickSub, setPickSub] = useState<ClassSession | null>(null)
+  const staff = p.can('absences.review') || p.can('schedule.edit') || a.attendance
   const slots = useSlots()
   const dir = useDirectory()
   const [roster, setRoster] = useState<ClassSession | null>(null)
@@ -93,7 +99,7 @@ function DayView() {
       </div>
       <p className="mb-2 text-sm font-semibold">{fmtDate(day)}</p>
       {sessions.isLoading ? <Spinner /> : !list.length ? (
-        <Empty title="مفيش حصص في اليوم ده">{a.all ? 'الحصص بتظهر هنا لما يتحدد لمين كل حصة من «لمين كل حصة».' : 'مفيش حصص ليك في اليوم ده.'}</Empty>
+        <Empty title="مفيش حصص في اليوم ده">{a.all ? 'الحصص بتيجي من الجدول الأسبوعي.' : 'مفيش حصص ليك في اليوم ده.'}</Empty>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {list.map((s) => {
@@ -110,8 +116,12 @@ function DayView() {
                       {s.substitute_id ? ` · درّس مكانه ${name(s.substitute_id)}` : ''}
                     </p>
                   </div>
-                  <Badge tone={s.status === 'اتعملت' ? 'green' : s.status === 'اتلغت' ? 'red' : s.status === 'اتأجلت' ? 'orange' : 'gray'}>{s.status}</Badge>
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge tone={s.status === 'اتعملت' ? 'green' : s.status === 'اتلغت' ? 'red' : s.status === 'اتأجلت' ? 'orange' : 'gray'}>{s.status}</Badge>
+                    {s.needs_substitute && !s.substitute_id && s.status === 'متوقعة' && <Badge tone="red">محتاجة بديل</Badge>}
+                  </div>
                 </div>
+                {s.notes && <p className="text-xs text-muted">{s.notes}</p>}
                 {s.attendance_at && <p className="text-sm">حضر {s.present_count ?? 0}{!s.takes_attendance ? ' · مش بيتاخد عليها غياب' : ''}</p>}
                 {!s.takes_attendance && !s.attendance_at && <p className="text-xs text-muted">الحصة دي مش بيتاخد عليها غياب، بس الحضور بيتسجل.</p>}
                 <div className="flex flex-wrap gap-2">
@@ -124,6 +134,14 @@ function DayView() {
                   {(mine(s) || a.all) && (
                     <Button size="sm" variant="secondary" onClick={() => setAnnounce(s)}><Megaphone className="size-4" /> تنبيه للطلاب</Button>
                   )}
+                  {staff && s.slot_id && s.status === 'متوقعة' && (
+                    <Button size="sm" variant={s.needs_substitute && !s.substitute_id ? 'primary' : 'secondary'} onClick={() => setPickSub(s)}>
+                      <UserRoundCog className="size-4" /> {s.substitute_id ? 'غيّر البديل' : 'بديل'}
+                    </Button>
+                  )}
+                  {slot && p.volunteerId && s.teacher_ids.includes(p.volunteerId) && s.status === 'متوقعة' && s.on_date > cairoToday() && (
+                    <Button size="sm" variant="ghost" onClick={() => setExcuse({ slot, date: s.on_date })}>اعتذار</Button>
+                  )}
                 </div>
               </Card>
             )
@@ -134,7 +152,37 @@ function DayView() {
       {request && <RequestModal s={request} onClose={() => setRequest(null)} />}
       {announce && <AnnounceModal s={announce} onClose={() => setAnnounce(null)} />}
       {oneOff && <OneOffModal day={day} onClose={() => setOneOff(false)} />}
+      {excuse && <AbsenceModal slot={excuse.slot} date={excuse.date} onClose={() => setExcuse(null)} />}
+      {pickSub && <SubstituteModal s={pickSub} onClose={() => setPickSub(null)} />}
     </>
+  )
+}
+
+function SubstituteModal({ s, onClose }: { s: ClassSession; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [who, setWho] = useState<string | null>(s.substitute_id)
+  const save = useMutation({
+    mutationFn: async () => {
+      const { error } = await sdb().rpc('set_substitute', { p_session: s.id, p_volunteer: who })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success(who ? 'البديل اتحط واتبلغ' : 'البديل اتشال')
+      qc.invalidateQueries({ queryKey: ['students'] })
+      onClose()
+    },
+    onError: toastError,
+  })
+  return (
+    <Modal open onClose={onClose} title={`بديل · ${s.subject} · ${fmtShort(s.on_date)}`}>
+      <div className="space-y-3">
+        <p className="text-sm text-muted">
+          البديل بيوصله إشعار، وبيوصله تذكير بالحصة بالليل وقبلها بساعتين، والحصة بتتسجل له في المتابعة اليومية. لو الحصة محتاجة بديل ومحدش اتحط لحد 8 بالليل قبلها، بتتلغي والأهالي بيتبلغوا.
+        </p>
+        <Field label="مين هيدّيها"><VolunteerSelect value={who} onChange={setWho} /></Field>
+        <Button onClick={() => save.mutate()} loading={save.isPending}>حفظ</Button>
+      </div>
+    </Modal>
   )
 }
 
@@ -199,7 +247,7 @@ function RosterModal({ s, onClose }: { s: ClassSession; onClose: () => void }) {
   return (
     <Modal open onClose={onClose} title={`${s.subject} · ${fmtShort(s.on_date)}`}>
       {roster.isLoading ? <Spinner /> : !roster.data?.length ? (
-        <p className="text-sm text-muted">مفيش طلاب في الحصة دي. حدد لمين الحصة من «لمين كل حصة».</p>
+        <p className="text-sm text-muted">مفيش طلاب في الحصة دي. حدد مين بيحضرها من تعديل الحصة في «الجدول الأسبوعي».</p>
       ) : (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -311,7 +359,7 @@ function AnnounceModal({ s, onClose }: { s: ClassSession; onClose: () => void })
 }
 
 /** Who a class is for: everyone, grades, groups or named students. */
-function AudienceEditor({ value, onChange }: { value: Omit<Audience, 'id' | 'slot_id' | 'session_id'>[]; onChange: (v: Omit<Audience, 'id' | 'slot_id' | 'session_id'>[]) => void }) {
+export function AudienceEditor({ value, onChange }: { value: Omit<Audience, 'id' | 'slot_id' | 'session_id'>[]; onChange: (v: Omit<Audience, 'id' | 'slot_id' | 'session_id'>[]) => void }) {
   const term = useCurrentTerm()
   const grades = useGrades()
   const groups = useGroups(term.data?.id)

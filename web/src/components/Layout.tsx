@@ -3,6 +3,10 @@ import { isEn } from '../lib/i18n'
 import clsx from 'clsx'
 import {
   BarChart3,
+  Boxes,
+  ClipboardCheck,
+  MessageSquareWarning,
+  PieChart,
   Bell,
   CalendarCheck,
   CalendarDays,
@@ -44,6 +48,9 @@ import { useJobs } from '@/lib/jobs'
 interface NavItem {
   to: string
   label: string
+  /** heading the item sits under in the menu (none = the top, personal part) */
+  section?: 'المتطوعين' | 'الطلاب' | 'المشترك' | 'السيستم'
+  end?: boolean
   icon: ComponentType<{ className?: string }>
   badge?: number
 }
@@ -122,29 +129,58 @@ export default function Layout() {
   const items = useMemo<NavItem[]>(() => {
     const list: NavItem[] = [{ to: '/', label: 'الرئيسية', icon: Home }]
     if (p.volunteerId || p.canRegisterActivity) list.push({ to: '/check-in', label: 'تسجيل حضور', icon: Hand })
-    if (p.canReview || p.can('tshirts.manage') || p.can('certificates.review') || p.can('hr.view') || p.can('absences.review') || p.can('schedule.edit')) list.push({ to: '/requests', label: 'الطلبات', icon: Inbox, badge: pending.data })
-    if (p.can('hr.view') || p.can('recruit.manage')) list.push({ to: '/recruit', label: 'الجداد', icon: UserPlus })
-    if (p.can('camps.manage') || p.can('stats.view')) list.push({ to: '/camps', label: 'الكامبات', icon: Tent })
-    if (p.canSeeVolunteers) list.push({ to: '/volunteers', label: 'المتطوعين', icon: Users })
-    if (p.viewAll || p.leader) list.push({ to: '/tree', label: 'الهيكل', icon: Network })
-    if (p.can('attendance.view_all') || p.can('attendance.register')) list.push({ to: '/followups', label: 'المتابعة اليومية', icon: ClipboardList })
-    list.push({ to: '/schedule', label: 'جدول الحصص', icon: CalendarDays })
-    if (p.can('students.view_all') || p.can('students.attendance') || teaches.data) list.push({ to: '/students', label: 'الطلاب', icon: GraduationCap })
-    if (p.volunteerId) list.push({ to: '/me/activities', label: 'أنشطتي', icon: UsersRound })
     if (p.volunteerId) list.push({ to: '/me', label: 'بياناتي', icon: UserRound })
-    if (p.can('stats.view') || p.leader) list.push({ to: '/stats', label: 'الإحصائيات', icon: BarChart3 })
-    if (p.can('stats.view')) list.push({ to: '/reports', label: 'التقارير', icon: FileBarChart })
-    if (p.can('mail.management')) list.push({ to: '/mail', label: 'إيميلات الإدارة', icon: Mail })
-    if (p.can('meetings.manage') || p.leader) list.push({ to: '/meetings', label: 'الاجتماعات', icon: CalendarCheck })
-    if (p.can('roles.manage')) list.push({ to: '/permissions', label: 'الصلاحيات', icon: ShieldCheck })
-    if (p.can('settings.manage')) list.push({ to: '/admin', label: 'الإعدادات', icon: Settings })
-    else if (p.can('data.export') || p.can('backup.manage')) list.push({ to: '/admin?tab=data', label: 'البيانات', icon: FileSpreadsheet })
-    if (p.can('log.view')) list.push({ to: '/log', label: 'السجل', icon: History })
+    if (p.volunteerId) list.push({ to: '/me/activities', label: 'أنشطتي', icon: UsersRound })
+    if (p.canReview || p.can('tshirts.manage') || p.can('certificates.review') || p.can('hr.view') || p.can('absences.review') || p.can('schedule.edit'))
+      list.push({ to: '/requests', label: 'الطلبات', icon: Inbox, badge: pending.data })
+
+    // المتطوعين
+    const v = 'المتطوعين' as const
+    if (p.canSeeVolunteers) list.push({ to: '/volunteers', label: 'المتطوعين', icon: Users, section: v })
+    if (p.can('hr.view') || p.can('recruit.manage')) list.push({ to: '/recruit', label: 'الجداد', icon: UserPlus, section: v })
+    if (p.viewAll || p.leader) list.push({ to: '/tree', label: 'الهيكل', icon: Network, section: v })
+    if (p.can('attendance.view_all') || p.can('attendance.register')) list.push({ to: '/followups', label: 'المتابعة اليومية', icon: ClipboardList, section: v })
+    if (p.can('meetings.manage') || p.leader) list.push({ to: '/meetings', label: 'الاجتماعات', icon: CalendarCheck, section: v })
+    if (p.can('camps.manage') || p.can('stats.view')) list.push({ to: '/camps', label: 'الكامبات', icon: Tent, section: v })
+
+    // الطلاب
+    const st = 'الطلاب' as const
+    const allStudents = p.can('students.view_all')
+    if (allStudents || p.can('students.attendance') || teaches.data) list.push({ to: '/students', label: 'الطلاب', icon: GraduationCap, section: st, end: true })
+    if (allStudents) list.push({ to: '/students/admissions', label: 'القبول', icon: ClipboardCheck, section: st })
+    if (allStudents) list.push({ to: '/students/groups', label: 'المجموعات', icon: Boxes, section: st })
+    if (p.can('students.review')) list.push({ to: '/students/requests', label: 'طلبات الطلاب', icon: MessageSquareWarning, section: st })
+    if (allStudents) list.push({ to: '/students/stats', label: 'إحصائيات الطلاب', icon: PieChart, section: st })
+
+    // المشترك
+    const sh = 'المشترك' as const
+    list.push({ to: '/classes', label: 'الحصص', icon: CalendarDays, section: sh })
+    if (p.can('stats.view') || p.leader) list.push({ to: '/stats', label: 'الإحصائيات', icon: BarChart3, section: sh })
+    if (p.can('stats.view')) list.push({ to: '/reports', label: 'التقارير', icon: FileBarChart, section: sh })
+    if (p.can('mail.management')) list.push({ to: '/mail', label: 'إيميلات الإدارة', icon: Mail, section: sh })
+
+    // السيستم
+    const sy = 'السيستم' as const
+    if (p.can('roles.manage')) list.push({ to: '/permissions', label: 'الصلاحيات', icon: ShieldCheck, section: sy })
+    if (p.can('settings.manage')) list.push({ to: '/admin', label: 'الإعدادات', icon: Settings, section: sy })
+    else if (p.can('data.export') || p.can('backup.manage')) list.push({ to: '/admin?tab=data', label: 'البيانات', icon: FileSpreadsheet, section: sy })
+    if (p.can('log.view')) list.push({ to: '/log', label: 'السجل', icon: History, section: sy })
     return list
   }, [p, pending.data, teaches.data])
 
   // Bottom bar: the four most used for this person, the rest under "المزيد"
-  const bottom = items.slice(0, 4)
+  const BOTTOM = ['/', '/check-in', '/classes', '/students', '/me', '/requests', '/volunteers']
+  const bottom = BOTTOM.map((to) => items.find((it) => it.to === to)).filter((x): x is NavItem => Boolean(x)).slice(0, 4)
+  const rest = items.filter((it) => !bottom.includes(it))
+  const sections = (list: NavItem[]) => {
+    const out: { title?: string; items: NavItem[] }[] = []
+    for (const it of list) {
+      const last = out[out.length - 1]
+      if (last && last.title === it.section) last.items.push(it)
+      else out.push({ title: it.section, items: [it] })
+    }
+    return out
+  }
   const { jobOf } = useJobs()
   const roleLabel = p.volunteerId ? jobOf({ id: p.volunteerId, position: me?.position }) : (me?.role_name ?? '')
   const displayName = (isEn && me?.full_name_en) || me?.full_name || me?.email || ''
@@ -161,8 +197,13 @@ export default function Layout() {
           </div>
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3">
-          {items.map((it) => (
-            <SideLink key={it.to} item={it} />
+          {sections(items).map((g, i) => (
+            <div key={i} className={g.title ? 'pt-3' : ''}>
+              {g.title && <p className="px-3 pb-1 text-[11px] font-bold tracking-wide text-muted">{g.title}</p>}
+              {g.items.map((it) => (
+                <SideLink key={it.to} item={it} />
+              ))}
+            </div>
           ))}
         </nav>
         <div className="border-t border-line p-4">
@@ -264,19 +305,28 @@ export default function Layout() {
                 <p className="text-xs text-muted">{roleLabel}</p>
               </div>
             </div>
+            <div className="max-h-[60vh] space-y-3 overflow-y-auto">
+            {sections(rest).map((g, i) => (
+              <div key={i}>
+                {g.title && <p className="mb-1 px-1 text-[11px] font-bold text-muted">{g.title}</p>}
+                <div className="grid grid-cols-3 gap-2">
+                  {g.items.map((it) => (
+                    <NavLink key={it.to} to={it.to} className="flex flex-col items-center gap-1 rounded-xl p-3 text-center text-xs font-semibold hover:bg-surface">
+                      <it.icon className="size-5 text-brand-700" />
+                      {it.label}
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
+            ))}
             <div className="grid grid-cols-3 gap-2">
-              {items.slice(4).map((it) => (
-                <NavLink key={it.to} to={it.to} className="flex flex-col items-center gap-1 rounded-xl p-3 text-center text-xs font-semibold hover:bg-surface">
-                  <it.icon className="size-5 text-brand-700" />
-                  {it.label}
-                </NavLink>
-              ))}
               <LangSwitch stacked />
               <PasswordButton stacked email={me?.email} />
               <button onClick={signOut} className="flex flex-col items-center gap-1 rounded-xl p-3 text-xs font-semibold text-red-600 hover:bg-red-50">
                 <LogOut className="size-5" />
                 خروج
               </button>
+            </div>
             </div>
           </div>
         </div>
@@ -289,7 +339,7 @@ function SideLink({ item }: { item: NavItem }) {
   return (
     <NavLink
       to={item.to}
-      end={item.to === '/' || item.to === '/me'}
+      end={item.end || item.to === '/' || item.to === '/me'}
       className={({ isActive }) =>
         clsx(
           'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition',

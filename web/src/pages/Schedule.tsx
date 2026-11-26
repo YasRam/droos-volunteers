@@ -14,13 +14,17 @@ import { fmtDate, fmtTime, timeInput, useDirectory, useLookups, withCurrent } fr
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import { WEEKDAYS, type ScheduleSlot, type Weekday } from '@/lib/types'
+import { sdb, type Audience } from '@/lib/students'
+import { AudienceEditor, useAudiences } from '@/pages/students/Classes'
+
+type AudienceRow = Omit<Audience, 'id' | 'slot_id' | 'session_id'>
 
 const KINDS = ['حصة', 'تأسيس', 'ورشة ثابتة']
 const AUDIENCES = ['الكل', 'بنات بس', 'ولاد بس']
 
 type View = 'day' | 'grade' | 'teacher' | 'coverage'
 
-export default function Schedule() {
+export default function Schedule({ embedded = false }: { embedded?: boolean }) {
   const p = usePermissions()
   const directory = useDirectory()
   const dirName = useCallback((id: string) => directory.data?.find((v) => v.id === id)?.full_name_ar ?? '…', [directory.data])
@@ -78,17 +82,28 @@ export default function Schedule() {
 
   return (
     <>
-      <PageHeader
-        title="جدول الحصص"
-        subtitle={q.data ? `${q.data.length} حصة في الأسبوع` : undefined}
-        actions={
-          p.canEditSchedule && (
+      {embedded ? (
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <p className="text-sm text-muted">{q.data ? `${q.data.length} حصة في الأسبوع. كل حصة هنا بتعمل حصة كل أسبوع في «النهارده» للمدرسين والطلاب.` : ''}</p>
+          {p.canEditSchedule && (
             <Button onClick={() => setEditing('new')}>
               <Plus className="size-4" /> حصة جديدة
             </Button>
-          )
-        }
-      />
+          )}
+        </div>
+      ) : (
+        <PageHeader
+          title="جدول الحصص"
+          subtitle={q.data ? `${q.data.length} حصة في الأسبوع` : undefined}
+          actions={
+            p.canEditSchedule && (
+              <Button onClick={() => setEditing('new')}>
+                <Plus className="size-4" /> حصة جديدة
+              </Button>
+            )
+          }
+        />
+      )}
       <Tabs
         value={view}
         onChange={setView}
@@ -204,7 +219,21 @@ function SlotForm({ slot, onClose }: { slot: ScheduleSlot | null; onClose: () =>
     },
   })
   const [coTeachers, setCoTeachers] = useState<string[]>(slot?.co_teachers ?? [])
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['schedule'] })
+  const perms = usePermissions()
+  const canAudience = perms.can('students.edit')
+  const audiences = useAudiences()
+  const [rows, setRows] = useState<AudienceRow[] | null>(null)
+  const current: AudienceRow[] = (audiences.data ?? [])
+    .filter((x) => slot && x.slot_id === slot.id)
+    .map(({ target, grade, group_id, student_id }) => ({ target, grade, group_id, student_id }))
+  const extra = slot as (ScheduleSlot & { starts_on?: string | null; ends_on?: string | null; status?: string }) | null
+  const [startsOn, setStartsOn] = useState(extra?.starts_on ?? '')
+  const [endsOn, setEndsOn] = useState(extra?.ends_on ?? '')
+  const [status, setStatus] = useState(extra?.status ?? 'شغالة')
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['schedule'] })
+    qc.invalidateQueries({ queryKey: ['students'] })
+  }
   const save = useMutation({
     mutationFn: async (f: Parameters<Parameters<typeof form.handleSubmit>[0]>[0]) => {
       if (!f.grade || !f.subject) throw { message: 'اختار السنة والمادة' }
@@ -212,9 +241,24 @@ function SlotForm({ slot, onClose }: { slot: ScheduleSlot | null; onClose: () =>
       const teacher = f.volunteer_id ? dir.data?.find((v) => v.id === f.volunteer_id)?.full_name_ar : f.teacher_name
       const co = coTeachers.filter((id) => id !== f.volunteer_id)
       if (co.length && !f.volunteer_id) throw { message: 'اختار المتطوع الأساسي الأول، وبعدين ضيف اللي معاه' }
-      const payload = { ...f, volunteer_id: f.volunteer_id || null, teacher_name: teacher || null, place: f.place.trim() || null, notes: f.notes.trim() || null, co_teachers: co }
-      const { error } = slot ? await supabase.from('schedule_slots').update(payload).eq('id', slot.id) : await supabase.from('schedule_slots').insert(payload)
-      if (error) throw error
+      if (endsOn && startsOn && endsOn < startsOn) throw { message: 'تاريخ النهاية قبل البداية' }
+      const payload = {
+        ...f, volunteer_id: f.volunteer_id || null, teacher_name: teacher || null, place: f.place.trim() || null, notes: f.notes.trim() || null, co_teachers: co,
+        starts_on: startsOn || null, ends_on: endsOn || null, status,
+      }
+      const res = slot
+        ? await supabase.from('schedule_slots').update(payload).eq('id', slot.id).select('id').single()
+        : await supabase.from('schedule_slots').insert(payload).select('id').single()
+      if (res.error) throw res.error
+      const id = (res.data as { id: string }).id
+      if (canAudience && rows) {
+        const del = await sdb().from('audiences').delete().eq('slot_id', id)
+        if (del.error) throw del.error
+        if (rows.length) {
+          const ins = await sdb().from('audiences').insert(rows.map((r) => ({ ...r, slot_id: id })))
+          if (ins.error) throw ins.error
+        }
+      }
     },
     onSuccess: () => {
       toast.success('اتحفظت')
@@ -300,6 +344,22 @@ function SlotForm({ slot, onClose }: { slot: ScheduleSlot | null; onClose: () =>
             <input type="checkbox" className="size-4 accent-brand-700" {...form.register('takes_attendance')} />
             بيتاخد عليها غياب
           </label>
+        </Field>
+        {canAudience && (
+          <div className="sm:col-span-2">
+            <Field label="مين من الطلاب بيحضرها" hint="سنة، مجموعة، أو طلاب بالاسم. دول اللي بيظهروا في الغياب وبيوصلهم الإلغاء والتأجيل">
+              <AudienceEditor value={rows ?? current} onChange={setRows} />
+            </Field>
+          </div>
+        )}
+        <Field label="بتبدأ من" hint="فاضي = من دلوقتي">
+          <Input type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} />
+        </Field>
+        <Field label="بتخلص" hint="فاضي = مستمرة">
+          <Input type="date" value={endsOn} onChange={(e) => setEndsOn(e.target.value)} />
+        </Field>
+        <Field label="الحالة" hint="متوقفة أو اتلغت: الحصص الجاية بتختفي من «النهارده»">
+          <Select value={status} onChange={(e) => setStatus(e.target.value)} options={['شغالة', 'متوقفة', 'اتلغت']} />
         </Field>
         <div className="sm:col-span-2">
           <Field label="ملاحظات (اختياري)">

@@ -8,7 +8,7 @@ import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import { sdb } from '@/lib/students'
 
-type Tab = 'classes' | 'dismissals' | 'changes'
+type Tab = 'dismissals' | 'changes'
 
 interface SlotRequest {
   id: string
@@ -28,20 +28,16 @@ interface Dismissal { id: string; absences: number; review_note: string | null; 
 interface Change { id: string; student_id: string; changes: Record<string, { old: unknown; new: unknown }>; requested_at: string; student: { full_name: string } }
 
 export default function StudentRequests() {
-  const [tab, setTab] = useState<Tab>('classes')
+  const [tab, setTab] = useState<Tab>('dismissals')
   const q = useQuery({
     queryKey: ['students', 'requests'],
     queryFn: async () => {
-      const [slots, sr, dm, ch] = await Promise.all([
-        supabase.from('schedule_slots').select('id, subject, grade, day, starts_at'),
-        sdb().from('slot_requests').select('*').eq('status', 'pending').order('requested_at'),
+      const [dm, ch] = await Promise.all([
         sdb().from('dismissal_requests').select('id, absences, review_note, created_at, enrollment:enrollments(student_id, grade, student:students(full_name))').eq('status', 'pending').order('created_at'),
         sdb().from('change_requests').select('id, student_id, changes, requested_at, student:students(full_name)').eq('status', 'pending').order('requested_at'),
       ])
-      for (const r of [sr, dm, ch]) if (r.error) throw r.error
+      for (const r of [dm, ch]) if (r.error) throw r.error
       return {
-        slots: new Map(((slots.data ?? []) as { id: string; subject: string; grade: string; day: string; starts_at: string }[]).map((s) => [s.id, s])),
-        classes: sr.data as SlotRequest[],
         dismissals: dm.data as unknown as Dismissal[],
         changes: ch.data as unknown as Change[],
       }
@@ -51,35 +47,15 @@ export default function StudentRequests() {
   const d = q.data!
   return (
     <>
-      <PageHeader title="طلبات الطلاب" subtitle="مفيش حاجة من دول بتتطبق قبل الموافقة." />
+      <PageHeader title="طلبات الطلاب" subtitle="مفيش حاجة من دول بتتطبق قبل الموافقة. طلبات إلغاء وتأجيل الحصص في «الحصص» ← «الطلبات»." />
       <Tabs
         tabs={[
-          { value: 'classes' as Tab, label: 'الحصص', count: d.classes.length },
           { value: 'dismissals' as Tab, label: 'الفصل', count: d.dismissals.length },
           { value: 'changes' as Tab, label: 'تعديل البيانات', count: d.changes.length },
         ]}
         value={tab}
         onChange={setTab}
       />
-      {tab === 'classes' && (!d.classes.length ? <Empty title="مفيش طلبات حصص" /> : (
-        <div className="space-y-2">
-          {d.classes.map((r) => {
-            const s = d.slots.get(r.slot_id)
-            const what =
-              r.kind === 'إلغاء مرة' ? `إلغاء حصة ${fmtShort(r.on_date)}`
-              : r.kind === 'تأجيل' ? `تأجيل حصة ${fmtShort(r.on_date)} لـ ${fmtShort(r.new_date)} ${fmtTime(r.new_starts_at)}`
-              : r.kind === 'إيقاف' ? `إيقاف من ${fmtShort(r.pause_from)} لـ ${fmtShort(r.pause_to)}`
-              : `إلغاء الحصة خالص من ${fmtShort(r.from_date)}`
-            return (
-              <Decide key={r.id} table="slot_requests" id={r.id}>
-                <p className="font-semibold">{s ? `${s.subject} · ${s.grade} · ${s.day} ${fmtTime(s.starts_at)}` : 'حصة'}</p>
-                <p className="text-sm">{what}{r.reason ? ` · ${r.reason}` : ''}</p>
-                <p className="text-xs text-muted">من {r.requested_by} · {fmtShort(r.requested_at)}</p>
-              </Decide>
-            )
-          })}
-        </div>
-      ))}
       {tab === 'dismissals' && (!d.dismissals.length ? <Empty title="مفيش طلبات فصل" /> : (
         <div className="space-y-2">
           {d.dismissals.map((r) => (
@@ -131,5 +107,48 @@ function Decide({ table, id, children, approve = 'موافقة', reject = 'رف�
         <Button size="sm" variant="secondary" loading={act.isPending && act.variables === 'rejected'} onClick={() => act.mutate('rejected')}>{reject}</Button>
       </div>
     </Card>
+  )
+}
+
+/** Cancel / postpone / pause requests on the classes (shown in الحصص ← الطلبات). */
+export function SlotRequests() {
+  const q = useQuery({
+    queryKey: ['students', 'slot-requests'],
+    queryFn: async () => {
+      const [slots, sr] = await Promise.all([
+        supabase.from('schedule_slots').select('id, subject, grade, day, starts_at'),
+        sdb().from('slot_requests').select('*').eq('status', 'pending').order('requested_at'),
+      ])
+      if (sr.error) throw sr.error
+      return {
+        slots: new Map(((slots.data ?? []) as { id: string; subject: string; grade: string; day: string; starts_at: string }[]).map((s) => [s.id, s])),
+        classes: sr.data as SlotRequest[],
+      }
+    },
+  })
+  if (q.isLoading) return <Spinner />
+  const d = q.data!
+  return (
+    <>
+      {(!d.classes.length ? <Empty title="مفيش طلبات حصص" /> : (
+        <div className="space-y-2">
+          {d.classes.map((r) => {
+            const s = d.slots.get(r.slot_id)
+            const what =
+              r.kind === 'إلغاء مرة' ? `إلغاء حصة ${fmtShort(r.on_date)}`
+              : r.kind === 'تأجيل' ? `تأجيل حصة ${fmtShort(r.on_date)} لـ ${fmtShort(r.new_date)} ${fmtTime(r.new_starts_at)}`
+              : r.kind === 'إيقاف' ? `إيقاف من ${fmtShort(r.pause_from)} لـ ${fmtShort(r.pause_to)}`
+              : `إلغاء الحصة خالص من ${fmtShort(r.from_date)}`
+            return (
+              <Decide key={r.id} table="slot_requests" id={r.id}>
+                <p className="font-semibold">{s ? `${s.subject} · ${s.grade} · ${s.day} ${fmtTime(s.starts_at)}` : 'حصة'}</p>
+                <p className="text-sm">{what}{r.reason ? ` · ${r.reason}` : ''}</p>
+                <p className="text-xs text-muted">من {r.requested_by} · {fmtShort(r.requested_at)}</p>
+              </Decide>
+            )
+          })}
+        </div>
+      ))}
+    </>
   )
 }

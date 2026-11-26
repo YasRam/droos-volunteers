@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { Filter, Plus, Search, Upload } from 'lucide-react'
 import { lazy, useMemo, useState } from 'react'
-import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { Badge, Button, Card, Empty, Field, Input, PageHeader, Select, Spinner } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
 import { ageFrom } from '@/lib/data'
@@ -13,7 +13,6 @@ const StudentForm = lazy(() => import('./StudentForm'))
 const StudentDetail = lazy(() => import('./StudentDetail'))
 const Admissions = lazy(() => import('./Admissions'))
 const Groups = lazy(() => import('./Groups'))
-const Classes = lazy(() => import('./Classes'))
 const StudentRequests = lazy(() => import('./StudentRequests'))
 const StudentStats = lazy(() => import('./StudentStats'))
 const StudentImport = lazy(() => import('./StudentImport'))
@@ -34,43 +33,14 @@ export function useStudentAccess() {
   }
 }
 
-function StudentsNav() {
-  const a = useStudentAccess()
-  const links = [
-    { to: '/students', label: 'الطلاب', end: true, show: true },
-    { to: '/students/classes', label: 'الحصص والحضور', show: true },
-    { to: '/students/admissions', label: 'القبول', show: a.all },
-    { to: '/students/groups', label: 'المجموعات', show: a.all },
-    { to: '/students/requests', label: 'الطلبات', show: a.review },
-    { to: '/students/stats', label: 'الإحصائيات', show: a.all },
-  ].filter((l) => l.show)
-  return (
-    <div className="mb-4 flex gap-1 overflow-x-auto rounded-xl bg-white p-1 shadow-sm ring-1 ring-line">
-      {links.map((l) => (
-        <NavLink
-          key={l.to}
-          to={l.to}
-          end={l.end}
-          className={({ isActive }) =>
-            clsx('flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-center text-sm font-semibold transition', isActive ? 'bg-brand-700 text-white' : 'text-muted hover:bg-surface')
-          }
-        >
-          {l.label}
-        </NavLink>
-      ))}
-    </div>
-  )
-}
-
 export default function StudentsSection() {
   const a = useStudentAccess()
   return (
     <>
-      <StudentsNav />
       <Routes>
         <Route index element={<StudentList />} />
         <Route path="new" element={a.edit ? <StudentForm /> : <Navigate to="/students" replace />} />
-        <Route path="classes" element={<Classes />} />
+        <Route path="classes" element={<Navigate to="/classes" replace />} />
         <Route path="admissions" element={a.all ? <Admissions /> : <Navigate to="/students" replace />} />
         <Route path="groups" element={a.all ? <Groups /> : <Navigate to="/students" replace />} />
         <Route path="requests" element={a.review ? <StudentRequests /> : <Navigate to="/students" replace />} />

@@ -30,7 +30,7 @@ insert into schedule_slots (id, day, grade, subject, starts_at, ends_at, volunte
   select 'd9000000-0000-0000-0000-000000000000', students.weekday_ar(app.today()), '6ب', 'علوم', '16:00', '17:00', id, 'حصة', 'الفرع'
     from volunteers where code = 'A9001';
 select students.ensure_sessions(app.today() - 28, app.today());
-select t.ok((select count(*) from students.class_sessions where slot_id = 'd9000000-0000-0000-0000-000000000000') = 0, 'a class for nobody makes no sessions');
+select t.ok((select count(*) from students.class_sessions where slot_id = 'd9000000-0000-0000-0000-000000000000') = 5, 'a class with no students yet still has its dated classes (the teacher is reminded)');
 insert into students.audiences (slot_id, target, grade) values ('d9000000-0000-0000-0000-000000000000', 'grade', '6 ب');
 select students.ensure_sessions(app.today() - 28, app.today());
 select t.ok((select count(*) from students.class_sessions where slot_id = 'd9000000-0000-0000-0000-000000000000') = 5, 'one session a week for the last 5 weeks');

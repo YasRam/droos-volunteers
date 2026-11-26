@@ -55,6 +55,7 @@ export interface ClassSession {
   attendance_at: string | null
   present_count: number | null
   notes: string | null
+  needs_substitute?: boolean
 }
 export interface Mark { code: string; description: string | null; is_present: boolean; counts_absence: boolean; is_violation: boolean; sort_order: number }
 export interface Audience { id: string; slot_id: string | null; session_id: string | null; target: 'all' | 'grade' | 'group' | 'student'; grade: string | null; group_id: string | null; student_id: string | null }

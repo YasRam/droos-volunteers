@@ -28,7 +28,7 @@ const FollowUps = lazy(() => import('@/pages/FollowUps'))
 const Requests = lazy(() => import('@/pages/Requests'))
 const Camps = lazy(() => import('@/pages/Camps'))
 const Recruit = lazy(() => import('@/pages/Recruit'))
-const Schedule = lazy(() => import('@/pages/Schedule'))
+const Classes = lazy(() => import('@/pages/Classes'))
 const Stats = lazy(() => import('@/pages/Stats'))
 const Reports = lazy(() => import('@/pages/Reports'))
 const ManagementMail = lazy(() => import('@/pages/ManagementMail'))
@@ -40,6 +40,14 @@ const Tree = lazy(() => import('@/pages/Tree'))
 const AuditLog = lazy(() => import('@/pages/AuditLog'))
 const Join = lazy(() => import('@/pages/Join'))
 const VolunteerForm = lazy(() => import('@/pages/VolunteerForm'))
+
+/** Old address → new one, keeping ?absence=… and ?date=… from old notifications. */
+function KeepQuery({ to, tab }: { to: string; tab: string }) {
+  const { search } = useLocation()
+  const q = new URLSearchParams(search)
+  if (!q.has('tab')) q.set('tab', tab)
+  return <Navigate to={`${to}?${q}`} replace />
+}
 
 function Guard({ allow, children }: { allow: boolean; children: ReactNode }) {
   return allow ? <>{children}</> : <Navigate to="/" replace />
@@ -84,7 +92,8 @@ export default function App() {
           <Route path="requests/*" element={<Guard allow={p.canReview || p.can('tshirts.manage') || p.can('certificates.review') || p.can('hr.view') || p.can('absences.review') || p.can('schedule.edit')}><Requests /></Guard>} />
           <Route path="recruit" element={<Guard allow={p.can('hr.view') || p.can('recruit.manage')}><Recruit /></Guard>} />
           <Route path="camps" element={<Guard allow={p.can('camps.manage') || p.can('stats.view')}><Camps /></Guard>} />
-          <Route path="schedule" element={<Schedule />} />
+          <Route path="classes" element={<Classes />} />
+          <Route path="schedule" element={<KeepQuery to="/classes" tab="week" />} />
           <Route path="stats" element={<Guard allow={p.can('stats.view') || p.leader}><Stats /></Guard>} />
           <Route path="reports" element={<Guard allow={p.can('stats.view')}><Reports /></Guard>} />
           <Route path="students/*" element={<Guard allow={studentsAllowed}><Students /></Guard>} />
