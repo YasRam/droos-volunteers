@@ -198,3 +198,22 @@ export function useTeaches(volunteerId: string | null) {
     },
   })
 }
+
+export interface StudentRule {
+  id: string
+  body: string
+  version: number
+}
+
+/** The rules guardians agree to (students.rules). */
+export function useStudentRules() {
+  return useQuery({
+    queryKey: ['student-rules'],
+    queryFn: async () => {
+      const { data, error } = await sdb().from('rules').select('id, body, version, sort_order').eq('is_active', true).order('sort_order')
+      if (error) throw error
+      return data as StudentRule[]
+    },
+  })
+}
+

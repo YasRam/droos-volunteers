@@ -40,6 +40,7 @@ const Tree = lazy(() => import('@/pages/Tree'))
 const AuditLog = lazy(() => import('@/pages/AuditLog'))
 const Join = lazy(() => import('@/pages/Join'))
 const VolunteerForm = lazy(() => import('@/pages/VolunteerForm'))
+const Family = lazy(() => import('@/pages/Family'))
 
 /** Old address → new one, keeping ?absence=… and ?date=… from old notifications. */
 function KeepQuery({ to, tab }: { to: string; tab: string }) {
@@ -54,7 +55,7 @@ function Guard({ allow, children }: { allow: boolean; children: ReactNode }) {
 }
 
 export default function App() {
-  const { ready, session, known, failed, retry, inactive } = useAuth()
+  const { ready, session, known, failed, retry, inactive, family } = useAuth()
   const p = usePermissions()
   const teaches = useTeaches(p.volunteerId)
   const studentsAllowed = p.can('students.view_all') || p.can('students.attendance') || Boolean(teaches.data) || teaches.isLoading
@@ -70,6 +71,14 @@ export default function App() {
     )
   if (!ready) return <Spinner label="لحظة..." />
   if (!session && !devAuth) return <Login />
+  if (family)
+    return (
+      <PageErrorBoundary>
+        <Suspense fallback={<Spinner />}>
+          <Family />
+        </Suspense>
+      </PageErrorBoundary>
+    )
   if (failed) return <Offline onRetry={retry} />
   if (!known) return <NotRegistered />
   if (inactive) return <Inactive />

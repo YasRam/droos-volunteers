@@ -17,10 +17,22 @@ interface AuthState {
   inactive: boolean
   retry: () => void
   isLeader: boolean
+  /** a guardian or student account (<mobile or national id>@family.droos): the family page only */
+  family: boolean
+  signInFamily: (login: string, password: string) => Promise<void>
   signIn: () => Promise<void>
   signInWithPassword: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
 }
+
+const FAMILY_DOMAIN = '@family.droos'
+
+/** Arabic digits → Latin, digits only, +20 → 0: the same as students.digits() in the database. */
+export function cleanDigits(t: string) {
+  const latin = t.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x660)).replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x6f0))
+  return latin.replace(/\D/g, '').replace(/^(0020|20)(1[0125]\d{8})$/, '0$2')
+}
+export const familyEmail = (login: string) => cleanDigits(login) + FAMILY_DOMAIN
 
 const AuthContext = createContext<AuthState | null>(null)
 
@@ -51,10 +63,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [qc])
 
   const signedIn = isDevAuth || Boolean(session)
+  const family = Boolean(session?.user.email?.endsWith(FAMILY_DOMAIN))
 
   const meQuery = useQuery({
     queryKey: ['me', session?.user.id ?? 'dev'],
-    enabled: ready && signedIn,
+    enabled: ready && signedIn && !family,
     staleTime: 5 * 60_000,
     retry: 4,
     retryDelay: (n) => Math.min(1000 * 2 ** n, 8000),
@@ -78,6 +91,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     inactive: Boolean(me?.inactive),
     retry: () => void meQuery.refetch(),
     isLeader,
+    family,
+    signInFamily: async (login, password) => {
+      const { error } = await supabase.auth.signInWithPassword({ email: familyEmail(login), password })
+      if (error) throw new Error(/invalid/i.test(error.message) ? 'البيانات أو كلمة السر غلط' : error.message)
+    },
     signIn: async () => {
       await supabase.auth.signInWithOAuth({
         provider: 'google',

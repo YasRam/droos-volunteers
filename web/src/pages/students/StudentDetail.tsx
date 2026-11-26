@@ -20,6 +20,7 @@ import {
   type Student,
 } from '@/lib/students'
 import { useStudentAccess } from './Students'
+import { FamilyAccessCard } from '@/components/StudentRules'
 
 export default function StudentDetail() {
   const { id } = useParams()
@@ -159,6 +160,7 @@ export default function StudentDetail() {
         )}
 
         {(a.contacts || a.sensitive) && <FamilyCard s={s} />}
+        {a.all && <FamilyAccessCard studentId={s.id} hasGuardian={Boolean(s.guardian_id)} />}
       </div>
 
       {modal === 'flag' && <FlagModal studentId={s.id} onClose={() => setModal(null)} />}

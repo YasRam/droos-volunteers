@@ -30,6 +30,7 @@ import {
   UserRound,
   Users,
   UsersRound,
+  ScrollText,
 } from 'lucide-react'
 import { Suspense, useEffect, useMemo, useState, type ComponentType } from 'react'
 import { Spinner } from '@/components/ui'
@@ -150,6 +151,7 @@ export default function Layout() {
     if (allStudents) list.push({ to: '/students/admissions', label: 'القبول', icon: ClipboardCheck, section: st })
     if (allStudents) list.push({ to: '/students/groups', label: 'المجموعات', icon: Boxes, section: st })
     if (p.can('students.review')) list.push({ to: '/students/requests', label: 'طلبات الطلاب', icon: MessageSquareWarning, section: st })
+    if (allStudents) list.push({ to: '/students/rules', label: 'قواعد الطلاب', icon: ScrollText, section: st })
     if (allStudents) list.push({ to: '/students/stats', label: 'إحصائيات الطلاب', icon: PieChart, section: st })
 
     // المشترك

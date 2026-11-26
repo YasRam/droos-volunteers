@@ -69,6 +69,8 @@ const TABLES: Record<string, string[]> = {
   'students.announcements': ['id'],
   'students.change_requests': ['id'],
   'students.dismissal_requests': ['id'],
+  'students.rules': ['id'],
+  'students.rule_answers': ['guardian_id', 'rule_id'],
 }
 
 const PAGE = 1000

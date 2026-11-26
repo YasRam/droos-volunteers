@@ -16,6 +16,7 @@ const Groups = lazy(() => import('./Groups'))
 const StudentRequests = lazy(() => import('./StudentRequests'))
 const StudentStats = lazy(() => import('./StudentStats'))
 const StudentImport = lazy(() => import('./StudentImport'))
+const StudentRulesPage = lazy(() => import('@/components/StudentRules').then((m) => ({ default: m.StudentRulesPage })))
 
 /** Who may open the students part at all: تنظيم and up, or a volunteer who teaches. */
 export function useStudentAccess() {
@@ -45,6 +46,7 @@ export default function StudentsSection() {
         <Route path="groups" element={a.all ? <Groups /> : <Navigate to="/students" replace />} />
         <Route path="requests" element={a.review ? <StudentRequests /> : <Navigate to="/students" replace />} />
         <Route path="import" element={a.edit && a.sensitive ? <StudentImport /> : <Navigate to="/students" replace />} />
+        <Route path="rules" element={a.all ? <StudentRulesPage /> : <Navigate to="/students" replace />} />
         <Route path="stats" element={a.all ? <StudentStats /> : <Navigate to="/students" replace />} />
         <Route path=":id/edit" element={a.edit ? <StudentForm /> : <Navigate to="/students" replace />} />
         <Route path=":id" element={<StudentDetail />} />

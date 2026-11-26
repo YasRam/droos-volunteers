@@ -10,6 +10,13 @@
 //     HR (hr.edit) or roles.manage set a temporary password for a volunteer. Only
 //     roles.manage may do it for someone who has permissions.
 //
+//  { action: 'family_password', kind: 'guardian'|'student', login, national_id?, phone?, password }
+//     anyone: a guardian (mobile + a national ID on the family's file) or a student (national ID +
+//     a family mobile) sets a password. Login is <mobile or national id>@family.droos.
+//
+//  { action: 'family_set_password', kind, student_id, password }   + Authorization: Bearer <user JWT>
+//     staff with students.accounts set a password for a student or his guardian.
+//
 // Deploy with "Verify JWT" OFF (the first action has no account yet); the second checks the JWT itself.
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -35,6 +42,20 @@ async function setPassword(email: string, userId: string | null, password: strin
     const { error } = await db.auth.admin.createUser({ email, password, email_confirm: true })
     if (error) throw error
   }
+}
+
+const students = db.schema('students')
+
+/** Family accounts: the login can change (new mobile), so the email follows it. Returns the user id. */
+async function setFamilyPassword(email: string, userId: string | null, password: string): Promise<string> {
+  if (userId) {
+    const { error } = await db.auth.admin.updateUserById(userId, { password, email, email_confirm: true })
+    if (error) throw error
+    return userId
+  }
+  const { data, error } = await db.auth.admin.createUser({ email, password, email_confirm: true })
+  if (error) throw error
+  return data.user.id
 }
 
 Deno.serve(async (req) => {
@@ -73,6 +94,38 @@ Deno.serve(async (req) => {
       if (t.staff && !t.caller_manages_roles) return fail('ده معاه صلاحيات، وكلمة السر بتاعته بتتغير من الأدمن بس', 403)
       await setPassword(t.email, t.user_id, password)
       return json({ ok: true, email: t.email })
+    }
+
+    if (body.action === 'family_password') {
+      const kind = body.kind === 'student' ? 'student' : 'guardian'
+      const { data, error } = await students.rpc('family_check', {
+        p_kind: kind, p_login: body.login ?? '', p_nid: body.national_id ?? '', p_phone: body.phone ?? null,
+      })
+      if (error) throw error
+      if (!data.ok) return fail(data.error)
+      const userId = await setFamilyPassword(data.login_email, data.user_id, password)
+      const { error: linkError } = await students.rpc('family_link', { p_user: userId, p_kind: kind, p_id: data.id, p_login_email: data.login_email })
+      if (linkError) throw linkError
+      return json({ ok: true, email: data.login_email })
+    }
+
+    if (body.action === 'family_set_password') {
+      const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
+      const { data: who, error: authError } = await db.auth.getUser(token)
+      if (authError || !who.user?.email) return fail('ادخل الموقع تاني', 401)
+      const kind = body.kind === 'student' ? 'student' : 'guardian'
+      const { data: t, error } = await students.rpc('family_target', { p_caller: who.user.email, p_kind: kind, p_student: body.student_id })
+      if (error) throw error
+      if (!t) return fail('الطالب ده مش موجود', 404)
+      if (!t.allowed) return fail('محتاج صلاحية «حسابات أولياء الأمور والطلاب»', 403)
+      if (!t.id) return fail('الطالب ده مالوش ولي أمر متسجل. ضيفه الأول')
+      if (!t.login) return fail(kind === 'guardian' ? 'مفيش موبايل لولي الأمر. ضيفه الأول' : 'مفيش رقم قومي للطالب. ضيفه الأول')
+      const userId = await setFamilyPassword(t.login_email, t.user_id, password)
+      const { error: linkError } = await students.rpc('family_link', {
+        p_user: userId, p_kind: kind, p_id: t.id, p_login_email: t.login_email, p_by: who.user.email,
+      })
+      if (linkError) throw linkError
+      return json({ ok: true, login: t.login })
     }
 
     return fail('unknown action')
