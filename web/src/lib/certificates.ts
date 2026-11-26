@@ -16,6 +16,7 @@ export interface CertificateRequest {
   id: string
   volunteer_id: string
   id_card_path: string
+  id_card_back_path: string | null
   purpose: string | null
   status: 'pending' | 'accepted' | 'rejected'
   review_note: string | null

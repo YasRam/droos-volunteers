@@ -76,6 +76,12 @@ function Review({ request, onClose }: { request: CertificateRequest; onClose: ()
     },
   })
   const photo = useQuery({ queryKey: ['id-card', request.id_card_path], queryFn: () => idCardUrl(request.id_card_path), staleTime: 5 * 60_000 })
+  const backPhoto = useQuery({
+    queryKey: ['id-card', request.id_card_back_path],
+    enabled: Boolean(request.id_card_back_path),
+    queryFn: () => idCardUrl(request.id_card_back_path!),
+    staleTime: 5 * 60_000,
+  })
   const [note, setNote] = useState(request.review_note ?? '')
 
   const decide = useMutation({
@@ -136,12 +142,24 @@ function Review({ request, onClose }: { request: CertificateRequest; onClose: ()
             <Spinner />
           ) : photo.data ? (
             <div className="space-y-2">
-              <img src={photo.data} alt="صورة البطاقة" className="max-h-72 w-full rounded-xl border border-line object-contain" />
-              <a href={photo.data} target="_blank" rel="noreferrer" download>
-                <Button variant="secondary" size="sm">
-                  <Download className="size-4" /> تنزيل الصورة
-                </Button>
-              </a>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {[
+                  ['الوش', photo.data],
+                  ['الضهر', backPhoto.data],
+                ].map(([label, url]) =>
+                  url ? (
+                    <div key={label} className="space-y-1">
+                      <p className="text-xs text-muted">{label}</p>
+                      <img src={url} alt={`${label} البطاقة`} className="max-h-72 w-full rounded-xl border border-line object-contain" />
+                      <a href={url} target="_blank" rel="noreferrer" download>
+                        <Button variant="secondary" size="sm">
+                          <Download className="size-4" /> تنزيل {label}
+                        </Button>
+                      </a>
+                    </div>
+                  ) : null,
+                )}
+              </div>
             </div>
           ) : (
             <p className="text-sm text-red-600">الصورة مش متاحة</p>

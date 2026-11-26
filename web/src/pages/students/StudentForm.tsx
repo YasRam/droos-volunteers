@@ -3,7 +3,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Button, Card, Field, Input, PageHeader, Select, Spinner, Textarea, Toggle } from '@/components/ui'
+import { Button, Card, Field, Input, PageHeader, Select, Spinner, Textarea } from '@/components/ui'
 import { toastError } from '@/lib/errors'
 import {
   PHONE_RE,
@@ -20,6 +20,17 @@ import { useStudentAccess } from './Students'
 
 const NID_RE = /^[23]\d{13}$/
 
+type GuardianKind = 'father' | 'mother' | 'other'
+interface Guardian {
+  id: string
+  full_name: string
+  relation: string
+  national_id: string | null
+  id_valid_until: string | null
+  job: string | null
+  phone: string | null
+  custody_document: string | null
+}
 interface Phone { number: string; label: string; is_whatsapp: boolean }
 interface Form {
   full_name: string
@@ -39,7 +50,10 @@ interface Form {
   mother_national_id: string
   mother_id_valid_until: string
   mother_job: string
-  custodian: boolean
+  father_phone: string
+  mother_phone: string
+  /** who is the guardian: the father (default), the mother (educational guardianship) or someone else */
+  g_kind: GuardianKind
   g_name: string
   g_relation: string
   g_national_id: string
@@ -62,7 +76,8 @@ const BLANK: Form = {
   phones: [{ number: '', label: 'البيت', is_whatsapp: true }],
   father_name: '', father_national_id: '', father_id_valid_until: '', father_job: '',
   mother_name: '', mother_national_id: '', mother_id_valid_until: '', mother_job: '',
-  custodian: false, g_name: '', g_relation: 'أم', g_national_id: '', g_phone: '', g_valid_until: '', g_job: '', g_document: '',
+  father_phone: '', mother_phone: '',
+  g_kind: 'father', g_name: '', g_relation: 'أم', g_national_id: '', g_phone: '', g_valid_until: '', g_job: '', g_document: '',
   kids_under_5: '', kids_5_to_10: '', boys_over_10: '', girls_over_10: '',
   family_income: '', family_support: '', health_notes: '', important_notes: '', notes: '',
 }
@@ -80,7 +95,7 @@ function check(f: Form, isNew: boolean): string | null {
     if (!t(f.school)) return 'اكتب اسم المدرسة'
     if (!t(f.mother_name)) return 'اكتب اسم الأم'
   }
-  for (const [label, v] of [['الأب', f.father_national_id], ['الأم', f.mother_national_id], ['ولي الأمر', f.custodian ? f.g_national_id : '']] as const) {
+  for (const [label, v] of [['الأب', f.father_national_id], ['الأم', f.mother_national_id], ['ولي الأمر', f.g_kind === 'other' ? f.g_national_id : '']] as const) {
     if (v && !NID_RE.test(v)) return `الرقم القومي لـ${label} لازم 14 رقم ويبدأ بـ 2 أو 3`
   }
   if (f.father_national_id && f.father_national_id === f.mother_national_id) return 'الرقم القومي للأم نفس رقم الأب'
@@ -90,10 +105,12 @@ function check(f: Form, isNew: boolean): string | null {
   if (isNew && !phones.length) return 'اكتب رقم تليفون واحد على الأقل'
   for (const p of phones) if (!PHONE_RE.test(normalizePhone(p.number))) return `رقم التليفون «${p.number}» مش صح (11 رقم يبدأ بـ 01)`
   if (new Set(phones.map((p) => normalizePhone(p.number))).size !== phones.length) return 'فيه رقم تليفون متكرر'
-  if (f.custodian) {
-    if (!t(f.g_name)) return 'اكتب اسم ولي الأمر'
-    if (f.g_phone && !PHONE_RE.test(normalizePhone(f.g_phone))) return 'رقم ولي الأمر مش صح'
-  }
+  if (!PHONE_RE.test(normalizePhone(f.g_phone))) return 'اكتب رقم ولي الأمر (11 رقم يبدأ بـ 01). ده رقم التواصل الأساسي'
+  for (const [label, v] of [['الأب', f.father_phone], ['الأم', f.mother_phone]] as const)
+    if (v.trim() && !PHONE_RE.test(normalizePhone(v))) return `رقم ${label} مش صح`
+  if (f.g_kind === 'mother' && !t(f.mother_name)) return 'اكتب اسم الأم'
+  if (f.g_kind !== 'father' && !t(f.g_document)) return 'اكتب الورقة اللي اتأكدنا منها (الولاية التعليمية أو الحضانة)'
+  if (f.g_kind === 'other' && !t(f.g_name)) return 'اكتب اسم ولي الأمر'
   return null
 }
 
@@ -112,19 +129,22 @@ export default function StudentForm() {
     queryKey: ['students', 'edit', id],
     enabled: !isNew,
     queryFn: async () => {
-      const [s, priv, phones] = await Promise.all([
+      const [s, priv, phones, g] = await Promise.all([
         sdb().from('students').select('*').eq('id', id!).single(),
         sdb().from('student_private').select('*').eq('student_id', id!).maybeSingle(),
         sdb().from('phones').select('*').eq('student_id', id!).order('sort_order'),
+        sdb().from('students').select('guardian:guardians(*)').eq('id', id!).maybeSingle(),
       ])
       if (s.error) throw s.error
-      return { s: s.data as Student, priv: (priv.data ?? null) as Record<string, unknown> | null, phones: (phones.data ?? []) as Phone[] }
+      const guardian = ((g.data as { guardian: Guardian | null } | null)?.guardian ?? null) as Guardian | null
+      return { s: s.data as Student, priv: (priv.data ?? null) as Record<string, unknown> | null, phones: (phones.data ?? []) as Phone[], guardian }
     },
   })
   useEffect(() => {
     if (!existing.data) return
-    const { s, priv, phones } = existing.data
+    const { s, priv, phones, guardian: g } = existing.data
     const str = (k: string) => (priv?.[k] == null ? '' : String(priv[k]))
+    const kind: GuardianKind = !g || g.relation === 'أب' ? 'father' : g.relation === 'أم' && (!g.national_id || g.national_id === str('mother_national_id')) ? 'mother' : 'other'
     setF({
       ...BLANK,
       full_name: s.full_name, school: s.school ?? '', school_shift: s.school_shift ?? 'صباحي', carnet_no: s.carnet_no ?? '', notes: s.notes ?? '',
@@ -134,6 +154,13 @@ export default function StudentForm() {
       kids_under_5: str('kids_under_5'), kids_5_to_10: str('kids_5_to_10'), boys_over_10: str('boys_over_10'), girls_over_10: str('girls_over_10'),
       family_income: str('family_income'), family_support: str('family_support'), health_notes: str('health_notes'), important_notes: str('important_notes'),
       phones: phones.length ? phones.map((p) => ({ number: p.number, label: p.label ?? '', is_whatsapp: p.is_whatsapp })) : BLANK.phones,
+      father_phone: str('father_phone'), mother_phone: str('mother_phone'),
+      g_kind: kind,
+      g_phone: g?.phone ?? '',
+      g_document: g?.custody_document ?? '',
+      ...(kind === 'other' && g
+        ? { g_name: g.full_name, g_relation: g.relation, g_national_id: g.national_id ?? '', g_valid_until: g.id_valid_until ?? '', g_job: g.job ?? '' }
+        : {}),
     })
     setFatherTouched(true)
   }, [existing.data])
@@ -150,7 +177,7 @@ export default function StudentForm() {
       return ((data ?? []) as { id: string; full_name: string }[])[0] ?? null
     },
   })
-  const guardianNid = f.custodian ? f.g_national_id : f.father_national_id
+  const guardianNid = f.g_kind === 'other' ? f.g_national_id : f.g_kind === 'mother' ? f.mother_national_id : f.father_national_id
   const sibling = useQuery({
     queryKey: ['students', 'guardian-nid', guardianNid],
     enabled: NID_RE.test(guardianNid),
@@ -169,16 +196,25 @@ export default function StudentForm() {
       if (isNew && !term.data) throw { message: 'مفيش ترم حالي. اعمل ترم من «القبول» الأول.' }
       const phones = f.phones.filter((p) => p.number.trim()).map((p, i) => ({ number: normalizePhone(p.number), label: t(p.label), is_whatsapp: p.is_whatsapp, sort_order: i }))
 
-      // the guardian: an existing one with the same national ID (brothers/sisters), or a new one
-      let guardianId: string | null = sibling.data?.id ?? null
-      if (isNew && !guardianId) {
-        const g = f.custodian
-          ? { full_name: f.g_name.trim(), relation: f.g_relation, national_id: t(f.g_national_id), id_valid_until: t(f.g_valid_until), job: t(f.g_job), phone: t(normalizePhone(f.g_phone)), custody_document: t(f.g_document) }
-          : { full_name: t(f.father_name) ?? fatherFromStudentName(f.full_name), relation: 'أب', national_id: t(f.father_national_id), id_valid_until: t(f.father_id_valid_until), job: t(f.father_job), phone: phones[0]?.number ?? null }
-        const gid = crypto.randomUUID()
-        const { error } = await sdb().from('guardians').insert({ id: gid, ...g })
+      // the guardian: the father, the mother (educational guardianship) or someone else.
+      // Brothers/sisters share one guardian (same national ID); his phone is the main contact.
+      const g =
+        f.g_kind === 'father'
+          ? { full_name: t(f.father_name) ?? fatherFromStudentName(f.full_name), relation: 'أب', national_id: t(f.father_national_id), id_valid_until: t(f.father_id_valid_until), job: t(f.father_job), custody_document: null }
+          : f.g_kind === 'mother'
+            ? { full_name: f.mother_name.trim(), relation: 'أم', national_id: t(f.mother_national_id), id_valid_until: t(f.mother_id_valid_until), job: t(f.mother_job), custody_document: t(f.g_document) }
+            : { full_name: f.g_name.trim(), relation: f.g_relation, national_id: t(f.g_national_id), id_valid_until: t(f.g_valid_until), job: t(f.g_job), custody_document: t(f.g_document) }
+      const guardianRow = { ...g, phone: normalizePhone(f.g_phone) }
+      const current = existing.data?.guardian ?? null
+      const sameKind = current && (current.relation === 'أب') === (f.g_kind === 'father') && (current.relation === 'أم') === (f.g_kind === 'mother')
+      let guardianId: string | null = sibling.data?.id ?? (sameKind && (!current.national_id || !g.national_id || current.national_id === g.national_id) ? current.id : null)
+      if (guardianId) {
+        const { error } = await sdb().from('guardians').update(guardianRow).eq('id', guardianId)
         if (error) throw error
-        guardianId = gid
+      } else {
+        guardianId = crypto.randomUUID()
+        const { error } = await sdb().from('guardians').insert({ id: guardianId, ...guardianRow })
+        if (error) throw error
       }
 
       const student = { full_name: f.full_name.trim(), school: t(f.school), school_shift: f.school_shift || null, carnet_no: t(f.carnet_no), notes: t(f.notes) }
@@ -187,7 +223,7 @@ export default function StudentForm() {
         const { error } = await sdb().from('students').insert({ id: sid, ...student, guardian_id: guardianId })
         if (error) throw error
       } else {
-        const { error } = await sdb().from('students').update(student).eq('id', sid)
+        const { error } = await sdb().from('students').update({ ...student, guardian_id: guardianId }).eq('id', sid)
         if (error) throw error
       }
 
@@ -195,6 +231,7 @@ export default function StudentForm() {
         address: t(f.address),
         father_name: t(f.father_name), father_national_id: t(f.father_national_id), father_id_valid_until: t(f.father_id_valid_until), father_job: t(f.father_job),
         mother_name: t(f.mother_name), mother_national_id: t(f.mother_national_id), mother_id_valid_until: t(f.mother_id_valid_until), mother_job: t(f.mother_job),
+        father_phone: t(normalizePhone(f.father_phone)), mother_phone: t(normalizePhone(f.mother_phone)),
         kids_under_5: n(f.kids_under_5), kids_5_to_10: n(f.kids_5_to_10), boys_over_10: n(f.boys_over_10), girls_over_10: n(f.girls_over_10),
         family_income: t(f.family_income), family_support: t(f.family_support), health_notes: t(f.health_notes), important_notes: t(f.important_notes),
       }
@@ -325,37 +362,56 @@ export default function StudentForm() {
           </>
         )}
 
-        {isNew && (
+        {showPrivate && (
           <Section title="ولي الأمر">
-            <Toggle checked={f.custodian} onChange={(v) => set('custodian', v)} label="ولي الأمر مش الأب (الولاية التعليمية لحد تاني بورقة)" />
-            {f.custodian && (
-              <>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="اسم ولي الأمر">
-                    <Input value={f.g_name} onChange={(e) => set('g_name', e.target.value)} />
-                  </Field>
-                  <Field label="صلة القرابة">
-                    <Select value={f.g_relation} onChange={(e) => set('g_relation', e.target.value)} options={RELATIONS.filter((r) => r !== 'أب')} />
-                  </Field>
-                  <Field label="الرقم القومي">
-                    <Input dir="ltr" inputMode="numeric" maxLength={14} value={f.g_national_id} onChange={(e) => set('g_national_id', e.target.value.replace(/\D/g, ''))} />
-                  </Field>
-                  <Field label="الموبايل">
-                    <Input dir="ltr" inputMode="tel" value={f.g_phone} onChange={(e) => set('g_phone', e.target.value)} />
-                  </Field>
-                  <Field label="البطاقة سارية حتى">
-                    <Input type="date" value={f.g_valid_until} onChange={(e) => set('g_valid_until', e.target.value)} />
-                  </Field>
-                  <Field label="الوظيفة">
-                    <Input value={f.g_job} onChange={(e) => set('g_job', e.target.value)} />
-                  </Field>
-                </div>
-                <Field label="الورقة اللي اتأكدنا منها" hint="نوعها ورقمها أو لينكها">
-                  <Input value={f.g_document} onChange={(e) => set('g_document', e.target.value)} />
+            <div className="grid gap-2 sm:grid-cols-3">
+              {(
+                [
+                  ['father', 'الأب', 'الطبيعي'],
+                  ['mother', 'الأم', 'معاها ولاية تعليمية'],
+                  ['other', 'حد تاني', 'الولاد عايشين مع حد تاني'],
+                ] as const
+              ).map(([k, label, hint]) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => set('g_kind', k)}
+                  className={`rounded-xl p-3 text-start ring-1 ${f.g_kind === k ? 'bg-brand-50 ring-brand-400' : 'bg-white ring-line'}`}
+                >
+                  <p className="font-semibold">{label}</p>
+                  <p className="text-xs text-muted">{hint}</p>
+                </button>
+              ))}
+            </div>
+            <Field label="رقم ولي الأمر" hint="ده رقم التواصل الأساسي، وبيه ولي الأمر بيدخل صفحة الأسرة">
+              <Input dir="ltr" inputMode="tel" placeholder="01xxxxxxxxx" value={f.g_phone} onChange={(e) => set('g_phone', e.target.value)} />
+            </Field>
+            {f.g_kind === 'other' && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="اسم ولي الأمر">
+                  <Input value={f.g_name} onChange={(e) => set('g_name', e.target.value)} />
                 </Field>
-              </>
+                <Field label="صلة القرابة">
+                  <Select value={f.g_relation} onChange={(e) => set('g_relation', e.target.value)} options={RELATIONS.filter((r) => r !== 'أب' && r !== 'أم')} />
+                </Field>
+                <Field label="الرقم القومي">
+                  <Input dir="ltr" inputMode="numeric" maxLength={14} value={f.g_national_id} onChange={(e) => set('g_national_id', e.target.value.replace(/\D/g, ''))} />
+                </Field>
+                <Field label="البطاقة سارية حتى">
+                  <Input type="date" value={f.g_valid_until} onChange={(e) => set('g_valid_until', e.target.value)} />
+                </Field>
+                <Field label="الوظيفة">
+                  <Input value={f.g_job} onChange={(e) => set('g_job', e.target.value)} />
+                </Field>
+              </div>
             )}
-            {sibling.data && (
+            {f.g_kind !== 'father' && (
+              <Field label={f.g_kind === 'mother' ? 'ورقة الولاية التعليمية' : 'الورقة اللي اتأكدنا منها'} hint="نوعها ورقمها أو لينكها">
+                <Input value={f.g_document} onChange={(e) => set('g_document', e.target.value)} />
+              </Field>
+            )}
+            {f.g_kind !== 'other' && <p className="text-xs text-muted">بيانات ولي الأمر (الاسم والرقم القومي والبطاقة) بتتاخد من بيانات {f.g_kind === 'father' ? 'الأب' : 'الأم'} فوق.</p>}
+            {sibling.data && sibling.data.id !== existing.data?.guardian?.id && (
               <p className="rounded-xl bg-brand-50 p-3 text-sm text-brand-800">
                 ولي الأمر ده متسجل قبل كده ({sibling.data.full_name}) مع: {sibling.data.children.join('، ')}. الطالب هيتربط بنفس ولي الأمر.
               </p>
@@ -407,11 +463,15 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 function ParentFields({ f, set, p }: { f: Form; set: <K extends keyof Form>(k: K, v: Form[K]) => void; p: 'father' | 'mother' }) {
+  const phone = `${p}_phone` as const
   const nid = `${p}_national_id` as const
   const valid = `${p}_id_valid_until` as const
   const job = `${p}_job` as const
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
+    <div className="grid gap-3 sm:grid-cols-2">
+      <Field label="الموبايل" hint="مش إجباري">
+        <Input dir="ltr" inputMode="tel" value={f[phone]} onChange={(e) => set(phone, e.target.value)} />
+      </Field>
       <Field label="الرقم القومي">
         <Input dir="ltr" inputMode="numeric" maxLength={14} value={f[nid]} onChange={(e) => set(nid, e.target.value.replace(/\D/g, ''))} />
       </Field>

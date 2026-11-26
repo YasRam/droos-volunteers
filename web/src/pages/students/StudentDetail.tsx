@@ -211,7 +211,7 @@ function FamilyCard({ s }: { s: Student }) {
         a.sensitive ? sdb().from('student_private').select('*').eq('student_id', s.id).maybeSingle() : Promise.resolve({ data: null }),
       ])
       return {
-        g: g.data as { full_name: string; relation: string; phone: string | null; job: string | null; national_id: string | null; custody_document: string | null } | null,
+        g: g.data as { full_name: string; relation: string; phone: string | null; job: string | null; national_id: string | null; id_valid_until: string | null; custody_document: string | null } | null,
         phones: (phones.data ?? []) as { number: string; label: string | null; is_whatsapp: boolean }[],
         priv: priv.data as Record<string, string | number | null> | null,
       }
@@ -220,10 +220,25 @@ function FamilyCard({ s }: { s: Student }) {
   if (q.isLoading) return <Card><Spinner /></Card>
   const d = q.data!
   const row = (label: string, v: ReactNode) => (v === null || v === undefined || v === '' ? null : <p className="text-sm"><span className="text-muted">{label}: </span>{v}</p>)
+  const today = new Date().toISOString().slice(0, 10)
+  const soon = new Date(Date.now() + 30 * 86400_000).toISOString().slice(0, 10)
+  const card = (v: unknown) => {
+    if (!v) return null
+    const d = String(v)
+    return (
+      <>
+        {d}{' '}
+        {d < today ? <Badge tone="red">منتهية</Badge> : d <= soon ? <Badge tone="orange">هتنتهي قريب</Badge> : null}
+      </>
+    )
+  }
+  const tel = (v: unknown) => (v ? <a dir="ltr" className="font-semibold text-brand-700" href={`tel:${v}`}>{String(v)}</a> : null)
   return (
     <Card className="space-y-2 lg:col-span-2">
       <h2 className="font-bold">الأسرة والتواصل</h2>
-      {d.g && row('ولي الأمر', `${d.g.full_name} (${d.g.relation})${d.g.job ? ` · ${d.g.job}` : ''}`)}
+      {d.g && row('ولي الأمر', `${d.g.full_name} (${d.g.relation === 'أم' ? 'الأم · ولاية تعليمية' : d.g.relation})${d.g.job ? ` · ${d.g.job}` : ''}`)}
+      {d.g && row('رقم ولي الأمر (التواصل الأساسي)', tel(d.g.phone))}
+      {d.g && a.sensitive && d.g.relation !== 'أب' && d.g.relation !== 'أم' && row('بطاقة ولي الأمر سارية حتى', card(d.g.id_valid_until))}
       {d.g?.custody_document && row('ورقة الولاية', d.g.custody_document)}
       <div className="flex flex-wrap gap-2">
         {d.phones.map((p) => (
@@ -240,9 +255,11 @@ function FamilyCard({ s }: { s: Student }) {
           {row('الرقم القومي', d.priv.national_id)}
           {row('العنوان', d.priv.address)}
           {row('الأب', [d.priv.father_name, d.priv.father_job, d.priv.father_national_id].filter(Boolean).join(' · '))}
-          {row('بطاقة الأب سارية حتى', d.priv.father_id_valid_until)}
+          {row('موبايل الأب', tel(d.priv.father_phone))}
+          {row('بطاقة الأب سارية حتى', card(d.priv.father_id_valid_until))}
           {row('الأم', [d.priv.mother_name, d.priv.mother_job, d.priv.mother_national_id].filter(Boolean).join(' · '))}
-          {row('بطاقة الأم سارية حتى', d.priv.mother_id_valid_until)}
+          {row('موبايل الأم', tel(d.priv.mother_phone))}
+          {row('بطاقة الأم سارية حتى', card(d.priv.mother_id_valid_until))}
           {row('الأبناء', [d.priv.kids_under_5, d.priv.kids_5_to_10, d.priv.boys_over_10, d.priv.girls_over_10].some((x) => x != null)
             ? `أقل من 5: ${d.priv.kids_under_5 ?? 0} · 5–10: ${d.priv.kids_5_to_10 ?? 0} · ولاد +10: ${d.priv.boys_over_10 ?? 0} · بنات +10: ${d.priv.girls_over_10 ?? 0}` : null)}
           {row('الدخل', d.priv.family_income)}

@@ -3,8 +3,8 @@
 --
 --  * public.profile_requests: one open request per volunteer (sending again replaces it).
 --  * submit_profile_request(changes, photo_path) / review_profile_request(id, approve, note).
---  * The volunteer can no longer change his personal fields or his photo directly; staff with
---    volunteers.edit still can (and HR keeps changing photos). Accepting a request applies it.
+--  * The volunteer can no longer change his personal fields or his photo directly; HR (hr.edit)
+--    and volunteers.edit still can, and every change stays in the log. Accepting a request applies it.
 --  * Fix: camp / graduation and recruitment fields had no guard, so a volunteer could mark himself
 --    as having attended the camp or the graduation (which also moves his status). Now only
 --    stages.manage / camps.manage / his committee leader (camps) and HR / recruitment can.
@@ -65,7 +65,7 @@ begin
     raise exception 'الحالة واللجان بيعدّلها اللي معاه صلاحية تعديل المتطوعين' using errcode = '42501';
   end if;
 
-  if not applying and (
+  if not applying and not app.has_perm('hr.edit') and (
        new.full_name_ar is distinct from old.full_name_ar
     or new.full_name_en is distinct from old.full_name_en
     or new.phone is distinct from old.phone

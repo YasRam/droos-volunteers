@@ -47,6 +47,21 @@ export default function FollowUps() {
       return data as Participation[]
     },
   })
+  // Meetings / family days in the period, including those with nobody recorded as attending yet
+  const meetings = useQuery({
+    queryKey: ['followups-meetings', from, to, event],
+    queryFn: async () => {
+      let query = supabase.from('meetings').select('id, meeting_date, event, committee').gte('meeting_date', from).lte('meeting_date', to)
+      if (event) query = query.eq('event', event)
+      const { data, error } = await query
+      if (error) throw error
+      return data as { id: string; meeting_date: string; event: string; committee: string }[]
+    },
+  })
+  const emptyMeetings = useMemo(() => {
+    const used = new Set((q.data ?? []).map((r) => r.meeting_id).filter(Boolean))
+    return status ? [] : (meetings.data ?? []).filter((m) => !used.has(m.id))
+  }, [meetings.data, q.data, status])
   const names = useMemo(() => new Map((dir.data ?? []).map((v) => [v.id, v.full_name_ar])), [dir.data])
 
   const people = useMemo(() => {
@@ -69,8 +84,9 @@ export default function FollowUps() {
       g.count++
       m.set(r.meeting_id, g)
     }
+    for (const e of emptyMeetings) m.set(e.id, { id: e.id, date: e.meeting_date, event: e.event, subject: e.committee, count: 0 })
     return [...m.values()].sort((a, b) => b.date.localeCompare(a.date))
-  }, [q.data])
+  }, [q.data, emptyMeetings])
   return (
     <>
       <PageHeader
@@ -92,7 +108,7 @@ export default function FollowUps() {
                 <span className="min-w-0 flex-1 truncate font-semibold">
                   {g.event} · {g.subject}
                 </span>
-                <Badge tone="brand">{g.count} حاضر</Badge>
+                {g.count ? <Badge tone="brand">{g.count} حاضر</Badge> : <Badge tone="orange">مفيش حضور متسجل</Badge>}
                 <Pencil className="size-4 text-muted" />
               </button>
             ))}
@@ -139,7 +155,7 @@ export default function FollowUps() {
         ]}
       />
       {view === 'day' && !q.isLoading ? (
-        <ByDay rows={(q.data ?? []).filter((r) => !search.trim() || (names.get(r.volunteer_id) ?? '').includes(search.trim()))} names={names} onEdit={setEditing} />
+        <ByDay rows={(q.data ?? []).filter((r) => !search.trim() || (names.get(r.volunteer_id) ?? '').includes(search.trim()))} names={names} onEdit={setEditing} empty={search.trim() ? [] : emptyMeetings} />
       ) : q.isLoading ? (
         <Spinner />
       ) : !people.length ? (
@@ -158,13 +174,24 @@ export default function FollowUps() {
 }
 
 /** Same participations, one card per day (newest first); group activities stay one line. */
-function ByDay({ rows, names, onEdit }: { rows: Participation[]; names: Map<string, string>; onEdit: (r: Participation) => void }) {
+function ByDay({
+  rows,
+  names,
+  onEdit,
+  empty,
+}: {
+  rows: Participation[]
+  names: Map<string, string>
+  onEdit: (r: Participation) => void
+  empty: { id: string; meeting_date: string; event: string; committee: string }[]
+}) {
   const navigate = useNavigate()
   const days = useMemo(() => {
     const m = new Map<string, Participation[]>()
     for (const r of rows) m.set(r.activity_date, [...(m.get(r.activity_date) ?? []), r])
+    for (const e of empty) if (!m.has(e.meeting_date)) m.set(e.meeting_date, [])
     return [...m.entries()].sort((a, b) => b[0].localeCompare(a[0]))
-  }, [rows])
+  }, [rows, empty])
   if (!days.length) return <Empty title="مفيش مشاركات في الفترة دي" />
   return (
     <div className="space-y-3">
@@ -194,6 +221,18 @@ function ByDay({ rows, names, onEdit }: { rows: Participation[]; names: Map<stri
                   <Pencil className="size-4 text-muted" />
                 </button>
               ))}
+              {empty
+                .filter((e) => e.meeting_date === day)
+                .map((e) => (
+                  <button key={e.id} onClick={() => navigate(`/meetings?edit=${e.id}`)} className="flex w-full items-center gap-2 px-4 py-2 text-start text-sm hover:bg-surface">
+                    <Badge tone="brand">جماعي</Badge>
+                    <span className="min-w-0 flex-1 truncate font-semibold">
+                      {e.event} · {e.committee}
+                    </span>
+                    <Badge tone="orange">مفيش حضور متسجل</Badge>
+                    <Pencil className="size-4 text-muted" />
+                  </button>
+                ))}
               {singles.map((r) => (
                 <div key={r.id} className="flex items-center gap-2 px-4 py-2 text-sm">
                   <VolunteerName id={r.volunteer_id} name={names.get(r.volunteer_id) ?? '—'} className="w-40 shrink-0 truncate font-semibold" />
