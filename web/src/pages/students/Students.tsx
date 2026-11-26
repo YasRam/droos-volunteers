@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Filter, Plus, Search } from 'lucide-react'
+import { Filter, Plus, Search, Upload } from 'lucide-react'
 import { lazy, useMemo, useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { Badge, Button, Card, Empty, Field, Input, PageHeader, Select, Spinner } from '@/components/ui'
@@ -16,6 +16,7 @@ const Groups = lazy(() => import('./Groups'))
 const Classes = lazy(() => import('./Classes'))
 const StudentRequests = lazy(() => import('./StudentRequests'))
 const StudentStats = lazy(() => import('./StudentStats'))
+const StudentImport = lazy(() => import('./StudentImport'))
 
 /** Who may open the students part at all: تنظيم and up, or a volunteer who teaches. */
 export function useStudentAccess() {
@@ -73,6 +74,7 @@ export default function StudentsSection() {
         <Route path="admissions" element={a.all ? <Admissions /> : <Navigate to="/students" replace />} />
         <Route path="groups" element={a.all ? <Groups /> : <Navigate to="/students" replace />} />
         <Route path="requests" element={a.review ? <StudentRequests /> : <Navigate to="/students" replace />} />
+        <Route path="import" element={a.edit && a.sensitive ? <StudentImport /> : <Navigate to="/students" replace />} />
         <Route path="stats" element={a.all ? <StudentStats /> : <Navigate to="/students" replace />} />
         <Route path=":id/edit" element={a.edit ? <StudentForm /> : <Navigate to="/students" replace />} />
         <Route path=":id" element={<StudentDetail />} />
@@ -132,9 +134,16 @@ function StudentList() {
         }
         actions={
           a.edit && (
-            <Button onClick={() => navigate('/students/new')}>
-              <Plus className="size-4" /> طالب جديد
-            </Button>
+            <div className="flex gap-2">
+              {a.sensitive && (
+                <Button variant="secondary" onClick={() => navigate('/students/import')}>
+                  <Upload className="size-4" /> رفع شيت
+                </Button>
+              )}
+              <Button onClick={() => navigate('/students/new')}>
+                <Plus className="size-4" /> طالب جديد
+              </Button>
+            </div>
           )
         }
       />
