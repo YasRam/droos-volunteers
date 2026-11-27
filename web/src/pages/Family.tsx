@@ -65,15 +65,6 @@ export default function Family() {
   const home = useHome()
   const [rulesOpen, setRulesOpen] = useState(false)
   const h = home.data
-  const wa = useQuery({
-    queryKey: ['family-whatsapp', h?.children.map((c) => c.id).join()],
-    enabled: Boolean(h?.children.length),
-    queryFn: async () => {
-      const { data, error } = await sdb().rpc('whatsapp_for', { p_students: h!.children.map((c) => c.id) })
-      if (error) throw error
-      return data as { student_id: string; name: string; link: string }[]
-    },
-  })
   useEffect(() => {
     if (h && h.kind === 'guardian' && !h.rules_done) setRulesOpen(true)
   }, [h?.kind, h?.rules_done]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -113,7 +104,7 @@ export default function Family() {
               </Card>
             )}
             {h.children.map((c) => (
-              <ChildCard key={c.id} c={c} whatsapp={(wa.data ?? []).filter((w) => w.student_id === c.id)} />
+              <ChildCard key={c.id} c={c} />
             ))}
             <Notifications />
             {h.org && (h.org.phone || h.org.address || h.org.about) && (
@@ -162,7 +153,7 @@ function RulesCard({ home, onOpen }: { home: Home; onOpen: () => void }) {
   )
 }
 
-function ChildCard({ c, whatsapp }: { c: Child; whatsapp: { name: string; link: string }[] }) {
+function ChildCard({ c }: { c: Child }) {
   const [all, setAll] = useState(false)
   const recent = all ? c.recent : c.recent.slice(0, 5)
   return (
@@ -181,15 +172,6 @@ function ChildCard({ c, whatsapp }: { c: Child; whatsapp: { name: string; link: 
         )}
       </div>
 
-      {whatsapp.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-2">
-          {whatsapp.map((w) => (
-            <a key={w.link} href={w.link} target="_blank" rel="noreferrer" className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-200">
-              جروب واتساب: {w.name}
-            </a>
-          ))}
-        </div>
-      )}
       <div className="mt-3 grid grid-cols-4 gap-2 text-center">
         <Count label="حضر" value={c.counts.present} tone="text-emerald-700" />
         <Count label="غاب" value={c.counts.absent} tone="text-red-600" />

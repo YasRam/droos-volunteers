@@ -29,7 +29,6 @@ import {
   UserPlus,
   UserRound,
   Users,
-  IdCard,
   ScrollText,
 } from 'lucide-react'
 import { Suspense, useEffect, useMemo, useState, type ComponentType } from 'react'
@@ -151,7 +150,6 @@ export default function Layout() {
     if (allStudents) list.push({ to: '/students/groups', label: 'المجموعات', icon: Boxes, section: st })
     if (p.can('students.review')) list.push({ to: '/students/requests', label: 'طلبات الطلاب', icon: MessageSquareWarning, section: st })
     if (allStudents) list.push({ to: '/students/rules', label: 'قواعد الطلاب', icon: ScrollText, section: st })
-    if (allStudents && (p.can('students.edit') || p.can('students.view_sensitive'))) list.push({ to: '/students/ids', label: 'بطايق قربت تخلص', icon: IdCard, section: st })
     if (allStudents) list.push({ to: '/students/stats', label: 'إحصائيات الطلاب', icon: PieChart, section: st })
 
     // المشترك

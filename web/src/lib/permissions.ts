@@ -35,7 +35,6 @@ import {
   Users,
   UsersRound,
   type LucideIcon,
-  Wallet,
 } from 'lucide-react'
 
 export interface PermissionItem {
@@ -116,8 +115,7 @@ export const PERMISSION_GROUPS = [
     items: [
       { key: 'students.view_all', label: 'يشوف كل الطلاب', hint: 'الأسامي والحضور والمجموعات والاستدعاءات (من غير تليفونات)', icon: Eye },
       { key: 'students.view_contacts', label: 'بيانات التواصل', hint: 'تليفونات الطلاب والعنوان وبيانات ولي الأمر', icon: BookUser },
-      { key: 'students.view_sensitive', label: 'البيانات الحساسة', hint: 'الرقم القومي وبيانات الأب والأم والملاحظات الصحية', icon: IdCard },
-      { key: 'students.finance', label: 'دخل الأسرة والدعم', hint: 'المسئول بس: دخل الأسرة والدعم اللي بياخدوه', icon: Wallet },
+      { key: 'students.view_sensitive', label: 'البيانات الحساسة', hint: 'الرقم القومي والدخل والدعم والملاحظات الصحية', icon: IdCard },
       { key: 'students.edit', label: 'يضيف ويعدّل طلاب', hint: 'الطلاب والقبول والمجموعات ولمين الحصة', icon: UserPen },
       { key: 'students.attendance', label: 'يسجّل حضور أي حصة', hint: 'المدرس بيسجّل حصته من غير الصلاحية دي', icon: CalendarCheck },
       { key: 'students.flags', label: 'الاستدعاء والإجازات', hint: 'استدعاء ولي أمر، فصل مؤقت، إجازة', icon: CalendarX },

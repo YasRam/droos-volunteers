@@ -166,7 +166,7 @@ export function NationalIdCard({ volunteerId, canEdit }: { volunteerId: string; 
           </Button>
         </form>
       ) : (
-        <p className="mt-1 text-xs text-muted">لو فيه غلط عدّله من «تعديل بياناتي» والـ HR هيراجعه.</p>
+        <p className="mt-1 text-xs text-muted">الرقم القومي بيتعدّل من الإدارة بس. لو فيه غلط كلّم الـ HR.</p>
       )}
     </Card>
   )
@@ -184,7 +184,7 @@ interface ProfileRequest {
 }
 
 /** Labels of the fields a volunteer can ask to change (the same list as app.profile_fields()). */
-export const PROFILE_FIELDS: [keyof PersonalValues | 'national_id', string][] = [
+export const PROFILE_FIELDS: [keyof PersonalValues, string][] = [
   ['full_name_ar', 'الاسم بالعربي'],
   ['full_name_en', 'الاسم بالإنجليزي'],
   ['phone', 'التليفون'],
@@ -193,7 +193,6 @@ export const PROFILE_FIELDS: [keyof PersonalValues | 'national_id', string][] = 
   ['qualification', 'المؤهل'],
   ['area', 'المنطقة'],
   ['study_year', 'السنة الدراسية'],
-  ['national_id', 'الرقم القومي'],
 ]
 
 function useMyRequest(volunteerId: string | null) {
@@ -228,15 +227,6 @@ export default function MyProfile() {
     },
   })
   const req = useMyRequest(volunteerId)
-  const priv = useQuery({
-    queryKey: ['private', volunteerId],
-    enabled: Boolean(volunteerId),
-    queryFn: async () => {
-      const { data, error } = await supabase.from('volunteer_private').select('*').eq('volunteer_id', volunteerId!).maybeSingle()
-      if (error) throw error
-      return data as VolunteerPrivate | null
-    },
-  })
   const photo = useVolunteerPhoto(volunteerId)
 
   if (q.isLoading || !q.data) return <Spinner />
@@ -308,7 +298,7 @@ export default function MyProfile() {
           )}
         </div>
       </div>
-      {editing && <EditRequestModal v={v} pending={pending} photoUrl={photo.url} nationalId={priv.data?.national_id ?? null} onClose={() => setEditing(false)} />}
+      {editing && <EditRequestModal v={v} pending={pending} photoUrl={photo.url} onClose={() => setEditing(false)} />}
     </>
   )
 }
@@ -329,7 +319,7 @@ export function RequestChanges({ r, photoUrl }: { r: Pick<ProfileRequest, 'chang
     <ul className="mt-1 space-y-1 text-sm">
       {Object.entries(r.changes).map(([k, val]) => (
         <li key={k}>
-          <span className="text-muted">{label.get(k as keyof PersonalValues | 'national_id') ?? k}: </span>
+          <span className="text-muted">{label.get(k as keyof PersonalValues) ?? k}: </span>
           <span className="line-through opacity-60">{r.old_values[k] || '—'}</span> ← <b>{val || '—'}</b>
         </li>
       ))}
@@ -345,16 +335,12 @@ export function RequestChanges({ r, photoUrl }: { r: Pick<ProfileRequest, 'chang
 
 const requestSchema = personalSchema.pick({ full_name_ar: true, full_name_en: true, phone: true, whatsapp: true, email: true, qualification: true, study_year: true }).extend({
   area: z.string().optional(),
-  national_id: z
-    .string()
-    .optional()
-    .refine((x) => !x || /^[23]\d{13}$/.test(x.replace(/\D/g, '')), 'الرقم القومي 14 رقم ويبدأ بـ 2 أو 3'),
 })
 type RequestValues = z.infer<typeof requestSchema>
 
-function EditRequestModal({ v, pending, photoUrl, nationalId, onClose }: { v: Volunteer; pending: ProfileRequest | null; photoUrl: string | null; nationalId: string | null; onClose: () => void }) {
+function EditRequestModal({ v, pending, photoUrl, onClose }: { v: Volunteer; pending: ProfileRequest | null; photoUrl: string | null; onClose: () => void }) {
   const qc = useQueryClient()
-  const base: Record<string, string | undefined> = { ...personalDefaults(v), national_id: nationalId ?? '' }
+  const base = personalDefaults(v)
   const start: RequestValues = Object.fromEntries(
     PROFILE_FIELDS.map(([k]) => [k, pending && k in pending.changes ? (pending.changes[k] ?? '') : (base[k] ?? '')]),
   ) as RequestValues
@@ -373,7 +359,7 @@ function EditRequestModal({ v, pending, photoUrl, nationalId, onClose }: { v: Vo
         const { error } = await supabase.storage.from('photos').upload(path, picked, { contentType: picked.type })
         if (error) throw error
       }
-      const changes = Object.fromEntries(PROFILE_FIELDS.map(([k]) => [k, (vals[k as keyof RequestValues] ?? '').replace(k === 'national_id' ? /\D/g : /^$/, '').trim()]))
+      const changes = Object.fromEntries(PROFILE_FIELDS.map(([k]) => [k, (vals[k as keyof RequestValues] ?? '').trim()]))
       const { error } = await supabase.rpc('submit_profile_request', { p_changes: changes, p_photo: path })
       if (error) throw error
     },
@@ -434,9 +420,6 @@ function EditRequestModal({ v, pending, photoUrl, nationalId, onClose }: { v: Vo
           </Field>
           <Field label="السنة الدراسية (لو طالب)">
             <Input {...reg('study_year')} list="study-years" />
-          </Field>
-          <Field label="الرقم القومي" hint="منه بيتحسب تاريخ الميلاد والنوع" error={e.national_id?.message}>
-            <Input {...reg('national_id')} inputMode="numeric" dir="ltr" maxLength={14} />
           </Field>
         </div>
         <Button type="submit" className="w-full" loading={send.isPending}>

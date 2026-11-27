@@ -6,7 +6,6 @@ import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Spinner, Textarea, Toggle } from '@/components/ui'
 import { ageFrom, cairoToday, fmtDate, fmtShort, whatsappLink } from '@/lib/data'
-import { usePermissions } from '@/lib/auth'
 import { toastError } from '@/lib/errors'
 import {
   ENROLLMENT_TONE,
@@ -33,7 +32,7 @@ export default function StudentDetail() {
   const q = useQuery({
     queryKey: ['students', 'detail', id],
     queryFn: async () => {
-      const [s, enr, att, res, flags, leaves, notes, groups, care, wa] = await Promise.all([
+      const [s, enr, att, res, flags, leaves, notes, groups] = await Promise.all([
         sdb().from('students').select('*').eq('id', id!).single(),
         sdb().from('enrollments').select('*, term:terms(name)').eq('student_id', id!),
         sdb().from('attendance').select('mark, note, session:class_sessions(id, on_date, subject, kind, takes_attendance, status)').eq('student_id', id!),
@@ -42,8 +41,6 @@ export default function StudentDetail() {
         sdb().from('leaves').select('*').eq('student_id', id!).order('from_date', { ascending: false }),
         sdb().from('notes').select('*').eq('student_id', id!).order('created_at', { ascending: false }),
         sdb().from('group_members').select('group:groups(id, name, kind, term_id)').eq('student_id', id!),
-        sdb().from('care_notes').select('body').eq('student_id', id!).maybeSingle(),
-        sdb().rpc('whatsapp_for', { p_students: [id!] }),
       ])
       if (s.error) throw s.error
       type Att = { mark: string; note: string | null; session: Pick<ClassSession, 'id' | 'on_date' | 'subject' | 'kind' | 'takes_attendance' | 'status'> }
@@ -57,15 +54,13 @@ export default function StudentDetail() {
         leaves: (leaves.data ?? []) as Leave[],
         notes: (notes.data ?? []) as Note[],
         groups: ((groups.data ?? []) as unknown as { group: { id: string; name: string; kind: string; term_id: string } }[]).map((g) => g.group),
-        care: (care.data as { body: string } | null)?.body ?? null,
-        whatsapp: (wa.data ?? []) as { name: string; link: string }[],
       }
     },
   })
 
   if (q.isLoading) return <Spinner />
   if (!q.data) return <Empty title="الطالب ده مش موجود أو مش من طلابك" />
-  const { s, enrollments, attendance, results, flags, leaves, notes, groups, care, whatsapp } = q.data
+  const { s, enrollments, attendance, results, flags, leaves, notes, groups } = q.data
   const current = enrollments.find((e) => e.term_id === term.data?.id) ?? null
   const counting = new Set((marks.data ?? []).filter((m) => m.counts_absence).map((m) => m.code))
   const absences = attendance.filter((x) => counting.has(x.mark) && x.session.takes_attendance && x.session.status !== 'اتلغت' && term.data && x.session.on_date >= term.data.starts_on && x.session.on_date <= term.data.ends_on).length
@@ -96,18 +91,7 @@ export default function StudentDetail() {
           <Badge key={f.id} tone="red">{f.kind}{f.to_date ? ` لحد ${fmtShort(f.to_date)}` : ''}</Badge>
         ))}
         {groups.filter((g) => g.term_id === term.data?.id).map((g) => <Badge key={g.id} tone="brand">{g.name}</Badge>)}
-        {whatsapp.map((w) => (
-          <a key={w.link} href={w.link} target="_blank" rel="noreferrer">
-            <Badge tone="green">واتساب: {w.name}</Badge>
-          </a>
-        ))}
       </div>
-      {care && (
-        <Card className="mb-4 bg-orange-50 ring-orange-200">
-          <p className="text-sm font-bold text-orange-800">ملاحظات للتنظيم (مبتظهرش لولي الأمر)</p>
-          <p className="whitespace-pre-wrap text-sm">{care}</p>
-        </Card>
-      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="space-y-2">
@@ -218,21 +202,18 @@ function FlagRow({ f }: { f: Flag }) {
 
 function FamilyCard({ s }: { s: Student }) {
   const a = useStudentAccess()
-  const canFinance = usePermissions().can('students.finance')
   const q = useQuery({
     queryKey: ['students', 'family', s.id],
     queryFn: async () => {
-      const [g, phones, priv, fin] = await Promise.all([
+      const [g, phones, priv] = await Promise.all([
         s.guardian_id ? sdb().from('guardians').select('*').eq('id', s.guardian_id).maybeSingle() : Promise.resolve({ data: null }),
         sdb().from('phones').select('*').eq('student_id', s.id).order('sort_order'),
         a.sensitive ? sdb().from('student_private').select('*').eq('student_id', s.id).maybeSingle() : Promise.resolve({ data: null }),
-        canFinance ? sdb().from('family_finance').select('family_income, family_support').eq('student_id', s.id).maybeSingle() : Promise.resolve({ data: null }),
       ])
       return {
         g: g.data as { full_name: string; relation: string; phone: string | null; job: string | null; national_id: string | null; id_valid_until: string | null; custody_document: string | null } | null,
-        phones: (phones.data ?? []) as { number: string; label: string | null; is_whatsapp: boolean; is_main_whatsapp: boolean }[],
+        phones: (phones.data ?? []) as { number: string; label: string | null; is_whatsapp: boolean }[],
         priv: priv.data as Record<string, string | number | null> | null,
-        fin: fin.data as { family_income: string | null; family_support: string | null } | null,
       }
     },
   })
@@ -240,7 +221,7 @@ function FamilyCard({ s }: { s: Student }) {
   const d = q.data!
   const row = (label: string, v: ReactNode) => (v === null || v === undefined || v === '' ? null : <p className="text-sm"><span className="text-muted">{label}: </span>{v}</p>)
   const today = new Date().toISOString().slice(0, 10)
-  const soon = new Date(Date.now() + 90 * 86400_000).toISOString().slice(0, 10)
+  const soon = new Date(Date.now() + 30 * 86400_000).toISOString().slice(0, 10)
   const card = (v: unknown) => {
     if (!v) return null
     const d = String(v)
@@ -265,8 +246,7 @@ function FamilyCard({ s }: { s: Student }) {
             <Phone className="size-3.5" />
             <a href={`tel:${p.number}`}>{p.number}</a>
             {p.label && <span className="text-muted" dir="rtl">({p.label})</span>}
-            {!p.number.startsWith('01') && <span className="text-muted" dir="rtl">أرضي</span>}
-            {p.is_whatsapp && <a className="text-emerald-700" href={whatsappLink(p.number) ?? '#'} target="_blank" rel="noreferrer">{p.is_main_whatsapp ? 'واتساب (الأساسي)' : 'واتساب'}</a>}
+            {p.is_whatsapp && <a className="text-emerald-700" href={whatsappLink(p.number) ?? '#'} target="_blank" rel="noreferrer">واتساب</a>}
           </span>
         ))}
       </div>
@@ -282,8 +262,8 @@ function FamilyCard({ s }: { s: Student }) {
           {row('بطاقة الأم سارية حتى', card(d.priv.mother_id_valid_until))}
           {row('الأبناء', [d.priv.kids_under_5, d.priv.kids_5_to_10, d.priv.boys_over_10, d.priv.girls_over_10].some((x) => x != null)
             ? `أقل من 5: ${d.priv.kids_under_5 ?? 0} · 5–10: ${d.priv.kids_5_to_10 ?? 0} · ولاد +10: ${d.priv.boys_over_10 ?? 0} · بنات +10: ${d.priv.girls_over_10 ?? 0}` : null)}
-          {row('الدخل', d.fin?.family_income)}
-          {row('الدعم', d.fin?.family_support)}
+          {row('الدخل', d.priv.family_income)}
+          {row('الدعم', d.priv.family_support)}
           {row('صحي', d.priv.health_notes)}
           {row('ملاحظات هامة', d.priv.important_notes)}
         </div>
