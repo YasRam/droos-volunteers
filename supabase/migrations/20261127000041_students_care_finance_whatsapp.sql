@@ -321,3 +321,19 @@ drop trigger if exists students_notes_clear on students.students;
 create trigger students_notes_clear after insert or update of notes on students.students
   for each row when (new.notes is not null) execute function students.notes_clear_after();
 drop function if exists students.notes_clear();
+
+-- A grade's pause (exams, holidays) stops every class that is FOR that grade (its audiences),
+-- not only classes whose label says that grade.
+create or replace function students.is_paused(p_slot uuid, p_grade text, d date)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from students.schedule_pauses p
+     where d between p.from_date and p.to_date
+       and (p.slot_id = p_slot
+            or (p.slot_id is null and (
+                 p.grade is null
+                 or students.norm_grade(p.grade) = students.norm_grade(p_grade)
+                 or exists (select 1 from students.audiences a
+                             where a.slot_id = p_slot and a.target = 'grade'
+                               and students.norm_grade(a.grade) = students.norm_grade(p.grade))))))
+$$;

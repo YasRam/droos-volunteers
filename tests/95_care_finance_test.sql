@@ -65,4 +65,8 @@ select set_config('request.jwt.claims', '', false);
 insert into students.students (full_name, notes) values ('سارة', 'مينفعش تروح لوحدها');
 select t.ok((select notes from students.students where full_name = 'سارة') is null, 'student row keeps no notes');
 select t.ok((select body from students.care_notes c join students.students s on s.id = c.student_id where s.full_name = 'سارة') = 'مينفعش تروح لوحدها', 'notes moved to care notes');
+insert into schedule_slots (day, grade, subject, kind, starts_at, ends_at, status) values ('السبت', '1 ب', 'عربي', 'حصة', '10:00', '11:00', 'شغالة');
+insert into students.audiences (slot_id, target, grade) select id, 'grade', '2 ب' from schedule_slots where subject = 'عربي' and grade = '1 ب';
+insert into students.schedule_pauses (from_date, to_date, grade, reason) values (app.today(), app.today() + 3, '2 ب', 'امتحانات');
+select t.ok(students.is_paused((select id from schedule_slots where subject = 'عربي' and grade = '1 ب'), '1 ب', app.today() + 1), 'pause of 2 ب stops a class for 2 ب even if its label says 1 ب');
 \echo ALL CARE/FINANCE TESTS PASSED
