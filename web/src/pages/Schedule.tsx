@@ -4,7 +4,6 @@ import { Pencil, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AbsenceModal, useUpcomingAbsences } from '@/components/ClassAbsence'
-import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { VolunteerName } from '@/components/VolunteerLink'
 import { VolunteerChips } from '@/components/VolunteerPick'
@@ -14,13 +13,12 @@ import { fmtDate, fmtTime, timeInput, useDirectory, useLookups, withCurrent } fr
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import { WEEKDAYS, type ScheduleSlot, type Weekday } from '@/lib/types'
-import { sdb, type Audience } from '@/lib/students'
+import { sdb, useCurrentTerm, useGrades, useGroups, type Audience } from '@/lib/students'
 import { AudienceEditor, useAudiences } from '@/pages/students/Classes'
 
 type AudienceRow = Omit<Audience, 'id' | 'slot_id' | 'session_id'>
 
 const KINDS = ['حصة', 'تأسيس', 'ورشة ثابتة']
-const AUDIENCES = ['الكل', 'بنات بس', 'ولاد بس']
 
 type View = 'day' | 'grade' | 'teacher' | 'coverage'
 
@@ -201,50 +199,97 @@ function SlotForm({ slot, onClose }: { slot: ScheduleSlot | null; onClose: () =>
   const qc = useQueryClient()
   const lookups = useLookups()
   const dir = useDirectory()
-  const form = useForm({
-    defaultValues: {
-      day: slot?.day ?? 'السبت',
-      grade: slot?.grade ?? '',
-      subject: slot?.subject ?? '',
-      volunteer_id: slot?.volunteer_id ?? '',
-      teacher_name: slot?.teacher_name ?? '',
-      starts_at: slot ? timeInput(slot.starts_at) : '15:00',
-      ends_at: slot ? timeInput(slot.ends_at) : '16:00',
-      place: slot?.place ?? '',
-      kind: slot?.kind ?? 'حصة',
-      audience: slot?.audience ?? 'الكل',
-      takes_attendance: slot?.takes_attendance ?? true,
-      notes: slot?.notes ?? '',
-      teaching_mode: slot?.teaching_mode ?? 'مع بعض',
-    },
-  })
-  const [coTeachers, setCoTeachers] = useState<string[]>(slot?.co_teachers ?? [])
   const perms = usePermissions()
   const canAudience = perms.can('students.edit')
+  const grades = useGrades()
+  const term = useCurrentTerm()
+  const groups = useGroups(term.data?.id)
   const audiences = useAudiences()
-  const [rows, setRows] = useState<AudienceRow[] | null>(null)
+  const extra = slot as (ScheduleSlot & { starts_on?: string | null; ends_on?: string | null; status?: string }) | null
+  const [f, setF] = useState({
+    subject: slot?.subject ?? '',
+    kind: slot?.kind ?? 'حصة',
+    takes_attendance: slot?.takes_attendance ?? true,
+    day: (slot?.day ?? 'السبت') as Weekday,
+    starts_at: slot ? timeInput(slot.starts_at) : '15:00',
+    ends_at: slot ? timeInput(slot.ends_at) : '16:00',
+    place: slot?.place ?? '',
+    starts_on: extra?.starts_on ?? '',
+    ends_on: extra?.ends_on ?? '',
+    status: extra?.status ?? 'شغالة',
+    outside: Boolean(slot && !slot.volunteer_id && slot.teacher_name),
+    volunteer_id: slot?.volunteer_id ?? '',
+    teacher_name: slot?.volunteer_id ? '' : (slot?.teacher_name ?? ''),
+    teaching_mode: slot?.teaching_mode ?? 'مع بعض',
+    notes: slot?.notes ?? '',
+    grade: slot?.grade ?? '',
+  })
+  const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }))
+  const [coTeachers, setCoTeachers] = useState<string[]>(slot?.co_teachers ?? [])
   const current: AudienceRow[] = (audiences.data ?? [])
     .filter((x) => slot && x.slot_id === slot.id)
     .map(({ target, grade, group_id, student_id }) => ({ target, grade, group_id, student_id }))
-  const extra = slot as (ScheduleSlot & { starts_on?: string | null; ends_on?: string | null; status?: string }) | null
-  const [startsOn, setStartsOn] = useState(extra?.starts_on ?? '')
-  const [endsOn, setEndsOn] = useState(extra?.ends_on ?? '')
-  const [status, setStatus] = useState(extra?.status ?? 'شغالة')
+  const [rows, setRows] = useState<AudienceRow[] | null>(null)
+  const aud = rows ?? current
+
+  // The label shown everywhere for "who is it for": one grade, one group, or a summary
+  const audienceLabel = (list: AudienceRow[]) => {
+    if (!list.length) return f.grade
+    const gs = [...new Set(list.filter((x) => x.target === 'grade').map((x) => x.grade!))]
+    const gr = list.filter((x) => x.target === 'group').map((x) => groups.data?.find((g) => g.id === x.group_id)?.name ?? 'مجموعة')
+    if (list.some((x) => x.target === 'all')) return 'كل الطلاب'
+    const parts = [...gs, ...gr]
+    return parts.length ? parts.join(' + ') : 'طلاب بالاسم'
+  }
+
+  // Clashes with other weekly classes (same day and overlapping time)
+  const all = qc.getQueryData<ScheduleSlot[]>(['schedule']) ?? []
+  const clashes = useMemo(() => {
+    const overlap = (x: ScheduleSlot) =>
+      x.id !== slot?.id && x.day === f.day && (x as { status?: string }).status !== 'اتلغت' && timeInput(x.starts_at) < f.ends_at && timeInput(x.ends_at) > f.starts_at
+    const out: string[] = []
+    const people = [f.volunteer_id, ...coTeachers].filter(Boolean)
+    for (const x of all.filter(overlap)) {
+      const theirs = [x.volunteer_id, ...(x.co_teachers ?? [])]
+      const who = people.filter((id) => theirs.includes(id)).map((id) => dir.data?.find((v) => v.id === id)?.full_name_ar ?? 'متطوع')
+      if (who.length) out.push(`${who.join('، ')} عنده «${x.subject} · ${x.grade}» في نفس الوقت (${fmtTime(x.starts_at)})`)
+      if (f.place.trim() && x.place && x.place.trim() === f.place.trim()) out.push(`المكان «${x.place}» محجوز لـ«${x.subject} · ${x.grade}» في نفس الوقت`)
+    }
+    return out
+  }, [all, f.day, f.starts_at, f.ends_at, f.place, f.volunteer_id, coTeachers, dir.data, slot?.id])
+
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['schedule'] })
     qc.invalidateQueries({ queryKey: ['students'] })
   }
   const save = useMutation({
-    mutationFn: async (f: Parameters<Parameters<typeof form.handleSubmit>[0]>[0]) => {
-      if (!f.grade || !f.subject) throw { message: 'اختار السنة والمادة' }
+    mutationFn: async () => {
+      if (!f.subject.trim()) throw { message: 'اكتب المادة' }
       if (f.ends_at <= f.starts_at) throw { message: 'وقت النهاية لازم يكون بعد البداية' }
-      const teacher = f.volunteer_id ? dir.data?.find((v) => v.id === f.volunteer_id)?.full_name_ar : f.teacher_name
-      const co = coTeachers.filter((id) => id !== f.volunteer_id)
-      if (co.length && !f.volunteer_id) throw { message: 'اختار المتطوع الأساسي الأول، وبعدين ضيف اللي معاه' }
-      if (endsOn && startsOn && endsOn < startsOn) throw { message: 'تاريخ النهاية قبل البداية' }
+      if (canAudience && !aud.length) throw { message: 'اختار الحصة لمين (سنة أو مجموعة أو طلاب)' }
+      if (!canAudience && !f.grade) throw { message: 'اختار السنة الدراسية' }
+      if (f.outside && !f.teacher_name.trim()) throw { message: 'اكتب اسم المدرس' }
+      if (f.starts_on && f.ends_on && f.ends_on < f.starts_on) throw { message: 'تاريخ النهاية قبل البداية' }
+      if (clashes.length && !confirm(`فيه تعارض:\n${clashes.join('\n')}\n\nتحفظ برضه؟`)) throw { message: 'اتلغى الحفظ' }
+      const volunteer = f.outside ? null : f.volunteer_id || null
+      const co = volunteer ? coTeachers.filter((id) => id !== volunteer) : []
       const payload = {
-        ...f, volunteer_id: f.volunteer_id || null, teacher_name: teacher || null, place: f.place.trim() || null, notes: f.notes.trim() || null, co_teachers: co,
-        starts_on: startsOn || null, ends_on: endsOn || null, status,
+        subject: f.subject.trim(),
+        kind: f.kind,
+        takes_attendance: f.takes_attendance,
+        day: f.day,
+        starts_at: f.starts_at,
+        ends_at: f.ends_at,
+        place: f.place.trim() || null,
+        starts_on: f.starts_on || null,
+        ends_on: f.ends_on || null,
+        status: slot ? f.status : 'شغالة',
+        volunteer_id: volunteer,
+        teacher_name: f.outside ? f.teacher_name.trim() : volunteer ? (dir.data?.find((v) => v.id === volunteer)?.full_name_ar ?? null) : null,
+        co_teachers: co,
+        teaching_mode: co.length ? f.teaching_mode : 'مع بعض',
+        notes: f.notes.trim() || null,
+        grade: canAudience ? audienceLabel(aud) : f.grade,
       }
       const res = slot
         ? await supabase.from('schedule_slots').update(payload).eq('id', slot.id).select('id').single()
@@ -265,7 +310,7 @@ function SlotForm({ slot, onClose }: { slot: ScheduleSlot | null; onClose: () =>
       invalidate()
       onClose()
     },
-    onError: toastError,
+    onError: (e: { message?: string }) => (e?.message === 'اتلغى الحفظ' ? undefined : toastError(e)),
   })
   const remove = useMutation({
     mutationFn: async () => {
@@ -280,93 +325,136 @@ function SlotForm({ slot, onClose }: { slot: ScheduleSlot | null; onClose: () =>
     onError: toastError,
   })
   const subjects = [...new Set(lookups.data?.list('نوع الحدث', 'تدريس') ?? [])]
-  const all = qc.getQueryData<ScheduleSlot[]>(['schedule']) ?? []
   const places = [...new Set(all.map((x) => x.place).filter((x): x is string => Boolean(x)))]
+  const kinds = withCurrent(lookups.data?.list('نوع الحصة').length ? lookups.data.list('نوع الحصة') : KINDS, slot?.kind)
+  const section = 'space-y-3 rounded-2xl bg-surface p-3'
   return (
     <Modal open onClose={onClose} title={slot ? 'تعديل حصة' : 'حصة جديدة'}>
-      <form onSubmit={form.handleSubmit((f) => save.mutate(f))} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="اليوم">
-          <Select {...form.register('day')} options={WEEKDAYS} />
-        </Field>
-        <Field label="السنة الدراسية">
-          <Select {...form.register('grade')} placeholder="اختار..." options={lookups.data?.list('السنة الدراسية') ?? []} />
-        </Field>
-        <Field label="المادة">
-          <Input {...form.register('subject')} list="subjects" />
-          <datalist id="subjects">{subjects.map((s) => <option key={s} value={s} />)}</datalist>
-        </Field>
-        <Field label="المتطوع">
-          <Select {...form.register('volunteer_id')} placeholder="— مش متطوع —" options={(dir.data ?? []).map((v) => ({ value: v.id, label: v.full_name_ar }))} />
-        </Field>
-        {form.watch('volunteer_id') && (
-          <div className="space-y-2 rounded-xl bg-surface p-3 sm:col-span-2">
-            <Field label="متطوعين تانيين على الحصة دي" hint="سيبها فاضية لو مدرس واحد">
-              <VolunteerChips value={coTeachers} onChange={setCoTeachers} />
+      <form
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault()
+          save.mutate()
+        }}
+      >
+        <div className={section}>
+          <p className="text-sm font-bold">الحصة</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="المادة">
+              <Input value={f.subject} onChange={(e) => set('subject', e.target.value)} list="subjects" />
+              <datalist id="subjects">{subjects.map((x) => <option key={x} value={x} />)}</datalist>
             </Field>
-            {coTeachers.length > 0 && (
-              <Field label="بيشتغلوا إزاي؟">
-                <Select
-                  {...form.register('teaching_mode')}
-                  options={[
-                    { value: 'مع بعض', label: 'مع بعض: كلهم في الحصة كل مرة' },
-                    { value: 'بالتبادل', label: 'بالتبادل: كل أسبوع واحد بالترتيب' },
-                  ]}
-                />
-              </Field>
-            )}
-          </div>
-        )}
-        {!form.watch('volunteer_id') && (
-          <div className="sm:col-span-2">
-            <Field label="اسم المدرس" hint="لو المدرس مش متطوع في النشاط">
-              <Input {...form.register('teacher_name')} />
+            <Field label="النوع" hint="الامتحان بيتحدد من يوم الحصة نفسه">
+              <Select value={f.kind} onChange={(e) => set('kind', e.target.value)} options={kinds} />
             </Field>
           </div>
-        )}
-        <Field label="من">
-          <Input type="time" {...form.register('starts_at')} />
-        </Field>
-        <Field label="إلى">
-          <Input type="time" {...form.register('ends_at')} />
-        </Field>
-        <Field label="مكان الحصة">
-          <Input {...form.register('place')} list="places" placeholder="مثلاً: قاعة 1" />
-          <datalist id="places">{places.map((x) => <option key={x} value={x} />)}</datalist>
-        </Field>
-        <Field label="النوع">
-          <Select {...form.register('kind')} options={withCurrent(lookups.data?.list('نوع الحصة').length ? lookups.data.list('نوع الحصة') : KINDS, slot?.kind)} />
-        </Field>
-        <Field label="لمين">
-          <Select {...form.register('audience')} options={withCurrent(lookups.data?.list('لمين').length ? lookups.data.list('لمين') : AUDIENCES, slot?.audience)} />
-        </Field>
-        <Field label="الغياب">
-          <label className="flex h-10 items-center gap-2 text-sm">
-            <input type="checkbox" className="size-4 accent-brand-700" {...form.register('takes_attendance')} />
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" className="size-4 accent-brand-700" checked={f.takes_attendance} onChange={(e) => set('takes_attendance', e.target.checked)} />
             بيتاخد عليها غياب
           </label>
-        </Field>
-        {canAudience && (
-          <div className="sm:col-span-2">
-            <Field label="مين من الطلاب بيحضرها" hint="سنة، مجموعة، أو طلاب بالاسم. دول اللي بيظهروا في الغياب وبيوصلهم الإلغاء والتأجيل">
-              <AudienceEditor value={rows ?? current} onChange={setRows} />
+        </div>
+
+        <div className={section}>
+          <p className="text-sm font-bold">لمين</p>
+          {canAudience ? (
+            <AudienceEditor value={aud} onChange={setRows} />
+          ) : (
+            <Field label="السنة الدراسية">
+              <Select value={f.grade} onChange={(e) => set('grade', e.target.value)} placeholder="اختار..." options={withCurrent(grades.data ?? [], slot?.grade)} />
+            </Field>
+          )}
+          <p className="text-xs text-muted">الطلاب دول هم اللي بيظهروا في الغياب، وبيوصلهم إشعار لو الحصة اتلغت أو اتأجلت.</p>
+        </div>
+
+        <div className={section}>
+          <p className="text-sm font-bold">الميعاد والمكان</p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="اليوم">
+              <Select value={f.day} onChange={(e) => set('day', e.target.value as Weekday)} options={WEEKDAYS} />
+            </Field>
+            <Field label="من">
+              <Input type="time" value={f.starts_at} onChange={(e) => set('starts_at', e.target.value)} />
+            </Field>
+            <Field label="إلى">
+              <Input type="time" value={f.ends_at} onChange={(e) => set('ends_at', e.target.value)} />
             </Field>
           </div>
-        )}
-        <Field label="بتبدأ من" hint="فاضي = من دلوقتي">
-          <Input type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} />
-        </Field>
-        <Field label="بتخلص" hint="فاضي = مستمرة">
-          <Input type="date" value={endsOn} onChange={(e) => setEndsOn(e.target.value)} />
-        </Field>
-        <Field label="الحالة" hint="متوقفة أو اتلغت: الحصص الجاية بتختفي من «النهارده»">
-          <Select value={status} onChange={(e) => setStatus(e.target.value)} options={['شغالة', 'متوقفة', 'اتلغت']} />
-        </Field>
-        <div className="sm:col-span-2">
-          <Field label="ملاحظات (اختياري)">
-            <Input {...form.register('notes')} />
+          <Field label="المكان">
+            <Input value={f.place} onChange={(e) => set('place', e.target.value)} list="places" placeholder="مثلاً: قاعة 1" />
+            <datalist id="places">{places.map((x) => <option key={x} value={x} />)}</datalist>
           </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="بتبدأ من" hint="فاضي = من النهارده">
+              <Input type="date" value={f.starts_on} onChange={(e) => set('starts_on', e.target.value)} />
+            </Field>
+            <Field label="بتخلص" hint="فاضي = مستمرة">
+              <Input type="date" value={f.ends_on} onChange={(e) => set('ends_on', e.target.value)} />
+            </Field>
+          </div>
+          {slot && (
+            <Field label="الحالة" hint="متوقفة أو اتلغت: الحصص الجاية بتختفي من «النهارده»">
+              <Select value={f.status} onChange={(e) => set('status', e.target.value)} options={['شغالة', 'متوقفة', 'اتلغت']} />
+            </Field>
+          )}
         </div>
-        <div className="flex gap-2 sm:col-span-2">
+
+        <div className={section}>
+          <p className="text-sm font-bold">مين بيدّيها</p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              [false, 'متطوع من النشاط'],
+              [true, 'مدرس من بره'],
+            ].map(([v, label]) => (
+              <button
+                key={String(v)}
+                type="button"
+                onClick={() => set('outside', v as boolean)}
+                className={clsx('rounded-xl px-3 py-2 text-sm font-semibold ring-1', f.outside === v ? 'bg-brand-50 text-brand-800 ring-brand-300' : 'bg-white text-muted ring-line')}
+              >
+                {label as string}
+              </button>
+            ))}
+          </div>
+          {f.outside ? (
+            <Field label="اسم المدرس">
+              <Input value={f.teacher_name} onChange={(e) => set('teacher_name', e.target.value)} />
+            </Field>
+          ) : (
+            <>
+              <Field label="المتطوع" hint="فاضي = الحصة محتاجة مدرس">
+                <Select value={f.volunteer_id} onChange={(e) => set('volunteer_id', e.target.value)} placeholder="— لسه —" options={(dir.data ?? []).map((v) => ({ value: v.id, label: v.full_name_ar }))} />
+              </Field>
+              {f.volunteer_id && (
+                <Field label="متطوعين تانيين معاه" hint="سيبها فاضية لو مدرس واحد">
+                  <VolunteerChips value={coTeachers} onChange={setCoTeachers} />
+                </Field>
+              )}
+              {f.volunteer_id && coTeachers.filter((x) => x !== f.volunteer_id).length > 0 && (
+                <Field label="بيشتغلوا إزاي؟">
+                  <Select
+                    value={f.teaching_mode}
+                    onChange={(e) => set('teaching_mode', e.target.value as typeof f.teaching_mode)}
+                    options={[
+                      { value: 'مع بعض', label: 'مع بعض: كلهم في الحصة كل مرة' },
+                      { value: 'بالتبادل', label: 'بالتبادل: كل أسبوع واحد بالترتيب' },
+                    ]}
+                  />
+                </Field>
+              )}
+            </>
+          )}
+        </div>
+
+        <Field label="ملاحظات (اختياري)">
+          <Input value={f.notes} onChange={(e) => set('notes', e.target.value)} />
+        </Field>
+        {clashes.length > 0 && (
+          <div className="rounded-xl bg-orange-50 p-3 text-sm text-orange-800">
+            <p className="font-bold">تعارض في المواعيد</p>
+            <ul className="list-disc ps-5">{clashes.map((c) => <li key={c}>{c}</li>)}</ul>
+          </div>
+        )}
+        <div className="flex gap-2">
           <Button type="submit" className="flex-1" loading={save.isPending}>
             حفظ
           </Button>

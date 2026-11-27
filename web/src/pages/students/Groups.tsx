@@ -4,7 +4,69 @@ import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Spinner } from '@/components/ui'
 import { toastError } from '@/lib/errors'
-import { GROUP_KINDS, sdb, useCurrentTerm, useGroups, useStudents, type Group } from '@/lib/students'
+import { GROUP_KINDS, sdb, useCurrentTerm, useGrades, useGroups, useStudents, type Group } from '@/lib/students'
+
+interface WaGroup { id: string; name: string; link: string; target: string; grade: string | null; group_id: string | null }
+
+function useWhatsapp() {
+  return useQuery({
+    queryKey: ['students', 'whatsapp-groups'],
+    queryFn: async () => {
+      const { data, error } = await sdb().from('whatsapp_groups').select('*')
+      if (error) throw error
+      return data as WaGroup[]
+    },
+  })
+}
+
+/** The WhatsApp link of a grade or a group: shown to its students, their guardians and teachers. */
+function WhatsappLink({ grade, groupId, label, list }: { grade?: string; groupId?: string; label: string; list: WaGroup[] }) {
+  const a = useStudentAccess()
+  const qc = useQueryClient()
+  const cur = list.find((w) => (grade ? w.target === 'grade' && w.grade === grade : w.target === 'group' && w.group_id === groupId))
+  const [editing, setEditing] = useState(false)
+  const [link, setLink] = useState(cur?.link ?? '')
+  const save = useMutation({
+    mutationFn: async () => {
+      const v = link.trim()
+      if (v && !/^https:\/\/(chat\.whatsapp\.com|wa\.me)\//.test(v)) throw { message: 'اللينك لازم يبدأ بـ https://chat.whatsapp.com/' }
+      if (cur) {
+        const { error } = v ? await sdb().from('whatsapp_groups').update({ link: v }).eq('id', cur.id) : await sdb().from('whatsapp_groups').delete().eq('id', cur.id)
+        if (error) throw error
+      } else if (v) {
+        const { error } = await sdb().from('whatsapp_groups').insert({ name: label, link: v, target: grade ? 'grade' : 'group', grade: grade ?? null, group_id: groupId ?? null })
+        if (error) throw error
+      }
+    },
+    onSuccess: () => {
+      toast.success('اتحفظ')
+      setEditing(false)
+      qc.invalidateQueries({ queryKey: ['students', 'whatsapp-groups'] })
+    },
+    onError: toastError,
+  })
+  if (editing)
+    return (
+      <div className="mt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
+        <Input dir="ltr" className="h-8 flex-1" placeholder="https://chat.whatsapp.com/..." value={link} onChange={(e) => setLink(e.target.value)} />
+        <Button size="sm" loading={save.isPending} onClick={() => save.mutate()}>حفظ</Button>
+      </div>
+    )
+  return (
+    <div className="mt-2 flex items-center gap-2 text-sm" onClick={(e) => e.stopPropagation()}>
+      {cur ? (
+        <a href={cur.link} target="_blank" rel="noreferrer" className="font-semibold text-emerald-700">جروب الواتساب</a>
+      ) : (
+        <span className="text-muted">مفيش جروب واتساب</span>
+      )}
+      {a.edit && (
+        <button type="button" className="text-xs font-semibold text-brand-700" onClick={() => setEditing(true)}>
+          {cur ? 'تغيير' : 'ضيف لينك'}
+        </button>
+      )}
+    </div>
+  )
+}
 import { useStudentAccess } from './Students'
 
 export default function Groups() {
@@ -21,48 +83,84 @@ export default function Groups() {
     },
   })
   const [open, setOpen] = useState<Group | null>(null)
-  const [adding, setAdding] = useState(false)
+  const [adding, setAdding] = useState<string | null | false>(false)
   const count = (id: string) => (members.data ?? []).filter((m) => m.group_id === id).length
+  const grades = useGrades()
+  const students = useStudents()
+  const wa = useWhatsapp()
+  const perGrade = (g: string) => (students.data ?? []).filter((s) => s.enrollment?.grade === g).length
+  const card = (g: Group) => (
+    <button key={g.id} onClick={() => setOpen(g)} className="text-start">
+      <Card className="h-full hover:ring-brand-200">
+        <div className="flex items-center justify-between gap-2">
+          <p className="font-bold">{g.name}</p>
+          <Badge tone="brand">{g.kind}</Badge>
+        </div>
+        <p className="mt-1 text-sm text-muted">{count(g.id)} طالب{g.notes ? ` · ${g.notes}` : ''}</p>
+        <WhatsappLink groupId={g.id} label={g.name} list={wa.data ?? []} />
+      </Card>
+    </button>
+  )
+  const general = (groups.data ?? []).filter((g) => !g.grade)
 
   return (
     <>
       <PageHeader
         title="المجموعات"
         subtitle="التأسيس والولاد والبنات والورش. المجموعة ممكن تجمع طلاب من كذا سنة، والطالب ممكن يبقى في أكتر من مجموعة."
-        actions={a.edit && term.data && <Button onClick={() => setAdding(true)}><Plus className="size-4" /> مجموعة جديدة</Button>}
+        actions={a.edit && term.data && <Button onClick={() => setAdding(null)}><Plus className="size-4" /> مجموعة جديدة</Button>}
       />
-      {!term.data ? <Empty title="مفيش ترم حالي" /> : groups.isLoading ? <Spinner /> : !groups.data?.length ? (
-        <Empty title="مفيش مجموعات لسه" />
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {groups.data.map((g) => (
-            <button key={g.id} onClick={() => setOpen(g)} className="text-start">
-              <Card className="h-full hover:ring-brand-200">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-bold">{g.name}</p>
-                  <Badge tone="brand">{g.kind}</Badge>
-                </div>
-                <p className="mt-1 text-sm text-muted">{count(g.id)} طالب{g.notes ? ` · ${g.notes}` : ''}</p>
-              </Card>
-            </button>
-          ))}
+      {!term.data ? <Empty title="مفيش ترم حالي" /> : groups.isLoading || grades.isLoading ? <Spinner /> : (
+        <div className="space-y-6">
+          <section className="space-y-3">
+            <h2 className="font-bold">السنين الدراسية</h2>
+            <p className="text-sm text-muted">كل سنة ليها جروب واتساب، وممكن تتقسم مجموعات (كل مجموعة ليها جروبها).</p>
+            <div className="grid gap-3 lg:grid-cols-2">
+              {(grades.data ?? []).map((gr) => {
+                const subs = (groups.data ?? []).filter((g) => g.grade === gr)
+                return (
+                  <Card key={gr} className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-lg font-bold">{gr}</p>
+                      <span className="text-sm text-muted">{perGrade(gr)} طالب</span>
+                    </div>
+                    <WhatsappLink grade={gr} label={gr} list={wa.data ?? []} />
+                    {subs.length > 0 && <div className="grid gap-2 sm:grid-cols-2">{subs.map(card)}</div>}
+                    {a.edit && (
+                      <Button size="sm" variant="ghost" onClick={() => setAdding(gr)}>
+                        <Plus className="size-4" /> قسّم السنة دي لمجموعة
+                      </Button>
+                    )}
+                  </Card>
+                )
+              })}
+            </div>
+          </section>
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold">مجموعات عامة</h2>
+              {a.edit && <Button size="sm" onClick={() => setAdding(null)}><Plus className="size-4" /> مجموعة عامة</Button>}
+            </div>
+            <p className="text-sm text-muted">التأسيس والورش ومجموعات الولاد والبنات: بتجمع طلاب من كذا سنة.</p>
+            {!general.length ? <Empty title="مفيش مجموعات عامة" /> : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{general.map(card)}</div>}
+          </section>
         </div>
       )}
-      {adding && term.data && <NewGroup termId={term.data.id} onClose={() => setAdding(false)} />}
+      {adding !== false && term.data && <NewGroup termId={term.data.id} grade={adding} onClose={() => setAdding(false)} />}
       {open && <GroupMembers g={open} memberIds={(members.data ?? []).filter((m) => m.group_id === open.id).map((m) => m.student_id)} onClose={() => setOpen(null)} />}
     </>
   )
 }
 
-function NewGroup({ termId, onClose }: { termId: string; onClose: () => void }) {
+function NewGroup({ termId, grade, onClose }: { termId: string; grade: string | null; onClose: () => void }) {
   const qc = useQueryClient()
-  const [name, setName] = useState('')
+  const [name, setName] = useState(grade ? `${grade} - مجموعة ` : '')
   const [kind, setKind] = useState(GROUP_KINDS[0])
   const [notes, setNotes] = useState('')
   const save = useMutation({
     mutationFn: async () => {
       if (!name.trim()) throw { message: 'اكتب اسم المجموعة' }
-      const { error } = await sdb().from('groups').insert({ term_id: termId, name: name.trim(), kind, notes: notes.trim() || null })
+      const { error } = await sdb().from('groups').insert({ term_id: termId, name: name.trim(), kind, notes: notes.trim() || null, grade })
       if (error) throw error
     },
     onSuccess: () => {
@@ -73,7 +171,7 @@ function NewGroup({ termId, onClose }: { termId: string; onClose: () => void }) 
     onError: toastError,
   })
   return (
-    <Modal open onClose={onClose} title="مجموعة جديدة">
+    <Modal open onClose={onClose} title={grade ? `مجموعة من ${grade}` : 'مجموعة عامة جديدة'}>
       <div className="space-y-3">
         <Field label="الاسم" hint="زي «تأسيس عربي» أو «ورشة رسم 4–6 ب»"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
         <Field label="النوع"><Select value={kind} onChange={(e) => setKind(e.target.value)} options={GROUP_KINDS} /></Field>

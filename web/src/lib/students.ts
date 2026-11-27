@@ -37,7 +37,7 @@ export interface Application {
   notes: string | null
   created_at: string
 }
-export interface Group { id: string; term_id: string; name: string; kind: string; notes: string | null }
+export interface Group { id: string; term_id: string; name: string; kind: string; notes: string | null; grade: string | null }
 export interface ClassSession {
   id: string
   slot_id: string | null
@@ -174,11 +174,14 @@ export function fromNationalId(nid: string): { birth_date: string; gender: 'ذك
 export const fatherFromStudentName = (name: string) => name.trim().split(/\s+/).slice(1).join(' ')
 
 export const PHONE_RE = /^01[0125]\d{8}$/
+/** A landline: 0 + 8 digits (03xxxxxxx). No WhatsApp. */
+export const LANDLINE_RE = /^0[2-9]\d{7}$/
 /** «1001492240» / «+20 100 149 2240» → «01001492240». */
 export function normalizePhone(raw: string) {
   let d = raw.replace(/\D/g, '')
   if (d.startsWith('20') && d.length === 12) d = d.slice(2)
   if (d.length === 10 && d.startsWith('1')) d = '0' + d
+  if (d.length === 8 && /^[2-9]/.test(d)) d = '0' + d
   return d
 }
 

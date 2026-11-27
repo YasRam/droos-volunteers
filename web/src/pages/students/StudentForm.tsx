@@ -4,8 +4,10 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Button, Card, Field, Input, PageHeader, Select, Spinner, Textarea } from '@/components/ui'
+import { usePermissions } from '@/lib/auth'
 import { toastError } from '@/lib/errors'
 import {
+  LANDLINE_RE,
   PHONE_RE,
   RELATIONS,
   fatherFromStudentName,
@@ -31,7 +33,7 @@ interface Guardian {
   phone: string | null
   custody_document: string | null
 }
-interface Phone { number: string; label: string; is_whatsapp: boolean }
+interface Phone { number: string; label: string; is_whatsapp: boolean; is_main_whatsapp: boolean }
 interface Form {
   full_name: string
   national_id: string
@@ -73,7 +75,7 @@ interface Form {
 }
 const BLANK: Form = {
   full_name: '', national_id: '', grade: '', is_new: true, school: '', school_shift: 'صباحي', carnet_no: '', address: '',
-  phones: [{ number: '', label: 'البيت', is_whatsapp: true }],
+  phones: [{ number: '', label: '', is_whatsapp: true, is_main_whatsapp: true }],
   father_name: '', father_national_id: '', father_id_valid_until: '', father_job: '',
   mother_name: '', mother_national_id: '', mother_id_valid_until: '', mother_job: '',
   father_phone: '', mother_phone: '',
@@ -103,7 +105,10 @@ function check(f: Form, isNew: boolean): string | null {
   if (f.father_national_id && fromNationalId(f.father_national_id)?.gender === 'أنثى') return 'الرقم القومي للأب رقم ست'
   const phones = f.phones.filter((p) => p.number.trim())
   if (isNew && !phones.length) return 'اكتب رقم تليفون واحد على الأقل'
-  for (const p of phones) if (!PHONE_RE.test(normalizePhone(p.number))) return `رقم التليفون «${p.number}» مش صح (11 رقم يبدأ بـ 01)`
+  for (const p of phones) {
+    const num = normalizePhone(p.number)
+    if (!PHONE_RE.test(num) && !LANDLINE_RE.test(num)) return `رقم التليفون «${p.number}» مش صح: الموبايل 11 رقم يبدأ بـ 01، والأرضي 9 أرقام يبدأ بـ 0`
+  }
   if (new Set(phones.map((p) => normalizePhone(p.number))).size !== phones.length) return 'فيه رقم تليفون متكرر'
   if (!PHONE_RE.test(normalizePhone(f.g_phone))) return 'اكتب رقم ولي الأمر (11 رقم يبدأ بـ 01). ده رقم التواصل الأساسي'
   for (const [label, v] of [['الأب', f.father_phone], ['الأم', f.mother_phone]] as const)
@@ -124,36 +129,46 @@ export default function StudentForm() {
   const grades = useGrades()
   const [f, setF] = useState<Form>(BLANK)
   const [fatherTouched, setFatherTouched] = useState(false)
+  const canFinance = usePermissions().can('students.finance')
 
   const existing = useQuery({
     queryKey: ['students', 'edit', id],
     enabled: !isNew,
     queryFn: async () => {
-      const [s, priv, phones, g] = await Promise.all([
+      const [s, priv, phones, g, care, fin] = await Promise.all([
         sdb().from('students').select('*').eq('id', id!).single(),
         sdb().from('student_private').select('*').eq('student_id', id!).maybeSingle(),
         sdb().from('phones').select('*').eq('student_id', id!).order('sort_order'),
         sdb().from('students').select('guardian:guardians(*)').eq('id', id!).maybeSingle(),
+        sdb().from('care_notes').select('body').eq('student_id', id!).maybeSingle(),
+        sdb().from('family_finance').select('family_income, family_support').eq('student_id', id!).maybeSingle(),
       ])
       if (s.error) throw s.error
       const guardian = ((g.data as { guardian: Guardian | null } | null)?.guardian ?? null) as Guardian | null
-      return { s: s.data as Student, priv: (priv.data ?? null) as Record<string, unknown> | null, phones: (phones.data ?? []) as Phone[], guardian }
+      return {
+        s: s.data as Student,
+        priv: { ...((priv.data ?? {}) as Record<string, unknown>), ...((fin.data ?? {}) as Record<string, unknown>) } as Record<string, unknown> | null,
+        phones: (phones.data ?? []) as Phone[],
+        guardian,
+        care: (care.data as { body: string } | null)?.body ?? '',
+      }
     },
   })
   useEffect(() => {
     if (!existing.data) return
-    const { s, priv, phones, guardian: g } = existing.data
+    const { s, priv, phones, guardian: g, care } = existing.data
     const str = (k: string) => (priv?.[k] == null ? '' : String(priv[k]))
     const kind: GuardianKind = !g || g.relation === 'أب' ? 'father' : g.relation === 'أم' && (!g.national_id || g.national_id === str('mother_national_id')) ? 'mother' : 'other'
     setF({
       ...BLANK,
-      full_name: s.full_name, school: s.school ?? '', school_shift: s.school_shift ?? 'صباحي', carnet_no: s.carnet_no ?? '', notes: s.notes ?? '',
+      full_name: s.full_name, school: s.school ?? '', school_shift: s.school_shift ?? 'صباحي', carnet_no: s.carnet_no ?? '',
       national_id: str('national_id'), address: str('address'),
       father_name: str('father_name'), father_national_id: str('father_national_id'), father_id_valid_until: str('father_id_valid_until'), father_job: str('father_job'),
       mother_name: str('mother_name'), mother_national_id: str('mother_national_id'), mother_id_valid_until: str('mother_id_valid_until'), mother_job: str('mother_job'),
       kids_under_5: str('kids_under_5'), kids_5_to_10: str('kids_5_to_10'), boys_over_10: str('boys_over_10'), girls_over_10: str('girls_over_10'),
       family_income: str('family_income'), family_support: str('family_support'), health_notes: str('health_notes'), important_notes: str('important_notes'),
-      phones: phones.length ? phones.map((p) => ({ number: p.number, label: p.label ?? '', is_whatsapp: p.is_whatsapp })) : BLANK.phones,
+      phones: phones.length ? phones.map((p) => ({ number: p.number, label: p.label ?? '', is_whatsapp: p.is_whatsapp, is_main_whatsapp: p.is_main_whatsapp })) : BLANK.phones,
+      notes: care,
       father_phone: str('father_phone'), mother_phone: str('mother_phone'),
       g_kind: kind,
       g_phone: g?.phone ?? '',
@@ -194,7 +209,15 @@ export default function StudentForm() {
       if (err) throw { message: err }
       if (isNew && dupe.data) throw { message: `الطالب ده متسجل قبل كده: ${dupe.data.full_name}` }
       if (isNew && !term.data) throw { message: 'مفيش ترم حالي. اعمل ترم من «القبول» الأول.' }
-      const phones = f.phones.filter((p) => p.number.trim()).map((p, i) => ({ number: normalizePhone(p.number), label: t(p.label), is_whatsapp: p.is_whatsapp, sort_order: i }))
+      const phones = f.phones
+        .filter((p) => p.number.trim())
+        .map((p, i) => {
+          const number = normalizePhone(p.number)
+          const mobile = PHONE_RE.test(number)
+          return { number, label: t(p.label), is_whatsapp: mobile && p.is_whatsapp, is_main_whatsapp: mobile && p.is_whatsapp && p.is_main_whatsapp, sort_order: i }
+        })
+      // exactly one main WhatsApp when there is any WhatsApp number
+      if (phones.some((p) => p.is_whatsapp) && !phones.some((p) => p.is_main_whatsapp)) phones.find((p) => p.is_whatsapp)!.is_main_whatsapp = true
 
       // the guardian: the father, the mother (educational guardianship) or someone else.
       // Brothers/sisters share one guardian (same national ID); his phone is the main contact.
@@ -217,7 +240,7 @@ export default function StudentForm() {
         if (error) throw error
       }
 
-      const student = { full_name: f.full_name.trim(), school: t(f.school), school_shift: f.school_shift || null, carnet_no: t(f.carnet_no), notes: t(f.notes) }
+      const student = { full_name: f.full_name.trim(), school: t(f.school), school_shift: f.school_shift || null, carnet_no: t(f.carnet_no) }
       const sid = id ?? crypto.randomUUID()
       if (isNew) {
         const { error } = await sdb().from('students').insert({ id: sid, ...student, guardian_id: guardianId })
@@ -233,13 +256,25 @@ export default function StudentForm() {
         mother_name: t(f.mother_name), mother_national_id: t(f.mother_national_id), mother_id_valid_until: t(f.mother_id_valid_until), mother_job: t(f.mother_job),
         father_phone: t(normalizePhone(f.father_phone)), mother_phone: t(normalizePhone(f.mother_phone)),
         kids_under_5: n(f.kids_under_5), kids_5_to_10: n(f.kids_5_to_10), boys_over_10: n(f.boys_over_10), girls_over_10: n(f.girls_over_10),
-        family_income: t(f.family_income), family_support: t(f.family_support), health_notes: t(f.health_notes), important_notes: t(f.important_notes),
+        health_notes: t(f.health_notes), important_notes: t(f.important_notes),
       }
       if (isNew) {
         const { error } = await sdb().from('student_private').insert({ student_id: sid, national_id: f.national_id, ...priv })
         if (error) throw error
       } else if (a.sensitive) {
         const { error } = await sdb().from('student_private').update({ ...priv, national_id: t(f.national_id) }).eq('student_id', sid)
+        if (error) throw error
+      }
+
+      if (canFinance) {
+        const { error } = await sdb().from('family_finance').upsert({ student_id: sid, family_income: t(f.family_income), family_support: t(f.family_support) })
+        if (error) throw error
+      }
+      if (t(f.notes)) {
+        const { error } = await sdb().from('care_notes').upsert({ student_id: sid, body: f.notes.trim() })
+        if (error) throw error
+      } else if (!isNew) {
+        const { error } = await sdb().from('care_notes').delete().eq('student_id', sid)
         if (error) throw error
       }
 
@@ -317,29 +352,45 @@ export default function StudentForm() {
         {showContacts && (
           <Section title="التواصل">
             {showPrivate && (
-              <Field label="العنوان">
+              <Field label="العنوان" hint="عنوان ولي الأمر اللي الطالب عايش معاه">
                 <Input value={f.address} onChange={(e) => set('address', e.target.value)} />
               </Field>
             )}
-            <p className="text-sm font-semibold">أرقام التليفون</p>
-            {f.phones.map((p, i) => (
-              <div key={i} className="flex flex-wrap items-center gap-2">
-                <Input dir="ltr" inputMode="tel" className="w-40" placeholder="01xxxxxxxxx" value={p.number}
-                  onChange={(e) => set('phones', f.phones.map((x, j) => (j === i ? { ...x, number: e.target.value } : x)))} />
-                <Input className="w-32" placeholder="رقم مين" value={p.label}
-                  onChange={(e) => set('phones', f.phones.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
-                <label className="flex items-center gap-1 text-sm">
-                  <input type="checkbox" checked={p.is_whatsapp} onChange={(e) => set('phones', f.phones.map((x, j) => (j === i ? { ...x, is_whatsapp: e.target.checked } : x)))} />
-                  واتساب
-                </label>
-                {f.phones.length > 1 && (
-                  <button type="button" className="text-red-600" onClick={() => set('phones', f.phones.filter((_, j) => j !== i))} aria-label="شيل">
-                    <Trash2 className="size-4" />
-                  </button>
-                )}
-              </div>
-            ))}
-            <Button variant="ghost" size="sm" onClick={() => set('phones', [...f.phones, { number: '', label: '', is_whatsapp: false }])}>
+            <p className="text-sm font-semibold">أرقام ولي الأمر</p>
+            <p className="text-xs text-muted">رقم ولي الأمر الأساسي بيتكتب تحت في «ولي الأمر». هنا أي أرقام تانية: الأرضي (9 أرقام يبدأ بـ 0، ملهوش واتساب) أو موبايلات.</p>
+            {f.phones.map((p, i) => {
+              const num = normalizePhone(p.number)
+              const landline = LANDLINE_RE.test(num)
+              const upd = (patch: Partial<Phone>) => set('phones', f.phones.map((x, j) => (j === i ? { ...x, ...patch } : patch.is_main_whatsapp ? { ...x, is_main_whatsapp: false } : x)))
+              return (
+                <div key={i} className="flex flex-wrap items-center gap-2 rounded-xl bg-surface p-2">
+                  <Input dir="ltr" inputMode="tel" className="w-40" placeholder="01xxxxxxxxx أو 03xxxxxxx" value={p.number} onChange={(e) => upd({ number: e.target.value })} />
+                  <Input className="w-32" placeholder="رقم مين" value={p.label} onChange={(e) => upd({ label: e.target.value })} />
+                  {landline ? (
+                    <span className="text-xs text-muted">أرضي</span>
+                  ) : (
+                    <>
+                      <label className="flex items-center gap-1 text-sm">
+                        <input type="checkbox" checked={p.is_whatsapp} onChange={(e) => upd({ is_whatsapp: e.target.checked, ...(e.target.checked ? {} : { is_main_whatsapp: false }) })} />
+                        عليه واتساب
+                      </label>
+                      {p.is_whatsapp && (
+                        <label className="flex items-center gap-1 text-sm">
+                          <input type="radio" name="main-wa" checked={p.is_main_whatsapp} onChange={() => upd({ is_main_whatsapp: true })} />
+                          الأساسي للواتساب
+                        </label>
+                      )}
+                    </>
+                  )}
+                  {f.phones.length > 1 && (
+                    <button type="button" className="text-red-600" onClick={() => set('phones', f.phones.filter((_, j) => j !== i))} aria-label="شيل">
+                      <Trash2 className="size-4" />
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+            <Button variant="ghost" size="sm" onClick={() => set('phones', [...f.phones, { number: '', label: '', is_whatsapp: false, is_main_whatsapp: false }])}>
               <Plus className="size-4" /> رقم تاني
             </Button>
           </Section>
@@ -430,18 +481,19 @@ export default function StudentForm() {
             <p className="text-xs text-muted">
               عدد أفراد الأسرة: {[f.kids_under_5, f.kids_5_to_10, f.boys_over_10, f.girls_over_10].reduce((s, x) => s + (Number(x) || 0), 0) + 2} (مع الأب والأم)
             </p>
-            <div className="grid gap-3 sm:grid-cols-2">
+            {canFinance && <div className="grid gap-3 sm:grid-cols-2">
               <Field label="دخل الأسرة"><Input value={f.family_income} onChange={(e) => set('family_income', e.target.value)} /></Field>
               <Field label="الدعم اللي بياخدوه" hint="تكافل وكرامة، معاش، …"><Input value={f.family_support} onChange={(e) => set('family_support', e.target.value)} /></Field>
-            </div>
+            </div>}
             <Field label="ملاحظات صحية"><Input value={f.health_notes} onChange={(e) => set('health_notes', e.target.value)} /></Field>
             <Field label="ملاحظات هامة"><Textarea rows={3} value={f.important_notes} onChange={(e) => set('important_notes', e.target.value)} /></Field>
             <p className="text-xs text-muted">الجزء ده بيظهر بعد كده لصاحب صلاحية «البيانات الحساسة» بس.</p>
           </Section>
         )}
 
-        <Section title="ملاحظات للتنظيم">
-          <Textarea rows={2} value={f.notes} onChange={(e) => set('notes', e.target.value)} />
+        <Section title="ملاحظات للتنظيم بس">
+          <Textarea rows={2} value={f.notes} onChange={(e) => set('notes', e.target.value)} placeholder="مثلاً: مينفعش يروح لوحده · محدش يستلمه غير أبوه · ليه حالة خاصة نتعامل معاه برفق" />
+          <p className="text-xs text-muted">بتظهر للتنظيم والمدرس مع اسم الطالب، ومبتظهرش لولي الأمر ولا الطالب.</p>
         </Section>
 
         <div className="flex gap-2">
