@@ -69,6 +69,8 @@ const TABLES: Record<string, string[]> = {
   'students.announcements': ['id'],
   'students.change_requests': ['id'],
   'students.dismissal_requests': ['id'],
+  'students.care_notes': ['student_id'],
+  'students.family_finance': ['student_id'],
   'students.rules': ['id'],
   'students.rule_answers': ['guardian_id', 'rule_id'],
 }

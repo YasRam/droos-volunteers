@@ -197,6 +197,21 @@ function RosterModal({ s, onClose }: { s: ClassSession; onClose: () => void }) {
       return data as RosterRow[]
     },
   })
+  const ids = (roster.data ?? []).map((r) => r.student_id)
+  const extras = useQuery({
+    queryKey: ['students', 'roster-extras', s.id, ids.length],
+    enabled: ids.length > 0,
+    queryFn: async () => {
+      const [care, wa] = await Promise.all([
+        sdb().rpc('care_notes_for', { p_students: ids }),
+        s.slot_id ? sdb().rpc('whatsapp_for_slot', { p_slot: s.slot_id }) : Promise.resolve({ data: [] }),
+      ])
+      return {
+        care: new Map(((care.data ?? []) as { student_id: string; body: string }[]).map((c) => [c.student_id, c.body])),
+        whatsapp: (wa.data ?? []) as { name: string; link: string }[],
+      }
+    },
+  })
   const [marksBy, setMarksBy] = useState<Record<string, string>>({})
   const [scores, setScores] = useState<Record<string, string>>({})
   const [maxScore, setMaxScore] = useState(s.max_score?.toString() ?? '')
@@ -250,6 +265,15 @@ function RosterModal({ s, onClose }: { s: ClassSession; onClose: () => void }) {
         <p className="text-sm text-muted">مفيش طلاب في الحصة دي. حدد مين بيحضرها من تعديل الحصة في «الجدول الأسبوعي».</p>
       ) : (
         <div className="space-y-3">
+          {(extras.data?.whatsapp.length ?? 0) > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {extras.data!.whatsapp.map((w) => (
+                <a key={w.link} href={w.link} target="_blank" rel="noreferrer">
+                  <Badge tone="green">جروب واتساب: {w.name}</Badge>
+                </a>
+              ))}
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Button size="sm" variant="secondary" onClick={() => setAll('حاضر')}>الكل حاضر</Button>
             <Button size="sm" variant="secondary" onClick={() => setAll('غائب')}>الكل غائب</Button>
@@ -265,6 +289,7 @@ function RosterModal({ s, onClose }: { s: ClassSession; onClose: () => void }) {
                   {r.full_name} <span className="text-muted">{r.grade ? `· ${r.grade}` : ''}</span>
                   {r.call_in && <Badge tone="red">استدعاء ولي أمر</Badge>}
                   {r.suggested && <Badge tone="orange">{r.suggested}</Badge>}
+                  {extras.data?.care.get(r.student_id) && <span className="block text-xs font-semibold text-orange-700">⚠ {extras.data.care.get(r.student_id)}</span>}
                 </span>
                 <Select className="h-8 w-32" value={marksBy[r.student_id] ?? 'حاضر'} onChange={(e) => setMarksBy((m) => ({ ...m, [r.student_id]: e.target.value }))}
                   options={(marks.data ?? []).map((m) => m.code)} />

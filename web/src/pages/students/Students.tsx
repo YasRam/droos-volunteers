@@ -16,6 +16,7 @@ const Groups = lazy(() => import('./Groups'))
 const StudentRequests = lazy(() => import('./StudentRequests'))
 const StudentStats = lazy(() => import('./StudentStats'))
 const StudentImport = lazy(() => import('./StudentImport'))
+const ExpiringIdsPage = lazy(() => import('./StudentStats').then((m) => ({ default: () => m.ExpiringIds({}) })))
 const StudentRulesPage = lazy(() => import('@/components/StudentRules').then((m) => ({ default: m.StudentRulesPage })))
 
 /** Who may open the students part at all: تنظيم and up, or a volunteer who teaches. */
@@ -47,6 +48,7 @@ export default function StudentsSection() {
         <Route path="requests" element={a.review ? <StudentRequests /> : <Navigate to="/students" replace />} />
         <Route path="import" element={a.edit && a.sensitive ? <StudentImport /> : <Navigate to="/students" replace />} />
         <Route path="rules" element={a.all ? <StudentRulesPage /> : <Navigate to="/students" replace />} />
+        <Route path="ids" element={a.all ? <ExpiringIdsPage /> : <Navigate to="/students" replace />} />
         <Route path="stats" element={a.all ? <StudentStats /> : <Navigate to="/students" replace />} />
         <Route path=":id/edit" element={a.edit ? <StudentForm /> : <Navigate to="/students" replace />} />
         <Route path=":id" element={<StudentDetail />} />
@@ -56,8 +58,9 @@ export default function StudentsSection() {
   )
 }
 
-interface Filters { grade: string; status: string; group: string; gender: string }
-const EMPTY: Filters = { grade: '', status: '', group: '', gender: '' }
+interface Filters { grade: string; status: string; group: string; gender: string; shift: string; school: string; minAbsences: string }
+const EMPTY: Filters = { grade: '', status: '', group: '', gender: '', shift: '', school: '', minAbsences: '' }
+type SortKey = 'name' | 'grade' | 'status' | 'absences' | 'age' | 'school'
 
 function StudentList() {
   const a = useStudentAccess()
@@ -78,20 +81,48 @@ function StudentList() {
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState<Filters>(EMPTY)
   const [showFilters, setShowFilters] = useState(false)
+  const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: 'name', desc: false })
+  const gradeOrder = useMemo(() => new Map((grades.data ?? []).map((g, i) => [g, i])), [grades.data])
   const active = Object.values(filters).filter(Boolean).length
 
   const rows = useMemo(() => {
     const s = search.trim()
     const inGroup = filters.group ? new Set((members.data ?? []).filter((m) => m.group_id === filters.group).map((m) => m.student_id)) : null
-    return (students.data ?? []).filter((r) => {
+    const filtered = (students.data ?? []).filter((r) => {
       if (s && !(r.full_name.includes(s) || r.carnet_no?.includes(s))) return false
       if (filters.grade && r.enrollment?.grade !== filters.grade) return false
       if (filters.status && (r.enrollment?.status ?? 'مش مقيد') !== filters.status) return false
       if (filters.gender && r.gender !== filters.gender) return false
       if (inGroup && !inGroup.has(r.id)) return false
+      if (filters.shift && r.school_shift !== filters.shift) return false
+      if (filters.school && !(r.school ?? '').includes(filters.school.trim())) return false
+      if (filters.minAbsences && r.absences < Number(filters.minAbsences)) return false
       return true
     })
-  }, [students.data, members.data, search, filters])
+    const val = (r: (typeof list)[number]): string | number => {
+      switch (sort.key) {
+        case 'grade': return gradeOrder.get(r.enrollment?.grade ?? '') ?? 999
+        case 'status': return r.enrollment?.status ?? 'ي'
+        case 'absences': return r.absences
+        case 'age': return r.birth_date ? -Date.parse(r.birth_date) : Number.MAX_SAFE_INTEGER
+        case 'school': return r.school ?? 'ي'
+        default: return r.full_name
+      }
+    }
+    const list = filtered
+    return [...list].sort((x, y) => {
+      const a1 = val(x), b1 = val(y)
+      const c = typeof a1 === 'number' && typeof b1 === 'number' ? a1 - b1 : String(a1).localeCompare(String(b1), 'ar')
+      return (sort.desc ? -c : c) || x.full_name.localeCompare(y.full_name, 'ar')
+    })
+  }, [students.data, members.data, search, filters, sort, gradeOrder])
+  const head = (key: SortKey, label: string, cls = '') => (
+    <th className={clsx('p-2 text-start', cls)}>
+      <button type="button" className="font-semibold hover:text-ink" onClick={() => setSort((x) => ({ key, desc: x.key === key ? !x.desc : key === 'absences' }))}>
+        {label}{sort.key === key ? (sort.desc ? ' ↓' : ' ↑') : ''}
+      </button>
+    </th>
+  )
 
   const set = (k: keyof Filters, v: string) => setFilters((f) => ({ ...f, [k]: v }))
 
@@ -145,6 +176,15 @@ function StudentList() {
           <Field label="النوع">
             <Select value={filters.gender} onChange={(e) => set('gender', e.target.value)} options={['ذكر', 'أنثى']} placeholder="الكل" />
           </Field>
+          <Field label="الفترة">
+            <Select value={filters.shift} onChange={(e) => set('shift', e.target.value)} options={['صباحي', 'مسائي']} placeholder="الكل" />
+          </Field>
+          <Field label="المدرسة">
+            <Input value={filters.school} onChange={(e) => set('school', e.target.value)} placeholder="جزء من الاسم" />
+          </Field>
+          <Field label="غياب الترم على الأقل">
+            <Input type="number" min={0} value={filters.minAbsences} onChange={(e) => set('minAbsences', e.target.value)} />
+          </Field>
           {active > 0 && (
             <Button variant="ghost" onClick={() => setFilters(EMPTY)}>
               امسح الفلاتر
@@ -161,12 +201,12 @@ function StudentList() {
           <table className="w-full text-sm">
             <thead className="bg-surface text-xs text-muted">
               <tr>
-                <th className="p-2 text-start">الاسم</th>
-                <th className="p-2 text-start">السنة</th>
-                <th className="p-2 text-start">الحالة</th>
-                <th className="p-2 text-start">الغياب</th>
-                <th className="hidden p-2 text-start sm:table-cell">السن</th>
-                <th className="hidden p-2 text-start md:table-cell">المدرسة</th>
+                {head('name', 'الاسم')}
+                {head('grade', 'السنة')}
+                {head('status', 'الحالة')}
+                {head('absences', 'الغياب')}
+                {head('age', 'السن', 'hidden sm:table-cell')}
+                {head('school', 'المدرسة', 'hidden md:table-cell')}
               </tr>
             </thead>
             <tbody>

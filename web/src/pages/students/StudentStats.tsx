@@ -12,6 +12,24 @@ export default function StudentStats() {
   const students = useStudents()
   const grades = useGrades()
   const marks = useMarks()
+  const years = useQuery({
+    queryKey: ['students', 'stats-years'],
+    queryFn: async () => {
+      const [terms, enr] = await Promise.all([
+        sdb().from('terms').select('id, name, starts_on').order('starts_on'),
+        sdb().from('enrollments').select('term_id, grade, status').limit(20000),
+      ])
+      if (terms.error) throw terms.error
+      if (enr.error) throw enr.error
+      const rows = (enr.data ?? []) as { term_id: string; grade: string; status: string }[]
+      return ((terms.data ?? []) as { id: string; name: string; starts_on: string }[]).map((t) => {
+        const list = rows.filter((e) => e.term_id === t.id)
+        const byGrade: Record<string, number> = {}
+        for (const e of list) byGrade[e.grade] = (byGrade[e.grade] ?? 0) + 1
+        return { id: t.id, name: t.name, total: list.length, dismissed: list.filter((e) => e.status === 'مفصول').length, byGrade }
+      })
+    },
+  })
   const q = useQuery({
     queryKey: ['students', 'stats', term.data?.id],
     enabled: Boolean(term.data),
@@ -76,6 +94,32 @@ export default function StudentStats() {
         <Stat label="نسبة الحضور" value={s.rate === null ? '—' : `${s.rate}%`} tone="green" />
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="lg:col-span-2 overflow-x-auto">
+          <h2 className="mb-2 font-bold">عدد الطلاب كل ترم</h2>
+          {!years.data?.length ? <p className="text-sm text-muted">مفيش ترمات.</p> : (
+            <table className="w-full text-sm">
+              <thead className="text-xs text-muted">
+                <tr>
+                  <th className="p-1.5 text-start">الترم</th>
+                  <th className="p-1.5 text-start">المجموع</th>
+                  {(grades.data ?? []).map((g) => <th key={g} className="p-1.5 text-start">{g}</th>)}
+                  <th className="p-1.5 text-start">اتفصل</th>
+                </tr>
+              </thead>
+              <tbody>
+                {years.data.map((y) => (
+                  <tr key={y.id} className="border-t border-line">
+                    <td className="p-1.5 font-semibold">{y.name}</td>
+                    <td className="p-1.5 font-bold">{y.total}</td>
+                    {(grades.data ?? []).map((g) => <td key={g} className="p-1.5">{y.byGrade[g] ?? '—'}</td>)}
+                    <td className="p-1.5">{y.dismissed || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Card>
+        <ExpiringIds compact />
         <Card>
           <h2 className="mb-1 font-bold">نسبة الحضور لكل سنة</h2>
           <p className="mb-2 text-xs text-muted">حاضر من (حاضر + غائب) في الحصص اللي بيتاخد عليها غياب، الترم ده</p>
@@ -125,6 +169,52 @@ export default function StudentStats() {
           )}
         </Card>
       </div>
+    </>
+  )
+}
+
+interface Expiring { student_id: string; student_name: string; who: string; person: string | null; valid_until: string; days_left: number }
+
+/** Guardians' / parents' ID cards that ended or end within 3 months (students in this term). */
+export function ExpiringIds({ compact = false }: { compact?: boolean }) {
+  const q = useQuery({
+    queryKey: ['students', 'expiring-ids'],
+    queryFn: async () => {
+      const { data, error } = await sdb().rpc('expiring_ids', { p_within: 90 })
+      if (error) throw error
+      return data as Expiring[]
+    },
+  })
+  const list = q.data ?? []
+  const body = q.isLoading ? <Spinner /> : !list.length ? <p className="text-sm text-muted">مفيش بطايق هتنتهي خلال 3 شهور.</p> : (
+    <table className="w-full text-sm">
+      <tbody>
+        {(compact ? list.slice(0, 8) : list).map((x, i) => (
+          <tr key={i} className="border-t border-line first:border-0">
+            <td className="py-1.5"><Link to={`/students/${x.student_id}`} className="hover:underline">{x.student_name}</Link></td>
+            <td className="py-1.5 text-muted">{x.who}{x.person ? ` · ${x.person}` : ''}</td>
+            <td className={`py-1.5 text-end font-semibold ${x.days_left < 0 ? 'text-red-700' : x.days_left <= 30 ? 'text-orange-700' : ''}`}>
+              {x.days_left < 0 ? `انتهت من ${-x.days_left} يوم` : x.days_left === 0 ? 'بتنتهي النهارده' : `فاضل ${x.days_left} يوم`}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+  if (compact)
+    return (
+      <Card>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="font-bold">بطايق قربت تخلص ({list.length})</h2>
+          {list.length > 8 && <Link to="/students/ids" className="text-sm font-semibold text-brand-700">الكل</Link>}
+        </div>
+        {body}
+      </Card>
+    )
+  return (
+    <>
+      <PageHeader title="بطايق قربت تخلص" subtitle="بطاقة ولي الأمر أو الأب أو الأم اللي انتهت أو هتنتهي خلال 3 شهور. ولي الأمر بيوصله إشعار يبعت البطاقة الجديدة." />
+      <Card>{body}</Card>
     </>
   )
 }
