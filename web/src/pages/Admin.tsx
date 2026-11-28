@@ -7,6 +7,7 @@ import { Badge, Button, Card, Field, Input, Modal, PageHeader, Select, Spinner, 
 import { fmtDateTime } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { RulesEditor } from '@/components/Rules'
+import { StudentRulesPage } from '@/components/StudentRules'
 import { usePermissions } from '@/lib/auth'
 import { DataSection } from '@/pages/DataTools'
 import { useSearchParams } from 'react-router-dom'
@@ -14,14 +15,15 @@ import { locale } from '@/lib/i18n'
 import { supabase } from '@/lib/supabase'
 import type { Lookup } from '@/lib/types'
 
-type Tab = 'lists' | 'groups' | 'stages' | 'data'
+type Tab = 'lists' | 'groups' | 'stages' | 'data' | 'rules'
 
 export default function Admin() {
   const p = usePermissions()
   const [params, setParams] = useSearchParams()
   const tabs = [
     ...(p.can('settings.manage') ? [{ value: 'lists' as Tab, label: 'القوائم' }, { value: 'groups' as Tab, label: 'جروبات الواتساب' }] : []),
-    ...(p.can('stages.manage') || p.can('rules.manage') ? [{ value: 'stages' as Tab, label: 'مراحل التطوع والقواعد' }] : []),
+    ...(p.can('stages.manage') ? [{ value: 'stages' as Tab, label: 'مراحل التطوع' }] : []),
+    ...(p.can('rules.manage') || p.can('students.edit') ? [{ value: 'rules' as Tab, label: 'القواعد' }] : []),
     ...(p.can('data.export') || p.can('backup.manage') || p.can('settings.manage') ? [{ value: 'data' as Tab, label: 'البيانات والنسخ الاحتياطية' }] : []),
   ]
   const tab = (tabs.find((t) => t.value === params.get('tab'))?.value ?? tabs[0]?.value) as Tab
@@ -31,7 +33,22 @@ export default function Admin() {
       <Tabs value={tab} onChange={(t) => setParams({ tab: t })} tabs={tabs} />
       {tab === 'lists' && <Lists />}
       {tab === 'groups' && <Groups />}
-      {tab === 'stages' && (p.can('stages.manage') ? <StagesSettings withRules={p.can('rules.manage')} /> : <RulesEditor />)}
+      {tab === 'stages' && <StagesSettings withRules={false} />}
+      {tab === 'rules' && (
+        <div className="grid gap-6 xl:grid-cols-2">
+          {p.can('rules.manage') && (
+            <section>
+              <h2 className="mb-2 text-lg font-bold">قواعد المتطوعين</h2>
+              <RulesEditor />
+            </section>
+          )}
+          {(p.can('students.view_all') || p.can('students.edit')) && (
+            <section>
+              <StudentRulesPage />
+            </section>
+          )}
+        </div>
+      )}
       {tab === 'data' && (
         <div className="space-y-6">
           {p.can('data.export') && (

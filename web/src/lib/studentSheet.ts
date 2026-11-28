@@ -334,7 +334,7 @@ export async function readStudentWorkbook(
   for (const ws of wb.worksheets) {
     const code = gradeCode(ws.name)
     if (!code) {
-      if (!['بيانات الطلاب', 'انتظار', 'Database'].some((n) => normName(n) === normName(ws.name))) report.skipped.push(ws.name)
+      if (!['بيانات الطلاب', 'انتظار', 'Database', 'طريقة الملء'].some((n) => normName(n) === normName(ws.name))) report.skipped.push(ws.name)
       continue
     }
     const gs = readGrade(code, grid(ws))

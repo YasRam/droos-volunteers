@@ -11,7 +11,7 @@ import { usePermissions } from '@/lib/auth'
 import { addDays, cairoToday, fmtDate, fmtShort, fmtTime, timeInput, useDirectory } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
-import { sdb, useCurrentTerm, useGrades, useGroups, useMarks, useStudents, type Audience, type ClassSession, type RosterRow } from '@/lib/students'
+import { daysToBirthday, sdb, useCurrentTerm, useGrades, useGroups, useMarks, useStudents, type Audience, type ClassSession, type RosterRow } from '@/lib/students'
 import { type ScheduleSlot } from '@/lib/types'
 import { useStudentAccess } from './Students'
 
@@ -212,6 +212,8 @@ function RosterModal({ s, onClose }: { s: ClassSession; onClose: () => void }) {
       }
     },
   })
+  const all = useStudents()
+  const birthBy = useMemo(() => new Map((all.data ?? []).map((x) => [x.id, x.birth_date])), [all.data])
   const [marksBy, setMarksBy] = useState<Record<string, string>>({})
   const [scores, setScores] = useState<Record<string, string>>({})
   const [maxScore, setMaxScore] = useState(s.max_score?.toString() ?? '')
@@ -289,6 +291,7 @@ function RosterModal({ s, onClose }: { s: ClassSession; onClose: () => void }) {
                   {r.full_name} <span className="text-muted">{r.grade ? `· ${r.grade}` : ''}</span>
                   {r.call_in && <Badge tone="red">استدعاء ولي أمر</Badge>}
                   {r.suggested && <Badge tone="orange">{r.suggested}</Badge>}
+                  {daysToBirthday(birthBy.get(r.student_id), new Date(s.on_date)) === 0 && <Badge tone="purple">عيد ميلاده 🎂</Badge>}
                   {extras.data?.care.get(r.student_id) && <span className="block text-xs font-semibold text-orange-700">⚠ {extras.data.care.get(r.student_id)}</span>}
                 </span>
                 <Select className="h-8 w-32" value={marksBy[r.student_id] ?? 'حاضر'} onChange={(e) => setMarksBy((m) => ({ ...m, [r.student_id]: e.target.value }))}
@@ -395,11 +398,12 @@ export function AudienceEditor({ value, onChange }: { value: Omit<Audience, 'id'
     x.target === 'all' ? 'كل الطلاب' : x.target === 'grade' ? x.grade : x.target === 'group' ? groups.data?.find((g) => g.id === x.group_id)?.name ?? 'مجموعة' : students.data?.find((s) => s.id === x.student_id)?.full_name ?? 'طالب'
   const options =
     target === 'grade' ? (grades.data ?? []).map((g) => ({ value: g, label: g }))
-    : target === 'group' ? (groups.data ?? []).map((g) => ({ value: g.id, label: g.name }))
+    : target === 'group' ? (groups.data ?? []).map((g) => ({ value: g.id, label: g.grade ? `${g.grade} ← ${g.name}` : `عامة: ${g.name}` }))
     : target === 'student' ? (students.data ?? []).filter((s) => s.enrollment).map((s) => ({ value: s.id, label: `${s.full_name} · ${s.enrollment?.grade}` }))
     : []
   const add = () => {
     if (target !== 'all' && !pick) return
+    if (value.some((x) => x.target === target && (x.grade ?? x.group_id ?? x.student_id ?? '') === (target === 'all' ? '' : pick))) return setPick('')
     const row = { target, grade: target === 'grade' ? pick : null, group_id: target === 'group' ? pick : null, student_id: target === 'student' ? pick : null }
     onChange([...value, row])
     setPick('')

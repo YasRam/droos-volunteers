@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
+import { FeedbackDue } from '@/pages/Stats'
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Card, Empty, PageHeader, Spinner, Stat } from '@/components/ui'
@@ -120,6 +121,10 @@ export default function StudentStats() {
           )}
         </Card>
         <ExpiringIds compact />
+        <div>
+          <h2 className="mb-2 font-bold">طلاب محتاجين فيد باك</h2>
+          <FeedbackDue kind="student" />
+        </div>
         <Card>
           <h2 className="mb-1 font-bold">نسبة الحضور لكل سنة</h2>
           <p className="mb-2 text-xs text-muted">حاضر من (حاضر + غائب) في الحصص اللي بيتاخد عليها غياب، الترم ده</p>

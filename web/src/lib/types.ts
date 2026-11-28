@@ -213,6 +213,7 @@ export interface AuditRow {
   actor_name: string | null
   target_name: string | null
   target_volunteer_id: string | null
+  target_student_id?: string | null
 }
 
 export interface MonthlyParticipation {

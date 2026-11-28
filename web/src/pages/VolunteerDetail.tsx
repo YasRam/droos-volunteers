@@ -5,9 +5,8 @@ import { useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Badge, Button, Card, Empty, Field, Input, PageHeader, RequestBadge, Select, Spinner, StatusBadge, Tabs, Textarea, Toggle } from '@/components/ui'
+import { Badge, Button, Card, Empty, Field, Input, PageHeader, RequestBadge, Select, Spinner, StatusBadge, Tabs, Toggle } from '@/components/ui'
 import { VolunteerFacts } from '@/components/VolunteerFacts'
-import { VolunteerSelect } from '@/components/VolunteerPick'
 import { StagesCard } from '@/components/StagesCard'
 import { RecruitHistory, useRecruitLog } from '@/pages/Recruit'
 import { ContactLinks } from '@/components/VolunteerLink'
@@ -19,8 +18,9 @@ import { accountCall, tempPassword } from '@/lib/account'
 import { type Participation, type Volunteer, type VolunteerHr } from '@/lib/types'
 import { NationalIdCard, PersonalFields, personalDefaults, personalSchema, toPersonalPayload, type PersonalValues } from './MyProfile'
 import { useJobs } from '@/lib/jobs'
+import { FeedbackCard } from '@/components/Feedback'
 
-type Tab = 'data' | 'interview' | 'committee' | 'activities'
+type Tab = 'data' | 'status' | 'interview' | 'journey' | 'feedback' | 'activities'
 
 export default function VolunteerDetail() {
   const { jobOf } = useJobs()
@@ -61,10 +61,14 @@ export default function VolunteerDetail() {
 
   const wa = whatsappLink(v.whatsapp ?? v.phone)
   const age = ageFrom(v.birth_date)
+  const self = v.id === p.volunteerId
+  const seesFeedback = !self && (p.can('volunteers.edit') || p.can('hr.edit') || p.can('hr.notes') || leadsThis)
   const tabs: { value: Tab; label: string }[] = [
     { value: 'data', label: 'البيانات' },
-    ...(p.can('hr.view') || p.full ? [{ value: 'interview' as Tab, label: 'الحالة والمقابلة' }] : []),
-    { value: 'committee', label: 'اللجنة' },
+    { value: 'status', label: 'الحالة واللجنة' },
+    ...(p.can('hr.view') ? [{ value: 'interview' as Tab, label: 'المقابلة' }] : []),
+    { value: 'journey', label: 'رحلة التطوع' },
+    ...(seesFeedback ? [{ value: 'feedback' as Tab, label: 'الفيد باك' }] : []),
     { value: 'activities', label: 'المشاركات' },
   ]
 
@@ -118,8 +122,8 @@ export default function VolunteerDetail() {
           </div>
           <div className="space-y-4">
             <VolunteerFacts v={v} />
-            <StagesCard volunteerId={v.id} self={false} />
             {p.can('national_id.view') && <NationalIdCard volunteerId={v.id} canEdit={p.can('national_id.edit')} />}
+            {p.can('accounts.password') && <TempPasswordCard volunteerId={v.id} name={v.full_name_ar} email={v.email} phone={v.whatsapp || v.phone} />}
             {p.full && (
               <Button
                 variant="ghost"
@@ -133,15 +137,20 @@ export default function VolunteerDetail() {
           </div>
         </div>
       )}
+      {tab === 'status' && <StatusCommittee v={v} />}
       {tab === 'interview' && (
         <div className="space-y-4">
           <Interview v={v} />
-          {p.can('hr.view') && <RecruitCard volunteerId={v.id} />}
-          {p.can('accounts.password') && <TempPasswordCard volunteerId={v.id} name={v.full_name_ar} email={v.email} phone={v.whatsapp || v.phone} />}
-          <FollowupCard v={v} canEdit={p.can('volunteers.edit')} canNote={p.can('volunteers.edit') || p.leader} />
+          <RecruitCard volunteerId={v.id} />
         </div>
       )}
-      {tab === 'committee' && <Committee v={v} editable={canEditCommittee} />}
+      {tab === 'journey' && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Committee v={v} editable={canEditCommittee} />
+          <StagesCard volunteerId={v.id} self={false} />
+        </div>
+      )}
+      {tab === 'feedback' && <FeedbackCard volunteerId={v.id} />}
       {tab === 'activities' && <Activities volunteerId={v.id} />}
     </>
   )
@@ -200,120 +209,130 @@ function EditPersonal({ v }: { v: Volunteer }) {
   )
 }
 
-/** Status, job and committees (volunteers.edit) and the interview data (hr.*). */
-function Interview({ v }: { v: Volunteer }) {
+/** Status and committees (volunteers.edit). The exit reason only when the status is «خارج المتابعة». */
+function StatusCommittee({ v }: { v: Volunteer }) {
   const opts = useStatusOptions()
   const qc = useQueryClient()
   const p = usePermissions()
   const lookups = useLookups()
-  const canEditStatus = p.can('volunteers.edit')
-  const seesHr = p.can('hr.view')
-  const canEditHr = p.can('hr.edit')
-  const seesNotes = p.can('hr.notes')
-  const hr = useQuery({
-    queryKey: ['hr', v.id],
-    enabled: seesHr,
-    queryFn: async () => {
-      const { data, error } = await supabase.from(seesNotes ? 'volunteer_hr' : 'volunteer_hr_read').select('*').eq('volunteer_id', v.id).maybeSingle()
-      if (error) throw error
-      return data as VolunteerHr | null
-    },
-  })
-  const form = useForm({
-    values: {
-      status: v.status,
-      main_committee: v.main_committee ?? '',
-      sub_committee: v.sub_committee ?? '',
-      acceptance: hr.data?.acceptance ?? '',
-      interview_date: hr.data?.interview_date ?? '',
-      interviewer: hr.data?.interviewer ?? '',
-      interviewer_id: hr.data?.interviewer_id ?? null,
-      hr_notes: hr.data?.hr_notes ?? '',
-    },
-  })
+  const canEdit = p.can('volunteers.edit')
+  const [f, setF] = useState({ status: v.status as string, main_committee: v.main_committee ?? '', sub_committee: v.sub_committee ?? '', out_reason: v.out_reason ?? '' })
+  const out = f.status === 'خارج المتابعة'
   const save = useMutation({
-    mutationFn: async (f: Parameters<Parameters<typeof form.handleSubmit>[0]>[0]) => {
-      if (canEditStatus) {
-        const a = await supabase
-          .from('volunteers')
-          .update({ status: f.status, main_committee: f.main_committee || null, sub_committee: f.sub_committee || null })
-          .eq('id', v.id)
-        if (a.error) throw a.error
-      }
-      if (canEditHr) {
-        const b = await supabase
-          .from('volunteer_hr')
-          .update({
-            acceptance: f.acceptance || null,
-            interview_date: f.interview_date || null,
-            interviewer_id: f.interviewer_id || null,
-            interviewer: f.interviewer_id ? null : f.interviewer || null,
-            ...(seesNotes ? { hr_notes: f.hr_notes || null } : {}),
-          })
-          .eq('volunteer_id', v.id)
-        if (b.error) throw b.error
-      }
+    mutationFn: async () => {
+      if (out && !f.out_reason.trim()) throw { message: 'اكتب سبب الخروج من المتابعة' }
+      const { error } = await supabase
+        .from('volunteers')
+        .update({ status: f.status, main_committee: f.main_committee || null, sub_committee: f.sub_committee || null, out_reason: out ? f.out_reason.trim() : null })
+        .eq('id', v.id)
+      if (error) throw error
     },
     onSuccess: () => {
       toast.success('اتحفظت')
       qc.invalidateQueries({ queryKey: ['volunteer', v.id] })
-      qc.invalidateQueries({ queryKey: ['hr', v.id] })
       qc.invalidateQueries({ queryKey: ['volunteers'] })
+    },
+    onError: toastError,
+  })
+  const committees = lookups.data?.list('اللجنة') ?? []
+  return (
+    <Card>
+      <fieldset disabled={!canEdit} className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Field label="حالة المتطوع">
+          <Select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })} options={withCurrent(opts.statuses, v.status)} />
+        </Field>
+        <Field label="اللجنة الأساسية">
+          <Select value={f.main_committee} onChange={(e) => setF({ ...f, main_committee: e.target.value })} placeholder="—" options={withCurrent(committees, v.main_committee)} />
+        </Field>
+        <Field label="اللجنة الفرعية">
+          <Select value={f.sub_committee} onChange={(e) => setF({ ...f, sub_committee: e.target.value })} placeholder="—" options={withCurrent(committees, v.sub_committee)} />
+        </Field>
+        {out && (
+          <div className="sm:col-span-3">
+            <Field label="سبب الخروج من المتابعة" hint="أي سبب. لو السيستم طلّعه لوحده بيتكتب «عدم المشاركة لمدة 3 شهور»">
+              <Input value={f.out_reason} onChange={(e) => setF({ ...f, out_reason: e.target.value })} list="out-reasons" />
+              <datalist id="out-reasons">{(lookups.data?.list('سبب الخروج') ?? []).map((x) => <option key={x} value={x} />)}</datalist>
+            </Field>
+          </div>
+        )}
+      </fieldset>
+      {canEdit ? (
+        <Button className="mt-4" onClick={() => save.mutate()} loading={save.isPending}>
+          حفظ
+        </Button>
+      ) : (
+        <p className="mt-3 text-xs text-muted">عرض بس. التعديل محتاج صلاحية تعديل المتطوعين.</p>
+      )}
+    </Card>
+  )
+}
+
+/** The interview (hr.*): result, date and who did it (a volunteer with the HR permission). */
+function Interview({ v }: { v: Volunteer }) {
+  const opts = useStatusOptions()
+  const qc = useQueryClient()
+  const p = usePermissions()
+  const canEditHr = p.can('hr.edit')
+  const hr = useQuery({
+    queryKey: ['hr', v.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('volunteer_hr_read').select('*').eq('volunteer_id', v.id).maybeSingle()
+      if (error) throw error
+      return data as VolunteerHr | null
+    },
+  })
+  const interviewers = useQuery({
+    queryKey: ['interviewers'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('interviewers')
+      if (error) throw error
+      return data as { id: string; full_name_ar: string }[]
+    },
+  })
+  const [f, setF] = useState<{ acceptance: string; interview_date: string; interviewer_id: string } | null>(null)
+  const cur = f ?? { acceptance: hr.data?.acceptance ?? '', interview_date: hr.data?.interview_date ?? '', interviewer_id: hr.data?.interviewer_id ?? '' }
+  const save = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('volunteer_hr')
+        .update({ acceptance: cur.acceptance || null, interview_date: cur.interview_date || null, interviewer_id: cur.interviewer_id || null, interviewer: null })
+        .eq('volunteer_id', v.id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('اتحفظت')
+      setF(null)
+      qc.invalidateQueries({ queryKey: ['hr', v.id] })
       qc.invalidateQueries({ queryKey: ['volunteer_hr'] })
     },
     onError: toastError,
   })
-  if (seesHr && hr.isLoading) return <Spinner />
-  const committees = lookups.data?.list('اللجنة') ?? []
+  if (hr.isLoading) return <Spinner />
+  const people = interviewers.data ?? []
+  const options = [
+    ...people.map((x) => ({ value: x.id, label: x.full_name_ar })),
+    ...(cur.interviewer_id && !people.some((x) => x.id === cur.interviewer_id) ? [{ value: cur.interviewer_id, label: 'متطوع (مبقاش معاه صلاحية)' }] : []),
+  ]
   return (
     <Card>
-      <form onSubmit={form.handleSubmit((f) => save.mutate(f))} className="space-y-5">
-        <fieldset disabled={!canEditStatus} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <legend className="mb-2 text-sm font-bold text-brand-800 sm:col-span-2">الحالة واللجان</legend>
-          <Field label="حالة المتطوع">
-            <Select {...form.register('status')} options={withCurrent(opts.statuses, v.status)} />
-          </Field>
-          <Field label="اللجنة الأساسية">
-            <Select {...form.register('main_committee')} placeholder="—" options={committees} />
-          </Field>
-          <Field label="اللجنة الفرعية">
-            <Select {...form.register('sub_committee')} placeholder="—" options={committees} />
-          </Field>
-        </fieldset>
-        {seesHr && (
-          <fieldset disabled={!canEditHr} className="grid grid-cols-1 gap-4 border-t border-line pt-4 sm:grid-cols-2">
-            <legend className="mb-2 text-sm font-bold text-brand-800 sm:col-span-2">المقابلة</legend>
-            <Field label="درجة القبول" hint={hr.data?.status_changed_at ? `آخر تغيير ${fmtShort(hr.data.status_changed_at)}` : undefined}>
-              <Select {...form.register('acceptance')} placeholder="—" options={withCurrent(opts.acceptance, hr.data?.acceptance)} />
-            </Field>
-            <Field label="تاريخ المقابلة">
-              <Input type="date" {...form.register('interview_date')} />
-            </Field>
-            <Field label="القائم على المقابلة" hint="المقابلة بتتحسب مشاركة «انترفيو» ليه وللمتطوع في يومها، من غير تسجيل">
-              <VolunteerSelect
-                value={form.watch('interviewer_id')}
-                onChange={(id) => form.setValue('interviewer_id', id, { shouldDirty: true })}
-                disabled={!canEditHr}
-              />
-              {!form.watch('interviewer_id') && hr.data?.interviewer && <p className="mt-1 text-xs text-muted">مسجّل قبل كده: {hr.data.interviewer}</p>}
-            </Field>
-            {seesNotes && (
-              <div className="sm:col-span-2">
-                <Field label="ملاحظات HR">
-                  <Textarea {...form.register('hr_notes')} />
-                </Field>
-              </div>
-            )}
-          </fieldset>
-        )}
-        {(canEditStatus || canEditHr) ? (
-          <Button type="submit" loading={save.isPending}>
-            حفظ
-          </Button>
-        ) : (
-          <p className="text-xs text-muted">عرض بس. التعديل محتاج صلاحية تعديل المتطوعين أو المقابلة.</p>
-        )}
-      </form>
+      <fieldset disabled={!canEditHr} className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Field label="درجة القبول" hint={hr.data?.status_changed_at ? `آخر تغيير ${fmtShort(hr.data.status_changed_at)}` : undefined}>
+          <Select value={cur.acceptance} onChange={(e) => setF({ ...cur, acceptance: e.target.value })} placeholder="—" options={withCurrent(opts.acceptance, hr.data?.acceptance)} />
+        </Field>
+        <Field label="تاريخ المقابلة">
+          <Input type="date" value={cur.interview_date} onChange={(e) => setF({ ...cur, interview_date: e.target.value })} />
+        </Field>
+        <Field label="القائم على المقابلة" hint="متطوع معاه صلاحية الـ HR">
+          <Select value={cur.interviewer_id} onChange={(e) => setF({ ...cur, interviewer_id: e.target.value })} placeholder="—" options={options} />
+          {!cur.interviewer_id && hr.data?.interviewer && <p className="mt-1 text-xs text-muted">مكتوب قبل كده: {hr.data.interviewer}</p>}
+        </Field>
+      </fieldset>
+      <p className="mt-3 text-xs text-muted">ملاحظات المقابلة بتتكتب في «الفيد باك» (نوعها «مقابلة»)، وهي أول فيد باك عن المتطوع.</p>
+      {canEditHr && (
+        <Button className="mt-3" onClick={() => save.mutate()} loading={save.isPending} disabled={!f}>
+          حفظ
+        </Button>
+      )}
     </Card>
   )
 }
@@ -340,7 +359,7 @@ function Committee({ v, editable }: { v: Volunteer; editable: boolean }) {
   const flags: [keyof Volunteer, string][] = [
     ['contacted', 'تم التواصل'],
     ['passed_committee_test', 'اختبار اللجنة الأساسية'],
-    ['joined_group', 'دخل الجروب'],
+    ['joined_group', 'دخل الجروب (المتطوع بيعلّمها بنفسه كمان)'],
     ['is_active', 'المشاركات الفعالة'],
     ['bought_tshirt', 'اشترى التيشيرت'],
   ]
@@ -405,74 +424,6 @@ function Activities({ volunteerId }: { volunteerId: string }) {
           <RequestBadge status={p.status} />
         </div>
       ))}
-    </Card>
-  )
-}
-
-/** المتابعة: who follows this volunteer up, their notes, and why they left (for «شيت المتابعة»). */
-function FollowupCard({ v, canEdit, canNote }: { v: Volunteer; canEdit: boolean; canNote: boolean }) {
-  const qc = useQueryClient()
-  const lookups = useLookups()
-  const [f, setF] = useState({
-    follower_id: v.follower_id ?? null,
-    follower_trainee_id: v.follower_trainee_id ?? null,
-    follow_head_id: v.follow_head_id ?? null,
-    out_reason: v.out_reason ?? '',
-    follow_notes_1: v.follow_notes_1 ?? '',
-    follow_notes_2: v.follow_notes_2 ?? '',
-    follow_notes_3: v.follow_notes_3 ?? '',
-  })
-  const save = useMutation({
-    mutationFn: async () => {
-      const notes = { follow_notes_1: f.follow_notes_1 || null, follow_notes_2: f.follow_notes_2 || null, follow_notes_3: f.follow_notes_3 || null }
-      const payload = canEdit
-        ? { ...notes, follower_id: f.follower_id, follower_trainee_id: f.follower_trainee_id, follow_head_id: f.follow_head_id, out_reason: f.out_reason || null }
-        : notes
-      const { error } = await supabase.from('volunteers').update(payload).eq('id', v.id)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      toast.success('اتحفظ')
-      qc.invalidateQueries({ queryKey: ['volunteer', v.id] })
-      qc.invalidateQueries({ queryKey: ['volunteers'] })
-    },
-    onError: toastError,
-  })
-  if (!canEdit && !canNote) return null
-  return (
-    <Card>
-      <p className="mb-1 font-bold text-brand-800">المتابعة</p>
-      <p className="mb-4 text-xs text-muted">بتطلع في شيت المتابعة اللي بيتبعت كل نص شهر.</p>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Field label="المتابع">
-          <VolunteerSelect value={f.follower_id} onChange={(id) => setF({ ...f, follower_id: id })} disabled={!canEdit} />
-        </Field>
-        <Field label="متابع تحت التدريب">
-          <VolunteerSelect value={f.follower_trainee_id} onChange={(id) => setF({ ...f, follower_trainee_id: id })} disabled={!canEdit} />
-        </Field>
-        <Field label="هيد المتابعة">
-          <VolunteerSelect value={f.follow_head_id} onChange={(id) => setF({ ...f, follow_head_id: id })} disabled={!canEdit} />
-        </Field>
-        <div className="sm:col-span-3">
-          <Field label="سبب الخروج من المتابعة (الأعمدة)" hint="لو اتحدد، المتطوع بيطلع «خارج المتابعة» في الشيت">
-            <Select
-              value={f.out_reason}
-              onChange={(e) => setF({ ...f, out_reason: e.target.value })}
-              placeholder="—"
-              options={withCurrent(lookups.data?.list('سبب الخروج') ?? [], v.out_reason)}
-              disabled={!canEdit}
-            />
-          </Field>
-        </div>
-        {(['follow_notes_1', 'follow_notes_2', 'follow_notes_3'] as const).map((k, i) => (
-          <Field key={k} label={`ملاحظات ${i + 1}`}>
-            <Textarea value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} rows={2} />
-          </Field>
-        ))}
-      </div>
-      <Button className="mt-4" onClick={() => save.mutate()} loading={save.isPending}>
-        حفظ
-      </Button>
     </Card>
   )
 }

@@ -50,7 +50,7 @@ const age = (birth?: string | null) => {
 /** Builds the file for the season starting `start` (YYYY-MM-01), filling days up to `until` (YYYY-MM-DD). */
 export async function exportFollowup(start: string, until: string): Promise<{ blob: Blob; name: string; people: number }> {
   const ExcelJS = (await import('exceljs')).default
-  const [vols, priv, hr, tpl] = await Promise.all([
+  const [vols, priv, hr, tpl, fb] = await Promise.all([
     selectAll<Volunteer>('volunteers', 'full_name_ar'),
     selectAll<VolunteerPrivate>('volunteer_private', 'volunteer_id').catch(() => [] as VolunteerPrivate[]),
     selectAll<VolunteerHr>('volunteer_hr_read', 'volunteer_id').catch(() => [] as VolunteerHr[]),
@@ -58,7 +58,11 @@ export async function exportFollowup(start: string, until: string): Promise<{ bl
       if (!r.ok) throw { message: 'مقدرتش أجيب نموذج شيت المتابعة' }
       return r.arrayBuffer()
     }),
+    selectAll<{ volunteer_id: string; author_id: string | null; author_name: string | null; body: string; given_on: string }>('volunteer_feedback', 'given_on').catch(() => []),
   ])
+  // the feedback (newest first): who wrote the last one, and the last three
+  const fbBy = new Map<string, typeof fb>()
+  for (const f of [...fb].sort((a, b) => b.given_on.localeCompare(a.given_on))) fbBy.set(f.volunteer_id, [...(fbBy.get(f.volunteer_id) ?? []), f])
   const from = addMonths(start, -14)
   const { data: days, error } = await supabase.rpc('report_followup_days', { p_from: from, p_to: until })
   if (error) throw error
@@ -111,12 +115,14 @@ export async function exportFollowup(start: string, until: string): Promise<{ bl
     set('C', phone(v.phone))
     set('D', k.D)
     set('E', k.E)
-    set('H', v.follower_id ? nameBy.get(v.follower_id) : null)
-    set('I', v.follower_trainee_id ? nameBy.get(v.follower_trainee_id) : null)
-    set('J', v.follow_head_id ? nameBy.get(v.follow_head_id) : null)
-    set('K', v.follow_notes_1)
-    set('L', v.follow_notes_2)
-    set('M', v.follow_notes_3)
+    const notes = fbBy.get(v.id) ?? []
+    const writer = notes[0] ? (notes[0].author_id ? nameBy.get(notes[0].author_id) : notes[0].author_name) : null
+    set('H', writer ?? null)
+    set('I', null)
+    set('J', null)
+    set('K', notes[0]?.body ?? null)
+    set('L', notes[1]?.body ?? null)
+    set('M', notes[2]?.body ?? null)
     set('N', 'دروس التقويه')
     set('O', 'الاسكندريه')
     set('P', v.gender === 'أنثى' ? 'انثى' : v.gender)

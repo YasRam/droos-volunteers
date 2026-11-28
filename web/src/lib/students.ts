@@ -220,3 +220,13 @@ export function useStudentRules() {
   })
 }
 
+
+/** Days until the next birthday (0 = today), from a YYYY-MM-DD birth date. */
+export function daysToBirthday(birth: string | null | undefined, from = new Date()): number | null {
+  if (!birth) return null
+  const [, m, d] = birth.split('-').map(Number)
+  const base = new Date(from.getFullYear(), from.getMonth(), from.getDate())
+  let next = new Date(base.getFullYear(), m - 1, d)
+  if (next < base) next = new Date(base.getFullYear() + 1, m - 1, d)
+  return Math.round((next.getTime() - base.getTime()) / 86400_000)
+}

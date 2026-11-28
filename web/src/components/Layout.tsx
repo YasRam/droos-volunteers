@@ -32,7 +32,7 @@ import {
   IdCard,
   ScrollText,
 } from 'lucide-react'
-import { Suspense, useEffect, useMemo, useState, type ComponentType } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
 import { Spinner } from '@/components/ui'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -108,6 +108,19 @@ export default function Layout() {
   const qc = useQueryClient()
   const [moreOpen, setMoreOpen] = useState(false)
   const [bellOpen, setBellOpen] = useState(false)
+  const bellRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!bellOpen) return
+    const close = (e: PointerEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !bellRef.current?.contains(e.target as Node)) setBellOpen(false)
+    }
+    document.addEventListener('pointerdown', close)
+    document.addEventListener('keydown', close)
+    return () => {
+      document.removeEventListener('pointerdown', close)
+      document.removeEventListener('keydown', close)
+    }
+  }, [bellOpen])
   const teaches = useTeaches(p.volunteerId)
   const pending = usePendingCount(p.canReview || p.can('tshirts.manage') || p.can('certificates.review') || p.can('absences.review') || p.can('hr.edit') || p.can('volunteers.edit'))
   const notifications = useNotifications(me?.email ?? null)
@@ -235,7 +248,7 @@ export default function Layout() {
             <span className="font-bold">{displayName}</span>
             {roleLabel && <span className="text-sm text-muted">{' · '}{roleLabel}</span>}
           </div>
-          <div className="relative">
+          <div className="relative" ref={bellRef}>
             <button
               onClick={() => {
                 setBellOpen((o) => !o)
@@ -259,7 +272,10 @@ export default function Layout() {
                     notifications.data.map((n) => (
                       <button
                         key={n.id}
-                        onClick={() => n.link && navigate(n.link)}
+                        onClick={() => {
+                          setBellOpen(false)
+                          if (n.link) navigate(n.link)
+                        }}
                         className={clsx('block w-full border-b border-line px-4 py-3 text-start hover:bg-surface', !n.read_at && 'bg-brand-50/50')}
                       >
                         <p className="text-sm font-semibold">{n.title}</p>

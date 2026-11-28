@@ -1,12 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, ArrowRight, CheckCircle2, Eye, FileSpreadsheet, Upload } from 'lucide-react'
+import { AlertTriangle, ArrowRight, CheckCircle2, Download, Eye, FileSpreadsheet, Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
 import { Badge, Button, Card, Field, Input, PageHeader } from '@/components/ui'
 import { toastError } from '@/lib/errors'
 import { readStudentWorkbook, type SheetPayload, type SheetReport } from '@/lib/studentSheet'
-import { sdb, useCurrentTerm, useMarks } from '@/lib/students'
+import { sdb, useCurrentTerm, useGrades, useMarks } from '@/lib/students'
+import { downloadStudentTemplate } from '@/lib/studentTemplate'
 
 type Result = Record<string, number | boolean>
 
@@ -31,6 +32,7 @@ export default function StudentImport() {
   const qc = useQueryClient()
   const current = useCurrentTerm()
   const marks = useMarks()
+  const grades = useGrades()
   const file = useRef<HTMLInputElement>(null)
   const [term, setTerm] = useState<SheetPayload['term'] | null>(null)
   const [parsed, setParsed] = useState<{ name: string; payload: SheetPayload; report: SheetReport } | null>(null)
@@ -80,11 +82,16 @@ export default function StudentImport() {
         title="رفع شيت الطلاب"
         subtitle="بيانات الطلاب والحضور من شيت جوجل. تقدر ترفعه تاني بعد ما يتحدّث: اللي موجود مش بيتكرر."
         actions={
+          <>
+          <Button variant="secondary" disabled={!grades.data || !marks.data} onClick={() => downloadStudentTemplate(grades.data ?? [], (marks.data ?? []).map((m) => m.code)).catch(toastError)}>
+            <Download className="size-4" /> نزّل الشيت الفاضي
+          </Button>
           <Link to="/students">
             <Button variant="secondary">
               <ArrowRight className="size-4" /> الطلاب
             </Button>
           </Link>
+          </>
         }
       />
 

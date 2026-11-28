@@ -2,6 +2,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { ArrowLeft, Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { VolunteerName } from '@/components/VolunteerLink'
 import { Badge, Button, Card, Empty, Input, PageHeader, Select, Spinner } from '@/components/ui'
 import { fmtDateTime, fmtShort, fmtTime } from '@/lib/data'
@@ -11,20 +12,29 @@ import { REQUEST_LABEL, type AuditRow, type RequestStatus } from '@/lib/types'
 
 type Row = Record<string, unknown>
 
+/** Each section of the log and the tables it covers. */
+const SECTIONS: { key: string; label: string; tables: string[] }[] = [
+  { key: 'vol', label: 'بيانات المتطوعين', tables: ['volunteers', 'volunteer_private', 'volunteer_hr', 'profile_requests', 'registration_requests'] },
+  { key: 'fb', label: 'الفيد باك', tables: ['volunteer_feedback', 'feedback'] },
+  { key: 'acts', label: 'المشاركات والاجتماعات', tables: ['participations', 'group_activities', 'meetings', 'meeting_photos'] },
+  { key: 'classes', label: 'الحصص', tables: ['schedule_slots', 'class_sessions', 'audiences', 'class_absences', 'slot_requests', 'schedule_pauses'] },
+  { key: 'stu', label: 'بيانات الطلاب', tables: ['students', 'student_private', 'phones', 'guardians', 'care_notes', 'family_finance', 'change_requests'] },
+  { key: 'adm', label: 'القبول والمجموعات', tables: ['applications', 'enrollments', 'terms', 'groups', 'group_members', 'whatsapp_groups'] },
+  { key: 'att', label: 'الغياب والسلوك', tables: ['attendance', 'exam_results', 'flags', 'leaves', 'notes', 'dismissal_requests'] },
+  { key: 'perm', label: 'الصلاحيات', tables: ['staff_roles', 'roles', 'committee_leaders'] },
+  { key: 'req', label: 'الطلبات', tables: ['certificate_requests', 'tshirt_requests', 'camp_registrations'] },
+  { key: 'set', label: 'الإعدادات', tables: ['lookups', 'stages', 'camps', 'activity_rules', 'rules', 'backup'] },
+]
 const AREAS: Record<string, string> = {
-  volunteers: 'بيانات المتطوعين',
-  volunteer_private: 'الرقم القومي',
-  volunteer_hr: 'المقابلة',
-  participations: 'المشاركات',
-  group_activities: 'نشاط جماعي',
-  schedule_slots: 'جدول الحصص',
-  staff_roles: 'الصلاحيات',
-  roles: 'أنواع الصلاحيات',
-  committee_leaders: 'ليدر اللجان',
-  lookups: 'القوائم',
-  certificate_requests: 'شهادات التطوع',
-  backup: 'النسخ الاحتياطية',
-  meetings: 'الاجتماعات',
+  volunteers: 'بيانات المتطوعين', volunteer_private: 'الرقم القومي', volunteer_hr: 'المقابلة', participations: 'المشاركات',
+  group_activities: 'نشاط جماعي', schedule_slots: 'الحصص الأسبوعية', staff_roles: 'الصلاحيات', roles: 'أنواع الصلاحيات',
+  committee_leaders: 'ليدر اللجان', lookups: 'القوائم', certificate_requests: 'شهادات التطوع', backup: 'النسخ الاحتياطية',
+  meetings: 'الاجتماعات', profile_requests: 'طلبات تعديل البيانات', volunteer_feedback: 'فيد باك متطوع', feedback: 'فيد باك طالب',
+  students: 'الطلاب', student_private: 'بيانات الطالب الحساسة', phones: 'أرقام ولي الأمر', guardians: 'أولياء الأمور',
+  care_notes: 'ملاحظات للتنظيم', family_finance: 'دخل الأسرة', applications: 'طلبات الالتحاق', enrollments: 'التقييد',
+  groups: 'المجموعات', group_members: 'أعضاء المجموعات', attendance: 'الغياب', exam_results: 'الدرجات', flags: 'إجراءات',
+  leaves: 'الإجازات', class_sessions: 'الحصص بالتاريخ', audiences: 'الحصة لمين', class_absences: 'اعتذارات المدرسين',
+  slot_requests: 'طلبات الحصص', schedule_pauses: 'إيقاف الحصص', dismissal_requests: 'طلبات الفصل', terms: 'الترمات',
 }
 
 const FIELD: Record<string, string> = {
@@ -150,6 +160,19 @@ function sentence(r: AuditRow): string {
       return r.action === 'INSERT' ? `${who} طلب شهادة تطوع` : `رد على طلب شهادة ${who}: ${show(n?.status, 'status')}`
     case 'meetings':
       return r.action === 'INSERT' ? `سجّل اجتماع ${n?.committee} يوم ${show(n?.meeting_date)}` : r.action === 'DELETE' ? `مسح اجتماع ${o?.committee} يوم ${show(o?.meeting_date)}` : `عدّل اجتماع ${n?.committee}`
+    case 'students':
+      return r.action === 'INSERT' ? `ضاف طالب: ${who}` : r.action === 'DELETE' ? `مسح الطالب ${who}` : `عدّل بيانات الطالب ${who}`
+    case 'attendance':
+      return `سجّل «${String(n?.mark ?? o?.mark ?? '')}» للطالب ${who}`
+    case 'applications':
+      return r.action === 'INSERT' ? `طلب التحاق لـ ${who}` : `غيّر طلب التحاق ${who}: ${show(n?.status)}`
+    case 'enrollments':
+      return r.action === 'INSERT' ? `قيّد ${who} في ${String(n?.grade ?? '')}` : `غيّر تقييد ${who}${n?.status !== o?.status ? `: ${show(n?.status)}` : ''}`
+    case 'volunteer_feedback':
+    case 'feedback':
+      return r.action === 'DELETE' ? `مسح فيد باك عن ${who}` : `كتب فيد باك عن ${who}`
+    case 'class_sessions':
+      return r.action === 'INSERT' ? `اتعملت حصة ${String(n?.subject ?? '')} يوم ${show(n?.on_date)}` : `عدّل حصة ${String(n?.subject ?? o?.subject ?? '')} يوم ${show((n ?? o)?.on_date)}${n?.status !== o?.status ? `: ${show(n?.status)}` : ''}`
     case 'backup':
       return `استرجع نسخة احتياطية متاخدة ${n?.exported_at ? fmtDateTime(String(n.exported_at)) : ''} (كل البيانات اترجعت لحالتها وقتها)`
     default:
@@ -181,7 +204,7 @@ function PermissionChanges({ r }: { r: AuditRow }) {
   )
 }
 
-const PAGE = 100
+const PAGE = 60
 const TONE = { INSERT: 'green', UPDATE: 'blue', DELETE: 'red' } as const
 const VERB = { INSERT: 'إضافة', UPDATE: 'تعديل', DELETE: 'مسح' } as const
 
@@ -192,11 +215,11 @@ export default function AuditLog() {
   const actors = useQuery({
     queryKey: ['audit-actors'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('audit_log_read').select('actor_email, actor_name').order('at', { ascending: false }).limit(2000)
+      const { data, error } = await supabase.rpc('audit_actors')
       if (error) throw error
-      const m = new Map<string, string>()
-      for (const r of data as { actor_email: string | null; actor_name: string | null }[]) if (r.actor_email && !m.has(r.actor_email)) m.set(r.actor_email, r.actor_name ?? r.actor_email)
-      return [...m.entries()].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label, 'ar'))
+      return (data as { actor_email: string; actor_name: string }[])
+        .map((r) => ({ value: r.actor_email, label: r.actor_name }))
+        .sort((a, b) => a.label.localeCompare(b.label, 'ar'))
     },
   })
   const q = useInfiniteQuery({
@@ -204,10 +227,12 @@ export default function AuditLog() {
     initialPageParam: 0,
     getNextPageParam: (last: AuditRow[], all) => (last.length === PAGE ? all.length * PAGE : undefined),
     queryFn: async ({ pageParam }) => {
-      let query = supabase.from('audit_log_read').select('*').order('at', { ascending: false }).range(pageParam, pageParam + PAGE - 1)
-      if (area) query = query.eq('table_name', area)
-      if (actor) query = query.eq('actor_email', actor)
-      const { data, error } = await query
+      const { data, error } = await supabase.rpc('audit_feed', {
+        p_tables: area ? (SECTIONS.find((x) => x.key === area)?.tables ?? null) : null,
+        p_actor: actor || null,
+        p_offset: pageParam,
+        p_limit: PAGE,
+      })
       if (error) throw error
       return data as AuditRow[]
     },
@@ -222,7 +247,7 @@ export default function AuditLog() {
     <>
       <PageHeader title="السجل" subtitle="كل تغيير في السيستم: مين عمله، وعمل إيه، وإيه اللي اتغير" />
       <Card className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Select value={area} onChange={(e) => setArea(e.target.value)} placeholder="كل الأقسام" options={Object.entries(AREAS).map(([value, label]) => ({ value, label }))} />
+        <Select value={area} onChange={(e) => setArea(e.target.value)} placeholder="كل الأقسام" options={SECTIONS.map((x) => ({ value: x.key, label: x.label }))} />
         <Select value={actor} onChange={(e) => setActor(e.target.value)} placeholder="كل الناس" options={actors.data ?? []} />
         <div className="relative">
           <Search className="absolute start-3 top-2.5 size-5 text-muted" />
@@ -246,6 +271,11 @@ export default function AuditLog() {
                 </div>
                 <p className="mt-1 text-sm">
                   <span className={clsx('font-bold', r.actor_name === 'السيستم' ? 'text-muted' : 'text-brand-800')}>{r.actor_name ?? '—'}</span> {sentence(r)}
+                  {r.target_student_id && (
+                    <Link to={`/students/${r.target_student_id}`} className="ms-1 text-xs text-brand-700">
+                      (الملف)
+                    </Link>
+                  )}
                   {r.target_volunteer_id && (
                     <>
                       {' '}

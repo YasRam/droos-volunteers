@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AbsenceRequests } from '@/components/ClassAbsence'
+import { Pauses } from '@/components/Pauses'
 import { PageHeader, Spinner, Tabs } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
 
@@ -8,7 +9,7 @@ const DayView = lazy(() => import('./students/Classes').then((m) => ({ default: 
 const Schedule = lazy(() => import('./Schedule'))
 const SlotRequests = lazy(() => import('./students/StudentRequests').then((m) => ({ default: m.SlotRequests })))
 
-type Tab = 'today' | 'week' | 'requests'
+type Tab = 'today' | 'week' | 'pauses' | 'requests'
 
 /**
  * الحصص: one class for volunteers and students.
@@ -23,6 +24,7 @@ export default function Classes() {
   const tabs = [
     { value: 'today' as Tab, label: 'النهارده' },
     { value: 'week' as Tab, label: 'الجدول الأسبوعي' },
+    { value: 'pauses' as Tab, label: 'الإيقافات' },
     ...(reviews ? [{ value: 'requests' as Tab, label: 'الطلبات' }] : []),
   ]
   // old links: /schedule?absence=… opens the week; /classes?date=… opens that day
@@ -43,6 +45,7 @@ export default function Classes() {
       <Suspense fallback={<Spinner />}>
         {tab === 'today' && <DayView />}
         {tab === 'week' && <Schedule embedded />}
+        {tab === 'pauses' && <Pauses />}
         {tab === 'requests' && (
           <div className="space-y-6">
             <section>

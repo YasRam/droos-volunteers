@@ -9,11 +9,12 @@ import { z } from 'zod'
 import { CertificateCard } from '@/components/CertificateCard'
 import { VolunteerFacts } from '@/components/VolunteerFacts'
 import { useVolunteerPhoto } from '@/components/VolunteerPhoto'
+import { MyGroupsCard } from '@/components/MyGroups'
 import MyActivities from '@/pages/MyActivities'
 import { Link } from 'react-router-dom'
 import { Button, Card, Field, Input, Modal, PageHeader, Spinner, Textarea } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
-import { fmtShort, useSetting } from '@/lib/data'
+import { fmtShort } from '@/lib/data'
 import { toastError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import type { Volunteer, VolunteerPrivate } from '@/lib/types'
@@ -217,7 +218,6 @@ function useMyRequest(volunteerId: string | null) {
 /** بياناتي: everything about the volunteer to read. Changes (and the photo) go as a request to HR. */
 export default function MyProfile() {
   const { volunteerId, can } = usePermissions()
-  const groupLink = useSetting('whatsapp_group_link')
   const [editing, setEditing] = useState(false)
   const q = useQuery({
     queryKey: ['volunteer', volunteerId],
@@ -301,11 +301,7 @@ export default function MyProfile() {
           <VolunteerFacts v={v} />
           <NationalIdCard volunteerId={v.id} canEdit={can('national_id.edit')} />
           <CertificateCard volunteerId={v.id} />
-          {groupLink.data && !v.joined_group && (
-            <a href={groupLink.data} target="_blank" rel="noreferrer">
-              <Button className="w-full">ادخل جروب الواتساب</Button>
-            </a>
-          )}
+          <MyGroupsCard volunteerId={v.id} joined={Boolean(v.joined_group)} />
         </div>
       </div>
       {editing && <EditRequestModal v={v} pending={pending} photoUrl={photo.url} nationalId={priv.data?.national_id ?? null} onClose={() => setEditing(false)} />}

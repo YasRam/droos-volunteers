@@ -56,6 +56,12 @@ export default function StudentRequests() {
         value={tab}
         onChange={setTab}
       />
+      {tab === 'dismissals' && (
+        <p className="mb-3 rounded-xl bg-surface p-3 text-sm text-muted">
+          الطلبات دي السيستم بيعملها لوحده لما غياب الطالب من غير عذر يوصل لحد الفصل اللي في الإعدادات (بعد التحذير). التنظيم بيقرر:
+          «افصل» يخلّي حالته «مفصول» في الترم ده بس (يقدر يتقدّم الترم الجاي)، و«ميتفصلش» يقفل الطلب.
+        </p>
+      )}
       {tab === 'dismissals' && (!d.dismissals.length ? <Empty title="مفيش طلبات فصل" /> : (
         <div className="space-y-2">
           {d.dismissals.map((r) => (

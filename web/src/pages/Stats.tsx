@@ -9,7 +9,7 @@ import { addDays, cairoToday, fmtShort, useVolunteers, whatsappLink } from '@/li
 import { supabase } from '@/lib/supabase'
 import type { MonthlyParticipation } from '@/lib/types'
 
-type Tab = 'overview' | 'top' | 'responsible' | 'inactive' | 'birthdays'
+type Tab = 'overview' | 'people' | 'top' | 'responsible' | 'inactive' | 'feedback' | 'birthdays'
 const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
 const monthLabel = (ym: string) => `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(2, 4)}`
 
@@ -18,9 +18,11 @@ export default function Stats() {
   const [params, setParams] = useSearchParams()
   const tabs = [
     ...(p.staff || p.viewAll ? [{ value: 'overview' as Tab, label: 'نظرة عامة' }] : []),
+    ...(p.viewAll ? [{ value: 'people' as Tab, label: 'المتطوعين' }] : []),
     ...(p.can('stats.view') || p.leader ? [{ value: 'top' as Tab, label: 'الأكتر مشاركة' }] : []),
     ...(p.viewAll ? [{ value: 'responsible' as Tab, label: 'المسئولين والمشروع' }] : []),
     ...(p.viewAll ? [{ value: 'inactive' as Tab, label: 'مش بيشاركوا' }] : []),
+    ...(p.can('volunteers.edit') || p.can('hr.edit') || p.can('hr.notes') || p.leader ? [{ value: 'feedback' as Tab, label: 'محتاجين فيد باك' }] : []),
     ...(p.viewAll || p.leader ? [{ value: 'birthdays' as Tab, label: 'أعياد الميلاد' }] : []),
   ]
   const tab = (tabs.find((t) => t.value === params.get('tab'))?.value ?? tabs[0]?.value) as Tab
@@ -33,6 +35,8 @@ export default function Stats() {
       {tab === 'responsible' && <Responsible />}
       {tab === 'inactive' && <Inactive />}
       {tab === 'birthdays' && <Birthdays />}
+      {tab === 'people' && <People />}
+      {tab === 'feedback' && <FeedbackDue kind="volunteer" />}
     </>
   )
 }
@@ -371,5 +375,79 @@ function TopParticipants() {
         </Card>
       )}
     </>
+  )
+}
+
+/** Counts of the volunteers: by status, committee, gender, joined the group, journey. */
+function People() {
+  const vols = useVolunteers()
+  if (vols.isLoading) return <Spinner />
+  const list = vols.data ?? []
+  const by = (f: (v: (typeof list)[number]) => string | null | undefined) => {
+    const m = new Map<string, number>()
+    for (const v of list) {
+      const k = f(v) || '—'
+      m.set(k, (m.get(k) ?? 0) + 1)
+    }
+    return [...m.entries()].sort((a, b) => b[1] - a[1])
+  }
+  const inside = list.filter((v) => v.status !== 'خارج المتابعة')
+  const pct = (n: number) => (inside.length ? `${Math.round((n / inside.length) * 100)}%` : '—')
+  const box = (title: string, rows: [string, number][]) => (
+    <Card>
+      <h2 className="mb-2 font-bold">{title}</h2>
+      <ul className="space-y-1.5">
+        {rows.map(([k, n]) => (
+          <li key={k} className="text-sm">
+            <div className="flex justify-between"><span>{k}</span><span className="font-bold">{n}</span></div>
+            <div className="mt-0.5 h-1.5 rounded-full bg-surface"><div className="h-1.5 rounded-full bg-brand-600" style={{ width: `${(n / Math.max(...rows.map((r) => r[1]))) * 100}%` }} /></div>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  )
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="كل المتطوعين" value={list.length} />
+        <Stat label="داخل المتابعة" value={inside.length} tone="green" />
+        <Stat label="دخلوا الجروب" value={pct(inside.filter((v) => v.joined_group).length)} />
+        <Stat label="حضروا الكامب" value={pct(inside.filter((v) => v.attended_camp).length)} />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {box('حسب الحالة', by((v) => v.status))}
+        {box('حسب اللجنة الأساسية (داخل المتابعة)', by((v) => (v.status === 'خارج المتابعة' ? null : v.main_committee)).filter(([k]) => k !== '—' || true))}
+        {box('حسب النوع', by((v) => v.gender))}
+        {box('حسب السنة الدراسية', by((v) => v.study_year))}
+        {box('حسب المنطقة', by((v) => v.area).slice(0, 12))}
+        {box('سبب الخروج من المتابعة', by((v) => (v.status === 'خارج المتابعة' ? v.out_reason : undefined)).filter(([k]) => k !== '—'))}
+      </div>
+    </div>
+  )
+}
+
+/** Volunteers (or students) with no feedback in the last 3 months. */
+export function FeedbackDue({ kind }: { kind: 'volunteer' | 'student' }) {
+  const q = useQuery({
+    queryKey: ['feedback-due'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('feedback_due')
+      if (error) throw error
+      return data as { kind: string; id: string; name: string; last_on: string | null }[]
+    },
+  })
+  const rows = (q.data ?? []).filter((r) => r.kind === kind).sort((a, b) => (a.last_on ?? '').localeCompare(b.last_on ?? ''))
+  if (q.isLoading) return <Spinner />
+  if (!rows.length) return <Empty title="كله واخد فيد باك في آخر 3 شهور" />
+  return (
+    <Card className="divide-y divide-line p-0">
+      <p className="px-4 py-3 text-sm text-muted">{rows.length} {kind === 'volunteer' ? 'متطوع' : 'طالب'} مخدوش فيد باك من 3 شهور أو أكتر.</p>
+      {rows.map((r) => (
+        <Link key={r.id} to={kind === 'volunteer' ? `/volunteers/${r.id}` : `/students/${r.id}`} className="flex items-center justify-between gap-2 px-4 py-2.5 text-sm hover:bg-surface">
+          <span className="font-semibold">{r.name}</span>
+          <span className="text-xs text-muted">{r.last_on ? `آخر واحد ${fmtShort(r.last_on)}` : 'ولا مرة'}</span>
+        </Link>
+      ))}
+    </Card>
   )
 }

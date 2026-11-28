@@ -29,6 +29,7 @@ export function Button({
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: 'sm' | 'md' | 'lg'; loading?: boolean }) {
   return (
     <button
+      type="button"
       {...rest}
       disabled={disabled || loading}
       className={cn(

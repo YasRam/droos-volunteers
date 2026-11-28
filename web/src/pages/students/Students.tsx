@@ -1,11 +1,11 @@
 import clsx from 'clsx'
-import { Filter, Plus, Search, Upload } from 'lucide-react'
+import { Cake, Filter, Plus, Search, Upload } from 'lucide-react'
 import { lazy, useMemo, useState } from 'react'
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { Badge, Button, Card, Empty, Field, Input, PageHeader, Select, Spinner } from '@/components/ui'
 import { usePermissions } from '@/lib/auth'
 import { ageFrom } from '@/lib/data'
-import { ENROLLMENT_STATUSES, ENROLLMENT_TONE, useCurrentTerm, useGrades, useGroups, useStudents } from '@/lib/students'
+import { daysToBirthday, ENROLLMENT_STATUSES, ENROLLMENT_TONE, useCurrentTerm, useGrades, useGroups, useStudents } from '@/lib/students'
 import { useQuery } from '@tanstack/react-query'
 import { sdb } from '@/lib/students'
 
@@ -192,6 +192,7 @@ function StudentList() {
           )}
         </Card>
       )}
+      <Birthdays list={students.data ?? []} />
       {students.isLoading ? (
         <Spinner />
       ) : !rows.length ? (
@@ -227,5 +228,42 @@ function StudentList() {
         </Card>
       )}
     </>
+  )
+}
+
+/** Students (this term) whose birthday is in the coming two weeks. */
+function Birthdays({ list }: { list: { id: string; full_name: string; birth_date: string | null; enrollment?: { grade: string } | null }[] }) {
+  const [open, setOpen] = useState(false)
+  const soon = list
+    .filter((s) => s.enrollment)
+    .map((s) => ({ ...s, days: daysToBirthday(s.birth_date) }))
+    .filter((s): s is typeof s & { days: number } => s.days !== null && s.days <= 14)
+    .sort((a, b) => a.days - b.days)
+  if (!soon.length) return null
+  const today = soon.filter((s) => s.days === 0)
+  return (
+    <Card className="mb-3 bg-pink-50 ring-pink-200">
+      <button type="button" className="flex w-full flex-wrap items-center gap-2 text-start" onClick={() => setOpen(!open)}>
+        <Cake className="size-5 text-pink-600" />
+        <span className="font-bold">أعياد ميلاد الطلاب</span>
+        <span className="text-sm text-muted">
+          {today.length ? `النهارده: ${today.map((s) => s.full_name.split(' ')[0]).join('، ')} · ` : ''}
+          {soon.length} خلال أسبوعين
+        </span>
+        <span className="ms-auto text-xs text-brand-700">{open ? 'إخفاء' : 'عرض'}</span>
+      </button>
+      {open && (
+        <ul className="mt-2 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+          {soon.map((s) => (
+            <li key={s.id} className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-1.5 text-sm">
+              <Link to={`/students/${s.id}`} className="truncate font-semibold hover:underline">{s.full_name}</Link>
+              <span className="shrink-0 text-xs text-muted">
+                {s.enrollment?.grade} · {s.days === 0 ? 'النهارده 🎂' : s.days === 1 ? 'بكرة' : `بعد ${s.days} يوم`}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   )
 }
